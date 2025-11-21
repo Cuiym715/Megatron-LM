@@ -46,7 +46,7 @@ class MegatronModule(torch.nn.Module):
             return self.word_embeddings.weight
 
 
-    def initialize_word_embeddings(self, init_method_normal):
+    def initialize_word_embeddings(self, init_method):
         args = get_args()
         if not self.share_word_embeddings:
             raise Exception('initialize_word_embeddings() was called but '
@@ -77,7 +77,7 @@ class MegatronModule(torch.nn.Module):
             # stage's weights using all_reduce below.
             self.word_embeddings = tensor_parallel.VocabParallelEmbedding(
                 args.padded_vocab_size, args.hidden_size,
-                init_method=init_method_normal(args.init_method_std),
+                init_method=init_method,
                 params_dtype=args.params_dtype,
                 use_cpu_initialization=args.use_cpu_initialization,
                 perform_initialization=args.perform_initialization)
@@ -170,6 +170,8 @@ class Float16Module(MegatronModule):
         else:
             raise Exception('should not be here')
 
+        self.convert_output = not args.kaimm_vocab_in_pipeline_parallel
+
         self.float16_convertor = float16_convertor
 
 
@@ -181,7 +183,7 @@ class Float16Module(MegatronModule):
         if mpu.is_pipeline_first_stage():
             inputs = fp32_to_float16(inputs, self.float16_convertor)
         outputs = self.module(*inputs, **kwargs)
-        if mpu.is_pipeline_last_stage():
+        if self.convert_output and mpu.is_pipeline_last_stage():
             outputs = float16_to_fp32(outputs)
         return outputs
 

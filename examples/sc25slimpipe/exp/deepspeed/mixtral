@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Import configuration files
+MODEL=${MODEL:-"8x7b"}
+source "$SCRIPT_DIR/model/$MODEL"
+SEQ_LENGTH=${SEQUENCE_LENGTH:-}
+source "$SCRIPT_DIR/optimizer/llama1"
+source "$SCRIPT_DIR/dataset/llama3_128256"
+
+# Model configuration
+GLOBAL_BATCH_SIZE=${GLOBAL_BATCH_SIZE:-8}
+MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-1}
+TRAIN_ITERS=${TRAIN_ITERS:-20}
+
+# Parallelism configuration
+# Parallelism configuration
+TP=${TP:-8}       # Tensor Parallelism
+SP=${SP:-1}       # Sequence Parallelism
+EP=${EP:-1}       # Expert Parallelism
+ZERO=${ZERO:-1}    # Zero Redundancy Optimizer
+
+# Efficiency settings
+RECOMPUTE=${RECOMPUTE:-"no"}
+ALLOC_CONF=${ALLOC_CONF:-0}
+
+# Logging and checkpointing
+LOG_DIR=${LOG_DIR:-$SCRIPT_DIR/logs}
+LOG_INTERVAL=1
+TENSORBOARD_DIR=
+LOAD=
+SAVE=$LOAD
+SAVE_INTERVAL=1000
+
+# Profiling
+PROFILE=${PROFILE:-0}

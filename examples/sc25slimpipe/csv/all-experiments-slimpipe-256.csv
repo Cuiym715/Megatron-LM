@@ -1,0 +1,19 @@
+#GPUs,s,Model,B,b,t,c,p,e,d,n,v,l,recompute,Peak Memory (GiB),Parameter+Gradient Memory (GiB),Optimizer Memory (GiB),Activation Memory (GiB),Output Memory (GiB),Recomputed Memory (GiB),KV Cache Memory (GiB),KV Gradient Memory (GiB),Bubble Ratio
+#256,65536,LLaMA-150B-GQA,64,1,8,1,4,1,8,4,24,1,partial+fc1,55.35
+#256,131072,LLaMA-150B-GQA,32,1,8,1,8,1,4,8,12,1,partial+fc1,44.15
+#256,262144,LLaMA-150B-GQA,16,1,4,2,16,1,2,16,6,1,partial+fc1,47.61
+#256,524288,LLaMA-150B-GQA,8,1,4,4,16,1,1,16,6,1,partial+fc1,48.48
+#256,65536,LLaMA-70B-GQA,64,1,8,1,4,1,8,4,20,1,no,56.73
+#256,131072,LLaMA-70B-GQA,32,1,8,1,8,1,4,8,10,1,no,54.57
+#256,262144,LLaMA-70B-GQA,16,1,4,2,8,1,4,16,10,1,partial+fc1,42.73
+#256,524288,LLaMA-70B-GQA,8,1,4,2,16,1,2,32,5,1,partial+fc1,40.13
+#256,65536,Mixtral-8x22B,64,1,1,2,8,8,16,8,7,1,partial+fc1,47.13
+#256,131072,Mixtral-8x22B,32,1,1,4,8,8,8,8,7,1,partial+fc1,47.32
+#256,262144,Mixtral-8x22B,16,1,1,8,8,8,4,8,7,1,partial+fc1,48.79
+#256,524288,Mixtral-8x22B,8,1,1,16,8,8,2,8,7,1,partial+fc1,52.58
+#256,65536,Mixtral-8x7B,64,1,1,4,4,8,16,4,8,1,no,50.12
+#256,131072,Mixtral-8x7B,32,1,1,4,8,8,8,8,4,1,no,52.61
+#256,262144,Mixtral-8x7B,16,1,1,8,8,8,4,8,4,1,no,53.50
+256,262144,Mixtral-8x7B,16,1,1,16,4,8,4,4,8,1,no,45.14
+#256,524288,Mixtral-8x7B,8,1,1,8,8,8,4,16,8,1,partial+fc1,30.69
+256,524288,Mixtral-8x7B,8,1,1,16,8,8,2,8,4,1,no,46.78

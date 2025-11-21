@@ -3,13 +3,17 @@
 """Megatron arguments."""
 
 import argparse
+import dataclasses
 import json
 import os
 import torch
 import types
 
+import torch.nn.functional as F
 from megatron.global_vars import set_retro_args, get_retro_args
 from tools.retro.utils import get_args_path as get_retro_args_path
+
+from megatron.core.transformer import TransformerConfig
 
 
 def parse_args(extra_args_provider=None, ignore_unknown_args=False):
@@ -31,11 +35,14 @@ def parse_args(extra_args_provider=None, ignore_unknown_args=False):
     parser = _add_autoresume_args(parser)
     parser = _add_biencoder_args(parser)
     parser = _add_vision_args(parser)
+    parser = _add_moe_args(parser)
     parser = _add_logging_args(parser)
     parser = _add_inference_args(parser)
     parser = _add_transformer_engine_args(parser)
     parser = _add_retro_args(parser)
     parser = _add_llama_args(parser)
+    parser = _add_stability_args(parser)
+    parser = _add_experimental_args(parser)
 
     # Custom arguments.
     if extra_args_provider is not None:
@@ -56,7 +63,10 @@ def parse_args(extra_args_provider=None, ignore_unknown_args=False):
         args.rank = int(os.environ['OMPI_COMM_WORLD_RANK'])
         args.local_rank = int(os.environ['OMPI_COMM_WORLD_LOCAL_RANK'])
         args.world_size = int(os.environ['OMPI_COMM_WORLD_SIZE'])
-
+        addr, port = args.master_addr.split(':')
+        os.environ['MASTER_ADDR'] = addr
+        os.environ['MASTER_PORT'] = port
+        delattr(args, 'master_addr')
     return args
 
 def validate_args(args, defaults={}):
@@ -78,7 +88,7 @@ def validate_args(args, defaults={}):
     # Checks.
     model_parallel_size = args.pipeline_model_parallel_size * \
                           args.tensor_model_parallel_size
-    assert args.world_size % model_parallel_size == 0, 'world size is not'\
+    assert args.world_size % model_parallel_size == 0, 'world size ({}) is not'\
         ' divisible by tensor parallel size ({}) times pipeline parallel ' \
         'size ({})'.format(args.world_size, args.tensor_model_parallel_size,
                            args.pipeline_model_parallel_size)
@@ -148,15 +158,19 @@ def validate_args(args, defaults={}):
                 args.global_batch_size), flush=True)
     assert args.global_batch_size > 0
     if args.num_layers_per_virtual_pipeline_stage is not None:
-        assert args.pipeline_model_parallel_size > 2, \
-            'pipeline-model-parallel size should be greater than 2 with ' \
+        assert args.pipeline_model_parallel_size >= 2, \
+            'pipeline-model-parallel size should be greater than or equal to 2 with ' \
             'interleaved schedule'
-        assert args.num_layers % args.num_layers_per_virtual_pipeline_stage == 0, \
-            'number of layers is not divisible by number of layers per virtual ' \
-            'pipeline stage'
+        num_layers_including_padding_layers = args.kaimm_num_layers_padding_front + args.num_layers + args.kaimm_num_layers_padding_back
+        assert num_layers_including_padding_layers % (args.transformer_pipeline_model_parallel_size * args.num_layers_per_virtual_pipeline_stage) == 0, \
+            f'num_layers_including_padding_layers ({num_layers_including_padding_layers}) is not divisible ' \
+            f'by transformer_pipeline_model_parallel_size ({args.transformer_pipeline_model_parallel_size}) ' \
+            f'times num_layers_per_virtual_pipeline_stage ({args.num_layers_per_virtual_pipeline_stage})'
         args.virtual_pipeline_model_parallel_size = \
-            (args.num_layers // args.transformer_pipeline_model_parallel_size) // \
+            (num_layers_including_padding_layers // args.transformer_pipeline_model_parallel_size) // \
             args.num_layers_per_virtual_pipeline_stage
+        assert args.virtual_pipeline_model_parallel_size >= 2 or args.micro_seq_length > 0, \
+            'vpp should be greater than or equal to 2 with interleaved schedule'
     else:
         args.virtual_pipeline_model_parallel_size = None
 
@@ -258,19 +272,22 @@ def validate_args(args, defaults={}):
 
     # Checks.
     if args.ffn_hidden_size is None:
-        if args.swiglu:
-            # reduce the dimnesion for MLP since projections happens on
-            # two linear layers. this keeps the number of paramters in
-            # the same ballpark as the counterpart with 4*h size
-            # we keep it a multiple of 64, which means the actual tensor size
-            # will be a multiple of 64 / tp_size
-            args.ffn_hidden_size = int((4 * args.hidden_size * 2 / 3) / 64) * 64
-        else:
-            args.ffn_hidden_size = 4 * args.hidden_size
+        args.ffn_hidden_size = 4 * args.hidden_size
+
+    # if args.swiglu:
+    #     # reduce the dimnesion for MLP since projections happens on
+    #     # two linear layers. this keeps the number of paramters in
+    #     # the same ballpark as the counterpart with 4*h size
+    #     # we keep it a multiple of 64, which means the actual tensor size
+    #     # will be a multiple of 64 / tp_size
+    #     args.ffn_hidden_size = int((4 * args.hidden_size * 2 / 3) / 64) * 64
 
     if args.kv_channels is None:
         assert args.hidden_size % args.num_attention_heads == 0
         args.kv_channels = args.hidden_size // args.num_attention_heads
+
+    if args.kaimm_post_lm_processing_slice_size is not None:
+        assert args.kaimm_post_lm_processing_slice_size % args.context_parallel_size == 0
 
     if args.seq_length is not None:
         assert args.encoder_seq_length is None
@@ -283,6 +300,13 @@ def validate_args(args, defaults={}):
         assert args.max_position_embeddings >= args.seq_length
     if args.decoder_seq_length is not None:
         assert args.max_position_embeddings >= args.decoder_seq_length
+    # TODO(lizhouyang): support uneven length of micro sequences.
+    if args.micro_seq_length:
+        assert args.seq_length % args.micro_seq_length == 0
+        if args.num_layers_per_virtual_pipeline_stage is not None:
+            num_slices_per_seq = args.seq_length // args.micro_seq_length
+            assert num_slices_per_seq >= args.pipeline_model_parallel_size, \
+                "not enough slices per microbatch, at least pipeline paralell size."
     if args.lr is not None:
         assert args.min_lr <= args.lr
     if args.save is not None:
@@ -293,6 +317,14 @@ def validate_args(args, defaults={}):
     if args.fp32_residual_connection:
         assert args.fp16 or args.bf16, \
             'residual connection in fp32 only supported when using fp16 or bf16.'
+
+    if args.moe_grouped_gemm:
+        assert not args.fp16, 'Currently GroupedGEMM for MoE only supports bf16 and fp32 dtype.'
+        dc = torch.cuda.get_device_capability()
+        assert dc[0] >= 8, "Unsupported compute capability for GroupedGEMM kernels."
+
+    if args.moe_grouped_gemm and args.moe_te_grouped_gemm:
+        raise ValueError("cannot use both --moe-grouped-gemm and --moe-te-grouped-gemm")
 
     if args.weight_decay_incr_style == 'constant':
         assert args.start_weight_decay is None
@@ -342,6 +374,12 @@ def validate_args(args, defaults={}):
             'recompute method is not yet supported for ' \
             'selective recomputing granularity'
 
+    if args.kaimm_recompute_mlp_fc1 and not args.kaimm_recompute_mlp_activation_func:
+        raise NotImplementedError("Recomputing MLP FC1 requires recomputing MLP activation func")
+
+    if args.kaimm_recompute_norm and args.use_memory_efficient_norm:
+        raise ValueError('Recomputing norm has no effect for memory efficient norm.')
+
     # disable sequence parallelism when tp=1
     # to avoid change in numerics when
     # sequence_parallelism is enabled.
@@ -352,7 +390,7 @@ def validate_args(args, defaults={}):
     # model parallel memory optimization is enabled
     if args.sequence_parallel:
         args.async_tensor_model_parallel_allreduce = False
-    
+
     if args.async_tensor_model_parallel_allreduce or args.sequence_parallel:
         os.environ['CUDA_DEVICE_MAX_CONNECTIONS'] = '1'
 
@@ -367,12 +405,15 @@ def validate_args(args, defaults={}):
                 "Using async gradient all reduce requires setting the environment "
                 "variable CUDA_DEVICE_MAX_CONNECTIONS to 1")
 
-    if args.kaimm_cp_offload_mode != 0 and not args.context_parallel_comm_overlap_gemm:
-        raise NotImplementedError("CP offload requires overlap")
+    if args.pipeline_model_parallel_size == 1:
+        args.kaimm_vocab_in_pipeline_parallel = False
 
     assert 0. <= args.kaimm_offload_activation_ratio <= 1.
-    if args.kaimm_offload_activation_ratio and args.pipeline_model_parallel_size <= 2:
-        raise RuntimeError("Offload requires PP >= 3")
+    if args.kaimm_offload_activation_ratio and args.micro_seq_length == 0:
+        if args.pipeline_model_parallel_size < 2:
+            raise RuntimeError("Offload requires PP >= 2")
+        if args.virtual_pipeline_model_parallel_size is None and args.pipeline_model_parallel_size < 3:
+            raise RuntimeError("Offload requires PP >= 3 for non-interleaved pipeline parallelism")
 
     if args.tensor_model_parallel_size == 1:
         args.overlap_sp_ag = False
@@ -384,6 +425,18 @@ def validate_args(args, defaults={}):
     # Disable bias gelu fusion if we are disabling bias altogether
     if not args.add_bias_linear:
         args.bias_gelu_fusion = False
+
+    # alibi_bias_max should larger than 0 when using alibi
+    if(args.use_alibi):
+        assert args.alibi_bias_max > 0, \
+            'alibi_bias_max must be larger than 0 when using alibi'
+    else:
+        args.alibi_bias_max = 0
+
+    if args.make_main_grad_addresss_divisible_by != 1:
+        assert args.use_distributed_optimizer, \
+            "Main grad address alignment feature is only supported for distributed optimizer," \
+            " Please set \"--make-main-grad-addresss-divisible-by 1\" or \"--use-distributed-optimizer\""
 
     # Load retro args.
     if args.retro_workdir:
@@ -397,23 +450,30 @@ def validate_args(args, defaults={}):
                     retro_args.retro_gpt_chunk_length
                 set_retro_args(retro_args)
 
+    # MoE Spec check
+    if args.num_experts is not None:
+        assert args.spec is None, "Model Spec must be None when using MoEs"
+        if args.tensor_model_parallel_size > 1:
+            assert args.sequence_parallel, \
+                "When using MoE and tensor parallelism, sequence parallelism must be used."
+        if args.expert_hidden_size is None:
+            args.expert_hidden_size = args.ffn_hidden_size
+        assert args.context_parallel_size == 1 or args.moe_expert_capacity_factor is None, \
+            "Context parallelism is not supported with MoE token dropping."
+
+    # Expert parallelism check
+    if args.expert_model_parallel_size  > 1:
+        assert args.num_experts is not None, "num_experts must be non None to use expert model parallelism"
+        assert args.num_experts % args.expert_model_parallel_size == 0, \
+            "Number of experts should be a multiple of expert model parallel_size."
+        assert not args.fp16, \
+            "Expert parallelism is not supported with fp16 training."
+
     # Print arguments.
     _print_args("arguments", args)
     retro_args = get_retro_args()
     if retro_args and args != retro_args:
         _print_args("retro arguments", types.SimpleNamespace(**{k:v for k,v in vars(retro_args).items() if k.startswith("retro")}, rank=args.rank))
-
-    # Print env var
-    if args.rank == 0:
-        for env_key in sorted([
-            "CUDA_DEVICE_MAX_CONNECTIONS",
-            "NCCL_IB_QPS_PER_CONNECTION",
-            "NVTE_BWD_LAYERNORM_SM_MARGIN",
-            "NVTE_FWD_LAYERNORM_SM_MARGIN",
-            "PYTORCH_CUDA_ALLOC_CONF",
-            "TORCH_NCCL_AVOID_RECORD_STREAMS",
-        ]):
-            print("env", env_key, os.environ.get(env_key))
 
     return args
 
@@ -436,6 +496,49 @@ def _print_args(title, args):
 def _check_arg_is_not_none(args, arg):
     assert getattr(args, arg) is not None, '{} argument is None'.format(arg)
 
+def core_transformer_config_from_args(args):
+
+    # Translate args to core transformer configuration
+    kw_args = {}
+    for f in dataclasses.fields(TransformerConfig):
+        if hasattr(args, f.name):
+            kw_args[f.name] = getattr(args, f.name)
+    kw_args['persist_layer_norm'] = not args.no_persist_layer_norm
+    kw_args['layernorm_zero_centered_gamma'] = args.apply_layernorm_1p
+    kw_args['layernorm_epsilon'] = args.layernorm_epsilon
+    kw_args['deallocate_pipeline_outputs'] = True
+    kw_args['pipeline_dtype'] = args.params_dtype
+    kw_args['batch_p2p_comm'] = not args.overlap_p2p_comm
+    kw_args['num_moe_experts'] = args.num_experts
+    kw_args['rotary_interleaved'] = False
+    if args.swiglu:
+        kw_args['activation_func'] = F.silu
+        kw_args['gated_linear_unit'] = True
+        kw_args['bias_activation_fusion'] = args.bias_swiglu_fusion
+    else:
+        kw_args['bias_activation_fusion'] = args.bias_gelu_fusion
+    if args.squared_relu:
+        assert not args.swiglu
+        def squared_relu(x):
+            return torch.pow(F.relu(x), 2)
+        kw_args['activation_func'] = squared_relu
+    if args.init_method_xavier_uniform:
+        kw_args['init_method'] = torch.nn.init.xavier_uniform_
+        kw_args['scaled_init_method'] = torch.nn.init.xavier_uniform_
+    if args.group_query_attention:
+        kw_args['num_query_groups'] = args.num_query_groups
+    else:
+        kw_args['num_query_groups'] = None
+
+    # If using Retro, return Retro config.
+    retro_args = get_retro_args()
+    if retro_args:
+        kw_args['retro_preprocess'] = retro_args
+        return RetroConfig(**kw_args)
+
+    # Return Transformer config.
+    return TransformerConfig(**kw_args)
+
 
 def _add_llama_args(parser):
     group = parser.add_argument_group(title='llama')
@@ -443,6 +546,9 @@ def _add_llama_args(parser):
     group.add_argument('--rms-norm',
                        action='store_true', default=False,
                        help='Using RMSLayerNorm.')
+    group.add_argument('--gate-mlp',
+                       action='store_true', default=False,
+                       help='Using ParallelGateMLP.')
     group.add_argument('--use-fast-rms-norm',  action='store_true',
                        help='use Fast rms norm.')
     group.add_argument('--use-fast-rope',  action='store_true',
@@ -501,6 +607,39 @@ def _add_inference_args(parser):
 
     return parser
 
+def _add_stability_args(parser):
+    group = parser.add_argument_group(title='Stability')
+        # Stability setting
+    group.add_argument("--loss_median_window",
+                        type=int,
+                        default=10,
+                        help="Window size for calculating median of losses.")
+
+    group.add_argument("--restart_skip_counter",
+                        type=int,
+                        default=0,
+                        help="Skip several steps when restart to avoid dataloader spike.")
+
+    group.add_argument("--stability_protection",
+                    action='store_true',
+                    help="Flag to indicate whether stability protection is enabled.")
+
+    group.add_argument("--anomaly_times",
+                        type=float,
+                        default=1.1,
+                        help="Multiplier for determining anomaly threshold.")
+
+    group.add_argument("--skip_steps",
+                        type=int,
+                        default=5,
+                        help="Number of steps to skip when an anomaly is detected.")
+
+    group.add_argument("--consecutive_anomalies_steps",
+                        type=int,
+                        default=3,
+                        help="Number of consecutive steps with anomalies to trigger protection.")
+
+    return parser
 
 def _add_retro_args(parser):
     group = parser.add_argument_group(title='retro')
@@ -576,6 +715,12 @@ def _add_network_size_args(parser):
                        'This is the size of position embedding.')
     group.add_argument('--use-rotary-position-embeddings', action='store_true',
                        help='Use rotary positional embeddings or not')
+    group.add_argument('--rope-theta', type=float, default=10000.,
+                       help='The base period of the RoPE embeddings.')
+    group.add_argument('--use-alibi', action='store_true',
+                       help='Use alibi scale or not')
+    group.add_argument('--alibi-bias-max', type=int, default=8,
+                       help='max alibi bias')
     group.add_argument('--rotary-percent', type=float, default=1.0,
                        help='Percent of rotary dimension to use, default 100%')
     group.add_argument('--no-position-embedding',
@@ -585,6 +730,18 @@ def _add_network_size_args(parser):
     group.add_argument('--make-vocab-size-divisible-by', type=int, default=128,
                        help='Pad the vocab size to be divisible by this value.'
                        'This is added for computational efficieny reasons.')
+    group.add_argument('--make-main-grad-addresss-divisible-by', type=int, default=256,
+                       help='Pad the main grad address to be divisible by this value.'
+                       'This is added for computational efficieny reasons.')
+    group.add_argument('--mask-padded-vocab-in-ce-loss',
+                       action='store_true',
+                       help='If set, padded vocabularies are masked in computation'
+                       ' of cross entropy loss.')
+    group.add_argument('--kaimm-post-lm-processing-slice-size', type=int, default=None,
+                       help='Slice the computation of post LM processing'
+                       ' along the sequence length axis. This technique saves'
+                       ' memory on the last PP rank, but it slows down the'
+                       ' training due to the use of checkpointing.')
     group.add_argument('--layernorm-epsilon', type=float, default=1e-5,
                        help='Layer norm epsilon.')
     group.add_argument('--apply-layernorm-1p', action='store_true',
@@ -608,11 +765,12 @@ def _add_network_size_args(parser):
     group.add_argument('--bert-no-binary-head', action='store_false',
                        help='Disable BERT binary head.',
                        dest='bert_binary_head')
+    group.add_argument('--init-method-std-emb', type=float, default=None,
+                       help='Standard deviation of the zero mean normal '
+                            'distribution used for weight initialization.')
     group.add_argument('--disable-output-scale-init', action='store_true', default=False,
                        help='Standard deviation of the zero mean normal '
                             'distribution used for weight initialization.')
-    group.add_argument('--num-experts', type=int, default=None,
-                       help='Number of Experts in Switch Transformer (None means no Switch)')
     group.add_argument('--untie-embeddings-and-output-weights', action='store_true',
                        help='Untie embeddings and output weights.'),
     group.add_argument('--embedding-weights-in-fp32', action='store_true',
@@ -721,6 +879,8 @@ def _add_regularization_args(parser):
 def _add_training_args(parser):
     group = parser.add_argument_group(title='training')
 
+    mutex_group = parser.add_mutually_exclusive_group()
+
     group.add_argument('--micro-batch-size', type=int, default=None,
                        help='Batch size per model instance (local batch size). '
                        'Global batch size is local batch size times data '
@@ -760,8 +920,12 @@ def _add_training_args(parser):
                        'layer is recomputed.')
     group.add_argument('--kaimm-recompute-mlp-activation-func', action='store_true',
                        help='Recompute activation between parallel MLP linears')
+    group.add_argument('--kaimm-recompute-mlp-fc1', action='store_true',
+                       help='Recompute FC1 (aka h_to_4h) of parallel MLP linears')
     group.add_argument('--kaimm-recompute-norm', action='store_true',
                        help='Recompute RMSNorm to save memory')
+    group.add_argument('--kaimm-recompute-token-dispatcher', action='store_true',
+                       help='Recompute token_dispatcher to save memory')
     group.add_argument('--distribute-saved-activations',
                        action='store_true',
                        help='If set, distribute recomputed activations '
@@ -783,7 +947,43 @@ def _add_training_args(parser):
     group.add_argument('--no-clone-scatter-output-in-embedding', action='store_false',
                        help='If not set, clone the output of the scatter in embedding layer to GC original tensor.',
                        dest='clone_scatter_output_in_embedding')
+    group.add_argument('--ignore-index', type=int, default=-100,
+                       help="Symbol that do not calculate loss.")
+    group.add_argument("--padding-side", type=str, default="right",
+                       help="Huggingface tokenizer padding side.")
+    group.add_argument("--use-fast", action='store_true', default=False,
+                       help='Enable huggingface tokenizer use_fast.')
 
+    # https://github.com/NVIDIA/Megatron-LM/commit/31a9869
+    group.add_argument(
+        "--profile",
+        action="store_true",
+        help="Enable nsys profiling. When using this option, nsys "
+        "options should be specified in commandline. An example "
+        "nsys commandline is `nsys profile -s none -t nvtx,cuda "
+        "-o <path/to/output_file> --force-overwrite true "
+        "--capture-range=cudaProfilerApi "
+        "--capture-range-end=stop`.",
+    )
+    group.add_argument(
+        "--profile-step-start",
+        type=int,
+        default=10,
+        help="Gloabl step to start profiling.",
+    )
+    group.add_argument(
+        "--profile-step-end",
+        type=int,
+        default=12,
+        help="Gloabl step to stop profiling.",
+    )
+    group.add_argument(
+        "--profile-ranks",
+        nargs="+",
+        type=int,
+        default=[0],
+        help="Global ranks to profile.",
+    )
 
     # deprecated
     group.add_argument('--checkpoint-activations', action='store_true',
@@ -825,6 +1025,10 @@ def _add_training_args(parser):
     group.add_argument('--no-bias-gelu-fusion', action='store_false',
                        help='Disable bias and gelu fusion.',
                        dest='bias_gelu_fusion')
+    group.add_argument('--no-bias-swiglu-fusion', action='store_false',
+                       help='Disable bias and swiglu fusion, the fusion is '
+                       'available only when using megatron-core.',
+                       dest='bias_swiglu_fusion')
     group.add_argument('--no-bias-dropout-fusion', action='store_false',
                        help='Disable bias and dropout fusion.',
                        dest='bias_dropout_fusion')
@@ -856,6 +1060,10 @@ def _add_training_args(parser):
                        'This kernel supports only a set of hidden sizes. Please '
                        'check persist_ln_hidden_sizes if your hidden '
                        'size is supported.')
+    # Memory efficient norm saves the output tensor instead of the input tensor.
+    # Refer to https://github.com/NVIDIA/apex/pull/1715
+    group.add_argument('--use-memory-efficient-norm',  action='store_true',
+                       help='use memory effiecient norm.')
     group.add_argument('--sequence-parallel', action='store_true',
                        help='Enable sequence parallel optimization.')
     group.add_argument('--no-gradient-accumulation-fusion',
@@ -869,6 +1077,9 @@ def _add_training_args(parser):
     group.add_argument('--overlap-sp-rs',
                        action='store_true',
                        help='Enable reduce scatter overlapping for sequence parallel')
+    group.add_argument('--train-golden-model',
+                       action='store_true',
+                       help='Train a golden model.')
     return parser
 
 
@@ -884,8 +1095,16 @@ def _add_initialization_args(parser):
     group.add_argument('--init-method-std', type=float, default=0.02,
                        help='Standard deviation of the zero mean normal '
                        'distribution used for weight initialization.')
+
     group.add_argument('--init-method-xavier-uniform', action='store_true',
                        help='Enable Xavier uniform parameter initialization')
+
+    group.add_argument('--init-method-xavier-normal', action='store_true',
+                       help='Enable Xavier normal parameter initialization')
+    group.add_argument('--init-method-beta', type=float, default=1.0,
+                       help='Beta of Xavier normal distribution'
+                       'used for weight initialization.')
+
 
     return parser
 
@@ -906,6 +1125,8 @@ def _add_learning_rate_args(parser):
     group.add_argument('--lr-decay-samples', type=int, default=None,
                        help='number of samples to decay learning rate over,'
                        ' If None defaults to `--train-samples`')
+    group.add_argument('--warmup-init-lr', type=float, default=0.,
+                       help='Warmup initial learning rate')
     group.add_argument('--lr-warmup-fraction', type=float, default=None,
                        help='fraction of lr-warmup-(iters/samples) to use '
                        'for warmup (as a float)')
@@ -932,6 +1153,8 @@ def _add_learning_rate_args(parser):
                        '(learning rate, warmup iterations, minimum learning '
                        'rate, maximum number of iterations, and decay style '
                        'from checkpoint and ignore input arguments.')
+    group.add_argument('--custom-lr-scheduler', action='store_true',
+                       help='Using custom lr scheduler')
 
     return parser
 
@@ -1013,7 +1236,8 @@ def _add_mixed_precision_args(parser):
 
 def _add_distributed_args(parser):
     group = parser.add_argument_group(title='distributed')
-
+    group.add_argument('--master-addr', type=str, default='127.0.0.1:8389',
+                       help='master add.')
     group.add_argument('--tensor-model-parallel-size', type=int, default=1,
                        help='Degree of tensor model parallelism.')
     group.add_argument('--pipeline-model-parallel-size', type=int, default=1,
@@ -1032,17 +1256,43 @@ def _add_distributed_args(parser):
                        action='store_true',
                        help='overlap pipeline parallel communication with forward and backward chunks',
                        dest='overlap_p2p_comm')
-    group.add_argument('--kaimm-cp-offload-mode', type=int, default=0,
-                       choices=[0, 1, 2],
-                       help='Which method to retrieve KV in backward. '
-                       '0: gather inter-node; 1: offload; 2: offload + gather intra-node')
+    group.add_argument('--kaimm-context-parallel-impl', type=str, default='key-value',
+                       choices=['key-value', 'query-out'], help='Context parallel implementation.')
+    group.add_argument('--micro-seq-length', type=int, default=0,
+                       help='Sequence length per model instance forward, for token level pipeline parallel.')
+    group.add_argument('--kaimm-kv-cache-impl', type=str, default='chunked',
+                       choices=['chunked', 'extended'],
+                       help='KV cache implementation for token level pipeline parallel.')
+    group.add_argument('--kaimm-pipeline-attn-balance', type=int, default='0',
+                       help='exchange attention context to balance workloads among pipeline parallel ranks. \
+                            0: off; \
+                            n: on and exchange at most n slices of key-value;')
+    group.add_argument('--kaimm-overlap-optimizer-communication',
+                       action='store_true',
+                       help='overlap optimizer communication with backward chunks')
+    group.add_argument('--kaimm-overlap-gather-ratio', type=float, default=.200,
+                       help='ratio of params for each overlapped gather')
+    group.add_argument('--kaimm-overlap-reduce-ratio', type=float, default=.200,
+                       help='ratio of grads for each overlapped reduce')
     group.add_argument('--kaimm-overlap-cp-slow-ctas', type=int, default=None,
                        help='number of NCCL CTAs for overlapped CP backward gather KV communication')
+    group.add_argument('--kaimm-overlap-optimizer-slow-ctas', type=int, default=4,
+                       help='number of NCCL CTAs for overlapped optimizer communication')
+    group.add_argument('--kaimm-overlap-optimizer-no-barrier',
+                       action='store_true',
+                       help='No insert barriers between overlapped optimizer communication.')
+    group.add_argument('--kaimm-overlap-tune-ratio',
+                       action='store_true',
+                       help='tune overlap ratio suggestions by timing communication and calculation')
+    group.add_argument('--kaimm-overlap-tuning-target-time-ratio', type=float, default=.85,
+                       help='target ratio of overlapped gather/reduce time to fwd/bwd time')
     group.add_argument('--kaimm-profile-analysis', action='store_true',
                        default=False, help='Record timing info for analysis purpose. '
                        'Pipeline performance will go down due to synchronization.')
     group.add_argument('--kaimm-offload-activation-ratio', type=float, default=0.,
                        help='The proportion of offloaded activations relative to total activations.')
+    group.add_argument('--kaimm-offload-delay-to-next-stage', action='store_true',
+                       help='Delay the timing of offloading to the next stage of the same microbatch.')
     group.add_argument('--distributed-backend', default='nccl',
                        choices=['nccl', 'gloo'],
                        help='Which backend to use for distributed training.')
@@ -1084,8 +1334,21 @@ def _add_distributed_args(parser):
                        'is placed on its own pipeline stage, without any '
                        'transformer layers. (For T5, this flag currently only '
                        'affects the encoder embedding.)')
+    group.add_argument('--kaimm-num-layers-padding-front', type=int, default=0,
+                       help='Number of padding layers between the embedding layer '
+                       'and the first transformer layer')
+    group.add_argument('--kaimm-num-layers-padding-back', type=int, default=0,
+                       help='Number of padding layers between the LM head layer '
+                       'and the last transformer layer')
+    group.add_argument('--kaimm-vocab-in-pipeline-parallel', action='store_true',
+                       help='Distribute the vocabulary embedding in pipeline parallelism.')
     group.add_argument('--use-distributed-optimizer', action='store_true',
                        help='Use distributed optimizer.')
+    group.add_argument('--nccl-communicator-config-path', type=str, default=None,
+                       help='Path to the yaml file with NCCL communicator '
+                       'configurations. The number of min/max thread groups and thread '
+                       'group cluster size of each communicator can be configured by '
+                       'setting `min_ctas`, `max_ctas`, and `cga_cluster_size`.')
 
     return parser
 
@@ -1176,7 +1439,8 @@ def _add_data_args(parser):
                                 'GPT2BPETokenizer',
                                 'SentencePieceTokenizer',
                                 'GPTSentencePieceTokenizer',
-                                'NullTokenizer'],
+                                'NullTokenizer',
+                                'HuggingFaceTokenizer'],
                        help='What type of tokenizer to use.')
     group.add_argument('--tokenizer-model', type=str, default=None,
                        help='Sentencepiece tokenizer model.')
@@ -1190,6 +1454,8 @@ def _add_data_args(parser):
                        'end-of-document token.')
     group.add_argument('--eod-mask-loss', action='store_true',
                        help='Mask loss for the end of document tokens.')
+    group.add_argument('--pad-token-id', type=int, default=None,
+                       help="Idx of padding token.")
     group.add_argument('--kaimm-async-dataloader', action='store_true',
                        help='Load data in an async way.')
 
@@ -1330,5 +1596,74 @@ def _add_vision_args(parser):
                        help='teacher temperature')
     group.add_argument('--dino-warmup-teacher-temp-epochs', type=int, default=30,
                        help='warmup teacher temperaure epochs')
+
+    return parser
+
+def _add_moe_args(parser):
+    group = parser.add_argument_group(title="moe")
+    group.add_argument('--expert-model-parallel-size', type=int, default=1,
+                       help='Degree of expert model parallelism.')
+    group.add_argument('--num-experts', type=int, default=None,
+                       help='Number of Experts in MoE (None means no MoE)')
+    group.add_argument('--expert-hidden-size', type=int, default=None,
+                       help='Intermediate size of Experts in MoE (None means use --ffn-hidden-size)')
+    group.add_argument('--shared-expert-hidden-size', type=int, default=None,
+                       help='Intermediate size of shared Expert in MoE (None means no shared Expert)')
+    group.add_argument('--shared-expert-combine-method', type=str,
+                       choices=['add', 'softmax'],
+                       default="add",
+                       help='Combining method between routed experts and shared experts.')
+    group.add_argument('--moe-layer-interval', type=int, default=1,
+                       help='Use experts in every "moe-layer-interval" layers.')
+    group.add_argument('--moe-first',
+                       action='store_true',
+                       help='If set to True, the first layer would be MoE layer. '
+                       'Otherwise, the moe_layer_interval-th layer would be MoE layer')
+    group.add_argument('--moe-router-load-balancing-type', type=str,
+                       choices=['aux_loss', 'sinkhorn', "none"],
+                       default='aux_loss',
+                       help='Determines the load balancing strategy for the router. "aux_loss" corresponds to the load balancing loss used in GShard and SwitchTransformer, "sinkhorn" corresponds to the balancing algorithm used in S-BASE, and "none" implies no load balancing. The default is "aux_loss".')
+    group.add_argument('--moe-router-topk', type=int, default=2,
+                       help='Number of experts to route to for each token. The default is 2.')
+    group.add_argument('--moe-grouped-gemm', action='store_true',
+                       help='When there are multiple experts per rank, compress multiple local (potentially small) gemms in a single kernel launch to improve the utilization and performance by leveraging the Grouped GEMM feature introduced since CUTLASS 2.8 (https://github.com/fanshiqing/grouped_gemm).')
+    group.add_argument('--moe-te-grouped-gemm', action='store_true',
+                       help='Use the grouped gemm implement from transformer_engine.')
+    group.add_argument('--moe-aux-loss-coeff', type=float, default=0.0,
+                       help='Scaling coefficient for the aux loss: a starting value of 1e-2 is recommended.')
+    group.add_argument('--moe-z-loss-coeff', type=float, default=None,
+                       help='Scaling coefficient for the z-loss: a starting value of 1e-3 is recommended.')
+    group.add_argument('--moe-input-jitter-eps', type=float, default=None,
+                       help='Add noise to the input tensor by applying jitter with a specified epsilon value.')
+    group.add_argument('--moe-token-dispatcher-type', type=str,
+                       choices=['allgather', 'alltoall'],
+                       default='allgather',
+                       help='.')
+    group.add_argument('--moe-per-layer-logging', action='store_true',
+                       help='Enable per-layer logging for MoE, currently supports auxiliary loss and z loss.')
+    # Token dropping arguments
+    group.add_argument('--moe-expert-capacity-factor', type=float, default=None,
+                       help='The capacity factor for each expert, None means no token will be dropped.')
+    group.add_argument('--moe-pad-expert-input-to-capacity', action='store_true',
+                       help='Pads the input for each expert to match the expert capacity length, effective only after the --moe-expert-capacity-factor is set.')
+    group.add_argument('--moe-token-drop-policy', type=str, default='probs', choices=['probs', 'position'],
+                       help='The policy to drop tokens. Can be either "probs" or "position". If "probs", the tokens with the lowest probabilities will be dropped. If "position", tokens at the end of each batch will be dropped.')
+    group.add_argument('--moe-layer-recompute', action='store_true',
+                       help='Enable checkpointing for moe_layer, should be used when memory is not sufficient.')
+
+    return parser
+
+def _add_experimental_args(parser):
+    group = parser.add_argument_group(title='experimental')
+
+    group.add_argument('--spec', type=str, default=None, nargs='*',
+                       help='Specify the <module_location function_name> pair '
+                       'that returns a spec to customize a model, transformer '
+                       'block, or transformer layer, depending on the use case.'
+                       'To use local spec specify local as the argument.'
+                       'For more details, see the model class, '
+                       '`transformer_block.py`, or `transformer_layer.py`')
+    group.add_argument('--moe-router-force-load-balancing', action='store_true',
+                       help = 'Enforce load balancing for dropless MoE routing.')
 
     return parser

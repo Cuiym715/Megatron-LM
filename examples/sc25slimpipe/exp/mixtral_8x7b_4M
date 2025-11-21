@@ -1,0 +1,41 @@
+source "$SCRIPT_DIR/model/8x7b"
+SEQ_LENGTH=$((4096 * 1024))
+source "$SCRIPT_DIR/optimizer/llama2"
+# source "$SCRIPT_DIR/dataset/sample_enwiki_32005"
+source "$SCRIPT_DIR/dataset/sample_wiki_128000"
+source "$SCRIPT_DIR/performance/default"
+
+GLOBAL_BATCH_SIZE=4 #$(($NP * 1))
+TRAIN_ITERS=5
+
+NP=128
+
+TP=1
+CP=8
+EP=8
+PP=8
+PP_l=1
+SP=1
+CP_IMPL=query-out
+# CP_IMPL=key-value
+RECOMPUTE=partial+fc1
+OFFLOAD_ALPHA=1.0
+TP_OVERLAP=0
+DP_OVERLAP=0
+SYNC_LEVEL=1
+MICRO_SEQ_LENGTH=$((32 * 1024))
+POST_LM_PP=1
+POST_LM_PROCESSING_SLICE_SIZE=0
+KV_CACHE_IMPL=chunked
+PP_ATTN_BALANCE=1000
+
+LOG_DIR=$SCRIPT_DIR/log
+LOG_INTERVAL=1
+TENSORBOARD_DIR=
+
+FINETUNE=
+LOAD= #$SCRIPT_DIR/output/save
+SAVE= #$LOAD
+SAVE_INTERVAL=1000
+
+PROFILE=0

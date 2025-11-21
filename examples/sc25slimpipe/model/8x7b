@@ -1,0 +1,8 @@
+# Mixtral 8x7B
+# 46.7B parameters (12.9B active)
+
+source "$SCRIPT_DIR/model/8b"
+
+NUM_EXPERTS=8
+MOE_LAYER_INTERVAL=1
+MOE_ROUTER_TOPK=2

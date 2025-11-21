@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# Import configuration files
+MODEL=${MODEL:-"13b"}
+source "$SCRIPT_DIR/model/$MODEL"
+SEQ_LENGTH=${SEQUENCE_LENGTH:-}
+source "$SCRIPT_DIR/optimizer/llama1"
+source "$SCRIPT_DIR/dataset/llama3_128256"
+
+# Model configuration
+GLOBAL_BATCH_SIZE=${GLOBAL_BATCH_SIZE:-8}
+MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-1}
+TRAIN_ITERS=${TRAIN_ITERS:-20}
+NUM_SLICES=${NUM_SLICES:-1}
+
+# Parallelism configuration
+TP=${TP:-8}       # Tensor Parallelism
+CP=${CP:-1}       # Communication Parallelism
+PP=${PP:-8}       # Pipeline Parallelism
+PP_l=${PP_l:-}    # Pipeline Parallelism (local)
+EP=${EP:-1}       # Expert Parallelism
+SP=${SP:-1}       # Sequence Parallelism
+CP_IMPL=query-out # CP implementation type
+
+# Efficiency settings
+RECOMPUTE=${RECOMPUTE:-"full"}
+ALLOC_CONF=${ALLOC_CONF:-0}
+OFFLOAD_ALPHA=${OFFLOAD_ALPHA:-0}
+DP_OVERLAP=${DP_OVERLAP:-0}
+TP_OVERLAP=${TP_OVERLAP:-0}
+CLONE_SCATTER_OUTPUT_IN_EMBEDDING=${CLONE_SCATTER_OUTPUT_IN_EMBEDDING:-0}
+SFT_PADDING=${SFT_PADDING:-0}
+MICRO_SEQ_LENGTH=${MICRO_SEQ_LENGTH:-$((SEQ_LENGTH / NUM_SLICES))}
+POST_LM_PROCESSING_SLICE_SIZE=${POST_LM_PROCESSING_SLICE_SIZE:-0}
+POST_LM_PP=${POST_LM_PP:-1}
+KV_CACHE_IMPL=chunked
+PP_ATTN_BALANCE=${PP_ATTN_BALANCE:-100}
+
+# Set DP_OVERLAP based on PP_l
+if [ -z "$PP_l" ]; then
+    DP_OVERLAP=${DP_OVERLAP:-0}
+else
+    DP_OVERLAP=${DP_OVERLAP:-1}
+fi
+
+# Cluster-specific settings
+if [ "$CLUSTER" == "h800" ]; then
+    CLUSTER_DP_CTAS_MULTIPLIER=2
+else
+    CLUSTER_DP_CTAS_MULTIPLIER=1
+fi
+
+# Synchronization settings
+SYNC_LEVEL=${SYNC_LEVEL:-0}
+
+# Logging and checkpointing
+LOG_DIR=${LOG_DIR:-$SCRIPT_DIR/logs}
+LOG_INTERVAL=1
+TENSORBOARD_DIR=
+LOAD=
+SAVE=$LOAD
+SAVE_INTERVAL=1000
+
+# Profiling
+PROFILE=${PROFILE:-0}

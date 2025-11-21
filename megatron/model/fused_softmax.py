@@ -1,9 +1,7 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
-
-
 import torch
 import torch.nn as nn
 from megatron.model.enums import AttnMaskType
+from megatron import get_args
 
 
 class ScaledUpperTriangMaskedSoftmax(torch.autograd.Function):
@@ -136,6 +134,9 @@ class FusedScaleMaskSoftmax(nn.Module):
         self.softmax_in_fp32 = softmax_in_fp32
         self.scale = scale
 
+        self.use_alibi = get_args().use_alibi
+        self.alibi_mask = None
+
         assert (
             self.scale is None or softmax_in_fp32
         ), "softmax should be in fp32 when scaled"
@@ -144,10 +145,48 @@ class FusedScaleMaskSoftmax(nn.Module):
         # [b, np, sq, sk]
         assert input.dim() == 4
 
+        # if torch.distributed.get_rank() == 0:
+        #     import ipdb
+        #     ipdb.set_trace()
+
+        if self.use_alibi:
+            if self.alibi_mask is None:
+                b, np, sq, sk = input.shape
+                assert sq==sk
+                alibi_mask = self.init_alibi_mask(np, sq)
+                alibi_mask = alibi_mask.view(1,np,sq,sk)
+                alibi_mask = alibi_mask.repeat(b,1,1,1)
+                self.alibi_mask = alibi_mask.cuda()
+        
+        if self.use_alibi:
+            return self.forward_torch_softmax(input, mask, self.alibi_mask)
+            
         if self.is_kernel_available(mask, *input.size()):
             return self.forward_fused_softmax(input, mask)
         else:
             return self.forward_torch_softmax(input, mask)
+
+    # alibi_mask
+    def init_alibi_mask(self, n_head, max_seq_len, period=1):
+        import math
+        def get_slopes(n):
+            def get_slopes_power_of_2(n):
+                start = (2**(-2**-(math.log2(n)-3)))
+                ratio = start
+                return [start*ratio**i for i in range(n)]
+            if math.log2(n).is_integer():
+                return get_slopes_power_of_2(n)                   
+            else:                                                 
+                closest_power_of_2 = 2**math.floor(math.log2(n)) 
+                return get_slopes_power_of_2(closest_power_of_2) + get_slopes(2*closest_power_of_2)[0::2][:n-closest_power_of_2]
+        slopes = torch.Tensor(get_slopes(n_head))
+        bias = torch.arange(start=0, end=max_seq_len, step=period).unsqueeze(1).repeat(1,period).view(-1)//(period)
+        bias = - torch.flip(bias,dims=[0])
+        alibi = torch.zeros(max_seq_len, max_seq_len)
+        for i in range(max_seq_len):
+            alibi[i, :i+1] = bias[-(i+1):]
+        alibi = slopes.unsqueeze(1).unsqueeze(1) * alibi.unsqueeze(0)
+        return alibi
 
     def is_kernel_available(self, mask, b, np, sq, sk):
         attn_batches = b * np
@@ -189,13 +228,13 @@ class FusedScaleMaskSoftmax(nn.Module):
             else:
                 return ScaledSoftmax.apply(input, scale)
 
-    def forward_torch_softmax(self, input, mask):
+    def forward_torch_softmax(self, input, mask, alibi_mask=None):
         if self.input_in_float16 and self.softmax_in_fp32:
             input = input.float()
 
         if self.scale is not None:
             input = input * self.scale
-        mask_output = self.mask_func(input, mask) if mask is not None else input
+        mask_output = self.mask_func(input, mask, alibi_mask) if mask is not None else input
         probs = torch.nn.Softmax(dim=-1)(mask_output)
 
         if self.input_in_float16 and self.softmax_in_fp32:

@@ -2,12 +2,20 @@
 
 """Utility functions used throughout Megatron core"""
 from functools import reduce
+from pkg_resources import packaging
+import importlib.metadata
+import math
 import operator
+import os
+import sys
 
 import torch
 try:
     import transformer_engine
-    import transformer_engine_extensions as tex
+    if "transformer_engine_torch" in sys.modules:
+        import transformer_engine_torch as tex
+    else:
+        import transformer_engine_extensions as tex
 except:
     tex = None
 
@@ -44,6 +52,19 @@ def get_model_type(model):
     return get_attr_wrapped_model(model, 'model_type')
 
 
+def get_te_version():
+    def get_te_version_str():
+        if hasattr(transformer_engine, '__version__'):
+            return str(transformer_engine.__version__)
+        else:
+            return importlib.metadata.version("transformer-engine")
+
+    return packaging.version.Version(get_te_version_str())
+
+
+_te_version = get_te_version()
+
+
 class GlobalMemoryBuffer:
     """Global buffer to avoid dynamic memory allocations.
     Caller should ensure that buffers of the same name
@@ -71,41 +92,96 @@ class GlobalTEUserBuffer:
         self.buffer_ag = {}
         self.buffer_rs = {}
         assert tex is not None, "Using Transformer Engine userbuffer, please install transformer engine first."
-        self.set_sm_margin = 1
+        self.ag_sm_margin = int(os.getenv('UB_AG_SM_MARGIN', '0'))
+        self.rs_sm_margin = int(os.getenv('UB_RS_SM_MARGIN', '0'))
         self.cga_size = 2
-        self._NUM_MAX_UB_STREAMS = 2
+        self._NUM_MAX_UB_STREAMS = int(os.getenv('UB_MAX_STREAMS', '1'))
         self.aggregate = 0
 
     def get_ub(self, name, shape, dtype, tp_world_size, tp_rank_id, ag):
+        if _te_version >= packaging.version.Version("1.9.0.dev0"):
+            assert tex.ubuf_built_with_mpi()
+            assert torch.distributed.is_mpi_available()
+            mpi_group = torch.distributed.new_group(backend="mpi")
+            world_rank = torch.distributed.get_rank(mpi_group)
+            world_size = torch.distributed.get_world_size(mpi_group)
+            local_rank = world_rank % tp_world_size
+            local_size = tp_world_size
+            node_id = world_rank // tp_world_size
+            num_nodes = world_size // tp_world_size
+            atomic_gemm = False
+            ub_callbacks = tex.UbufBootstrapCallbacks()
         if(ag):
             if(name not in self.buffer_ag):
                 sample_buffer = torch.empty(shape, dtype = dtype, device="cuda")
-                self.buffer_ag[name] = tex.UbufP2PCommOverlap(
-                    sample_buffer,          # Sample userbuffer
-                    tp_rank_id,             # Rank id
-                    tp_world_size,          # TP size
-                    tp_world_size * 2,      # Number of communication SMs
-                    self.cga_size,          # CGA cluster size
-                    self.set_sm_margin,     # Set SM margin
-                    self.aggregate,         # Aggregate 2X GEMM chunks
-                    3,                      # Max concurrent GEMM streams
-                    torch.Tensor(),         # empty tensor to pass to counters
-                )
+                if _te_version >= packaging.version.Version("1.9.0.dev0"):
+                    is_reduce_scatter = False
+                    use_ce = True
+                    self.buffer_ag[name] = tex.UbufP2PCommOverlap(
+                        sample_buffer,                          # Sample userbuffer
+                        world_rank,                             # World rank
+                        world_size,                             # World size
+                        local_rank,                             # Rank within the node
+                        local_size,                             # Number of ranks/GPUs per node
+                        node_id,                                # Node ID
+                        num_nodes,                              # Number of nodes
+                        tp_world_size,                          # Tensor-parallel group size (may be different than local_size)
+                        tp_world_size,                          # Number of communication SMs
+                        self.cga_size,                          # CGA cluster size
+                        self.ag_sm_margin,                      # Set SM margin
+                        self.aggregate,                         # Aggregate 2X GEMM chunks
+                        self._NUM_MAX_UB_STREAMS,               # Max concurrent GEMM streams
+                        is_reduce_scatter,                      # Overlap with reduce scatter
+                        atomic_gemm,                            # Use a single GEMM with atomic-counters
+                        use_ce,                                 # Use copy engine for P2P communications
+                        ub_callbacks,
+                    )
+                else:
+                    self.buffer_ag[name] = tex.UbufP2PCommOverlap(
+                        sample_buffer,                          # Sample userbuffer
+                        tp_rank_id,                             # Rank id
+                        tp_world_size,                          # TP size
+                        tp_world_size,                          # Number of communication SMs
+                        self.cga_size,                          # CGA cluster size
+                        self.ag_sm_margin,                      # Set SM margin
+                        self.aggregate,                         # Aggregate 2X GEMM chunks
+                        self._NUM_MAX_UB_STREAMS,               # Max concurrent GEMM streams
+                        torch.Tensor(),                         # empty tensor to pass to counters
+                    )
             return self.buffer_ag[name]
         else:
             if(name not in self.buffer_rs):
                 sample_buffer = torch.empty(shape, dtype = dtype, device="cuda")
-                self.buffer_rs[name] = tex.UbufCommOverlap(
-                    sample_buffer,          # Sample userbuffer
-                    tp_rank_id,             # Rank id
-                    tp_world_size,          # TP size
-                    tp_world_size * 2,      # Number of communication SMs
-                    self.cga_size,          # CGA cluster size
-                    tp_world_size,          # Number of communication splits
-                    self.set_sm_margin,     # Set SM margin
-                    3,                      # Max concurrent GEMM streams
-                    torch.Tensor(),         # empty tensor to pass to counters
-                )
+                if _te_version >= packaging.version.Version("1.9.0.dev0"):
+                    self.buffer_rs[name] = tex.UbufCommOverlap(
+                        sample_buffer,                          # Sample userbuffer
+                        world_rank,                             # World rank
+                        world_size,                             # World size
+                        local_rank,                             # Rank within the node
+                        local_size,                             # Number of ranks/GPUs per node
+                        node_id,                                # Node ID
+                        num_nodes,                              # Number of nodes
+                        tp_world_size,                          # Tensor-parallel group size (may be different than local_size)
+                        tp_world_size * 2,                      # Number of communication SMs
+                        self.cga_size,                          # CGA cluster size
+                        tp_world_size,                          # Number of communication splits
+                        self.rs_sm_margin,                      # Set SM margin
+                        self._NUM_MAX_UB_STREAMS,               # Max concurrent GEMM streams
+                        atomic_gemm,                            # Use a single GEMM with atomic-counters
+                        ub_callbacks,
+                    )
+                else:
+                    self.buffer_rs[name] = tex.UbufCommOverlap(
+                        sample_buffer,                          # Sample userbuffer
+                        tp_rank_id,                             # Rank id
+                        tp_world_size,                          # TP size
+                        tp_world_size * 2,                      # Number of communication SMs
+                        self.cga_size,                          # CGA cluster size
+                        tp_world_size,                          # Number of communication splits
+                        self.rs_sm_margin,                      # Set SM margin
+                        self._NUM_MAX_UB_STREAMS,               # Max concurrent GEMM streams
+                        torch.Tensor(),                         # empty tensor to pass to counters
+                    )
             return self.buffer_rs[name]
 
 def _kernel_make_viewless_tensor(inp, requires_grad):
@@ -185,6 +261,25 @@ def safely_set_viewless_tensor_data(tensor, new_data_tensor):
     '''
     assert_viewless_tensor(tensor, extra_msg = "FYI, tensor._base has shape %s, and new_data_tensor has shape %s." % ("--" if tensor._base is None else tensor._base.shape, new_data_tensor.shape))
     tensor.data = new_data_tensor
+
+
+def init_method_normal(sigma):
+    """Init method based on N(0, sigma)."""
+
+    def init_(tensor):
+        return torch.nn.init.normal_(tensor, mean=0.0, std=sigma)
+
+    return init_
+
+
+def scaled_init_method_normal(sigma, num_layers):
+    """Init method based on N(0, sigma/sqrt(2*num_layers)."""
+    std = sigma / math.sqrt(2.0 * num_layers)
+
+    def init_(tensor):
+        return torch.nn.init.normal_(tensor, mean=0.0, std=std)
+
+    return init_
 
 
 _SYNC_EVENT = None

@@ -1,0 +1,8 @@
+SEQ_LENGTH=2048
+NUM_LAYERS=32           # GPT-3: Page 8, https://arxiv.org/pdf/2005.14165v4.pdf
+HIDDEN_SIZE=2560        # GPT-3: Page 8, https://arxiv.org/pdf/2005.14165v4.pdf
+FFN_HIDDEN_SIZE=6912
+NUM_ATTENTION_HEADS=32  # GPT-3: Page 8, https://arxiv.org/pdf/2005.14165v4.pdf
+GQA=0
+NUM_QUERY_GROUPS=
+POSITION_EMBEDDING=rope

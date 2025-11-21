@@ -3,8 +3,10 @@
 """Megatron initialization."""
 
 import random
+import resource
 import os
 import time
+import warnings
 
 import numpy as np
 import torch
@@ -15,21 +17,26 @@ from megatron import get_adlr_autoresume
 from megatron import get_args
 from megatron import get_tensorboard_writer
 from megatron.core import mpu, tensor_parallel
+from megatron.core.context_parallel import dattention
+from megatron.core.cudnn_attn import cudnn_attn_allow_graph_creation, cudnn_attn_check_capability, cudnn_attn_func
+from megatron.core.kv_cache import Growth, FakeCache, KVCache, cache_aware_attn_func, cp_qo_attn_func
+from megatron.core.utils import cuda_sync_and_record
 from megatron.arguments import (parse_args, validate_args)
 from megatron.checkpointing import load_args_from_checkpoint
 from megatron.global_vars import set_global_variables
 from megatron.model.transformer import bias_dropout_add_fused_train
 from megatron.model.fused_bias_gelu import bias_gelu
+from megatron.model.utils import swiglu, _compile_swiglu
 
 
 def initialize_megatron(extra_args_provider=None, args_defaults={},
                         ignore_unknown_args=False, allow_no_cuda=False):
     """Set global variables, initialize distributed, and
     set autoresume and random seeds.
-    `allow_no_cuda` should not be set unless using megatron for cpu only 
-    data processing. In general this arg should not be set unless you know 
+    `allow_no_cuda` should not be set unless using megatron for cpu only
+    data processing. In general this arg should not be set unless you know
     what you are doing.
-    Returns a function to finalize distributed env initialization 
+    Returns a function to finalize distributed env initialization
     (optionally, only when args.lazy_mpu_init == True)
     """
     if not allow_no_cuda:
@@ -40,11 +47,15 @@ def initialize_megatron(extra_args_provider=None, args_defaults={},
     args = parse_args(extra_args_provider, ignore_unknown_args)
 
     if args.use_checkpoint_args or args_defaults.get('use_checkpoint_args', False):
-        assert args.load is not None, '--use-checkpoints-args requires --load argument'
+        assert args.load is not None, '--use-checkpoint-args requires --load argument'
         load_args_from_checkpoint(args)
 
     validate_args(args, args_defaults)
-        
+
+    # Set rlimit
+    soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
+    resource.setrlimit(resource.RLIMIT_NOFILE, (hard_limit, hard_limit))
+
     # set global args, build tokenizer, and set adlr-autoresume,
     # tensorboard-writer, and timers.
     set_global_variables(args)
@@ -54,7 +65,7 @@ def initialize_megatron(extra_args_provider=None, args_defaults={},
         args = get_args()
         # Pytorch distributed.
         _initialize_distributed()
-        
+
         # Random seeds for reproducibility.
         if args.rank == 0:
             print('> setting random seeds to {} ...'.format(args.seed))
@@ -106,7 +117,7 @@ def _compile_dependencies():
     # ==================
 
     # Custom kernel constraints check.
-    seq_len = args.seq_length
+    seq_len = args.micro_seq_length or args.seq_length
     attn_batch_size = \
         (args.num_attention_heads / args.tensor_model_parallel_size) * \
         args.micro_batch_size
@@ -122,7 +133,7 @@ def _compile_dependencies():
             print('WARNING: constraints for invoking optimized'
                   ' fused softmax kernel are not met. We default'
                   ' back to unfused kernel invocations.', flush=True)
-    
+
     # Always build on rank zero first.
     if torch.distributed.get_rank() == 0:
         start_time = time.time()
@@ -184,17 +195,20 @@ def _initialize_distributed():
         else:
             if(args.overlap_sp_ag or args.overlap_sp_rs):
                 torch.distributed.new_group(backend='mpi')
-                
+
             mpu.initialize_model_parallel(args.tensor_model_parallel_size,
                                            args.pipeline_model_parallel_size,
                                            args.virtual_pipeline_model_parallel_size,
                                            args.pipeline_model_parallel_split_rank,
                                            context_parallel_size=args.context_parallel_size,
-                                           kaimm_cp_offload_mode=args.kaimm_cp_offload_mode,
+                                           expert_model_parallel_size=args.expert_model_parallel_size,
+                                           nccl_communicator_config_path=args.nccl_communicator_config_path,
                                            kaimm_overlap_cp_slow_ctas=args.kaimm_overlap_cp_slow_ctas,
-                                           overlap_sp_ag=args.overlap_sp_ag, 
+                                           kaimm_overlap_optimizer_communication=args.kaimm_overlap_optimizer_communication,
+                                           kaimm_overlap_optimizer_slow_ctas=args.kaimm_overlap_optimizer_slow_ctas,
+                                           overlap_sp_ag=args.overlap_sp_ag,
                                            overlap_sp_rs=args.overlap_sp_rs)
-            
+
             if args.rank == 0:
                 print(f'> initialized tensor model parallel with size '
                       f'{mpu.get_tensor_model_parallel_world_size()}')
@@ -272,10 +286,142 @@ def _warmup_jit_function():
     else:
         dtype = torch.float32
 
+    # Warmup fused swiglu
+    if args.swiglu:
+        if torch.distributed.get_rank() == 0:
+            start_time = time.time()
+            print('> compiling swiglu ...', flush=True)
+        if _compile_swiglu:
+            seq_len = args.micro_seq_length or args.seq_length
+            input = torch.rand((seq_len // mpu.get_context_parallel_world_size(), args.micro_batch_size,
+                                args.ffn_hidden_size * 2 // args.tensor_model_parallel_size),
+                               dtype=dtype, device='cuda')
+            for input_grad in [False, True]:
+                input.requires_grad = input_grad
+                for _ in range(5):
+                    output = None
+                    output = swiglu(input)
+                    if input_grad:
+                        output.sum().backward()
+            del input, output
+        else:
+            warnings.warn(f"[Rank {torch.distributed.get_rank()}] "
+                          f"The conditions of compiling `swiglu' are not being met. "
+                          f"Please verify your installation.")
+        torch.distributed.barrier()
+        if torch.distributed.get_rank() == 0:
+            print('>>> done with compiling swiglu. '
+                  'Compilation time: {:.3f} seconds'.format(
+                      time.time() - start_time), flush=True)
+
+    # Warmup cuDNN SDPA
+    if args.use_flash_attn:
+        if torch.distributed.get_rank() == 0:
+            start_time = time.time()
+            print('> creating cuDNN SDPA execution ...', flush=True)
+        b = args.micro_batch_size
+        s_q = s_kv = (args.micro_seq_length or args.seq_length) // mpu.get_context_parallel_world_size()
+        a = args.num_attention_heads // mpu.get_tensor_model_parallel_world_size()
+        g = args.num_query_groups // mpu.get_tensor_model_parallel_world_size() if args.group_query_attention else a
+        d = args.hidden_size // args.num_attention_heads
+        causal = True
+        if args.kaimm_kv_cache_impl == 'chunked':
+            growth = None   # chunked cache, no growth.
+        elif args.kaimm_kv_cache_impl == 'extended':
+            growth = Growth(growth_rate=2)    # geometry growth by 2.
+        for input_grad in [False, True] if args.recompute_granularity == 'full' else [True]:
+            dtype = args.params_dtype
+            kv_length = args.micro_seq_length // mpu.get_context_parallel_world_size()
+            num_heads = args.num_query_groups if args.group_query_attention else args.num_attention_heads
+            num_heads //= mpu.get_tensor_model_parallel_world_size()
+            shape = (kv_length, args.micro_batch_size, num_heads, args.kv_channels)
+            kv_cache = KVCache(dtype, shape, growth) if args.micro_seq_length else FakeCache()
+            layer_idx = 0
+            if args.micro_seq_length:
+                num_slices = args.seq_length // args.micro_seq_length
+                if args.kaimm_pipeline_attn_balance:
+                    num_slices -= (mpu.get_pipeline_model_parallel_world_size() - 1) // 2
+            else:
+                num_slices = 1
+            outputs = []
+            for _ in range(num_slices):
+                cuda_sync_and_record(sync_level=1)
+                kv_cache = kv_cache.detach()
+                if (mpu.get_context_parallel_world_size() == 1) and (not args.attention_dropout) and \
+                        cudnn_attn_check_capability(use_causal_mask_bottom_right=False):
+                    q = torch.rand(s_q, b, a, d, dtype=dtype, device="cuda").requires_grad_(input_grad)
+                    k = torch.rand(s_kv, b, g, d, dtype=dtype, device="cuda").requires_grad_(input_grad)
+                    v = torch.rand(s_kv, b, g, d, dtype=dtype, device="cuda").requires_grad_(input_grad)
+                    k, v, = kv_cache.update(layer_idx, [k, v])
+                    with cudnn_attn_allow_graph_creation(only_graph_creation=True):
+                        if kv_cache:
+                            o = cache_aware_attn_func(q, k, v, causal=causal)
+                        else:
+                            o = cudnn_attn_func(q.transpose(0, 1), k.transpose(0, 1), v.transpose(0, 1), causal).transpose(0, 1)
+                        if input_grad:
+                            outputs.append(o)
+                    del q, k, v, o
+                elif (mpu.get_context_parallel_world_size() >= 2) and (not args.attention_dropout) and \
+                        cudnn_attn_check_capability(use_causal_mask_bottom_right=True):
+                    cp_group = mpu.get_context_parallel_group()
+                    if args.kaimm_context_parallel_impl == 'query-out':
+                        assert args.kaimm_kv_cache_impl == "chunked", \
+                            f'context parallel with {args.kaimm_kv_cache_impl} kv cache is not implemented.'
+                        qi = torch.rand(s_q, b, a, d, dtype=dtype, device="cuda").requires_grad_(input_grad)
+                        ki = torch.rand(s_kv, b, g, d, dtype=dtype, device="cuda").requires_grad_(input_grad)
+                        vi = torch.rand(s_kv, b, g, d, dtype=dtype, device="cuda").requires_grad_(input_grad)
+                        with cudnn_attn_allow_graph_creation(only_graph_creation=True):
+                            oi, data_to_save = cp_qo_attn_func(qi, ki, vi, cp_group, kv_cache=kv_cache, layer_idx=layer_idx)
+                            if data_to_save is not None:
+                                oi = data_to_save(oi)
+                            if input_grad:
+                                outputs.append(oi)
+                        del qi, ki, vi, oi, data_to_save
+                    elif args.context_parallel_comm_overlap_gemm:
+                        qi = torch.rand(s_q, b, a, d, dtype=dtype, device="cuda").requires_grad_(input_grad)
+                        kv = torch.rand(2, s_kv * mpu.get_context_parallel_world_size(), b, g, d, dtype=dtype, device="cuda").requires_grad_(input_grad)
+                        with cudnn_attn_allow_graph_creation(only_graph_creation=True):
+                            oi, data_to_save = dattention.dattention_overlap(qi, kv, cp_group, kv_cache=kv_cache, layer_idx=layer_idx,
+                                                                            alibi_bias_max=0, tp_world_size=0, tp_rank=0)
+                            if data_to_save is not None:
+                                oi = dattention.shard_save_for_backward(oi, data_to_save, cp_group)
+                            if input_grad:
+                                outputs.append(oi)
+                        del qi, ki, vi, oi, data_to_save
+                    else:
+                        qi = torch.rand(s_q, b, a, d, dtype=dtype, device="cuda").requires_grad_(input_grad)
+                        ki = torch.rand(s_kv, b, g, d, dtype=dtype, device="cuda").requires_grad_(input_grad)
+                        vi = torch.rand(s_kv, b, g, d, dtype=dtype, device="cuda").requires_grad_(input_grad)
+                        with cudnn_attn_allow_graph_creation(only_graph_creation=True):
+                            oi, data_to_save = dattention.dattention(qi, ki, vi, cp_group, kv_cache=kv_cache, layer_idx=layer_idx,
+                                                                    alibi_bias_max=0, tp_world_size=0, tp_rank=0)
+                            if data_to_save is not None:
+                                oi = data_to_save(oi)
+                            if input_grad:
+                                outputs.append(oi)
+                        del qi, ki, vi, oi, data_to_save
+                else:
+                    warnings.warn(f"[Rank {torch.distributed.get_rank()}] "
+                            f"The conditions of buliding `cudnn_attn' are not being met.")
+            del kv_cache
+            if input_grad:
+                while outputs:
+                    cuda_sync_and_record(sync_level=1)
+                    oi = outputs.pop()
+                    with cudnn_attn_allow_graph_creation(only_graph_creation=True):
+                        oi.backward(torch.rand_like(oi))
+                    del oi
+        torch.distributed.barrier()
+        if torch.distributed.get_rank() == 0:
+            print('>>> done with creating cuDNN SDPA execution. '
+                  'Creation time: {:.3f} seconds'.format(
+                      time.time() - start_time), flush=True)
+
     # Warmup fused bias+gelu
     bias = torch.rand(args.ffn_hidden_size // args.tensor_model_parallel_size,
                       dtype=dtype, device='cuda')
-    input = torch.rand((args.seq_length // mpu.get_context_parallel_world_size(), args.micro_batch_size,
+    seq_len = args.micro_seq_length or args.seq_length
+    input = torch.rand((seq_len // mpu.get_context_parallel_world_size(), args.micro_batch_size,
                         args.ffn_hidden_size // args.tensor_model_parallel_size),
                        dtype=dtype, device='cuda')
     # Warmup JIT fusions with the input grad_enable state of both forward
@@ -290,9 +436,9 @@ def _warmup_jit_function():
 
     # Warmup fused bias+dropout+add
     if args.sequence_parallel:
-        seq_length = args.seq_length // mpu.get_tensor_model_parallel_world_size()
+        seq_length = (args.micro_seq_length or args.seq_length) // mpu.get_tensor_model_parallel_world_size()
     else:
-        seq_length = args.seq_length
+        seq_length = args.micro_seq_length or args.seq_length
     seq_length //= mpu.get_context_parallel_world_size()
     input = torch.rand((seq_length, args.micro_batch_size, args.hidden_size),
                        dtype=dtype, device='cuda')

@@ -1,0 +1,39 @@
+source "$SCRIPT_DIR/model/13b"
+SEQ_LENGTH=$((32 * 1024))
+source "$SCRIPT_DIR/optimizer/llama1"
+# source "$SCRIPT_DIR/dataset/sample_enwiki_32005"
+#source "$SCRIPT_DIR/dataset/sample_wiki_128000"
+source "$SCRIPT_DIR/dataset/llama3_128256"
+source "$SCRIPT_DIR/performance/default"
+
+GLOBAL_BATCH_SIZE=4
+TRAIN_ITERS=16
+
+NP=32
+
+TP=8
+CP=1
+PP=4
+PP_l=2
+SP=1
+CP_IMPL=query-out
+RECOMPUTE=full
+OFFLOAD_ALPHA=0
+TP_OVERLAP=1
+DP_OVERLAP=0
+SYNC_LEVEL=1
+MICRO_SEQ_LENGTH=$((8 * 1024))
+POST_LM_PP=1
+POST_LM_PROCESSING_SLICE_SIZE=0
+KV_CACHE_IMPL=chunked
+PP_ATTN_BALANCE=0
+
+LOG_DIR=$SCRIPT_DIR/llama_13b
+LOG_INTERVAL=1
+TENSORBOARD_DIR=
+
+LOAD=
+SAVE=$LOAD
+SAVE_INTERVAL=1000
+
+PROFILE=0

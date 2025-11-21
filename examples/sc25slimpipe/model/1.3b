@@ -1,0 +1,8 @@
+SEQ_LENGTH=2048
+NUM_LAYERS=24           # GPT-3: Page 8, https://arxiv.org/pdf/2005.14165v4.pdf
+HIDDEN_SIZE=2048        # GPT-3: Page 8, https://arxiv.org/pdf/2005.14165v4.pdf
+FFN_HIDDEN_SIZE=5504
+NUM_ATTENTION_HEADS=16  # https://huggingface.co/EleutherAI/gpt-neo-1.3B/blob/main/config.json
+GQA=0
+NUM_QUERY_GROUPS=
+POSITION_EMBEDDING=rope

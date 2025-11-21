@@ -2,11 +2,11 @@
 
 """Megatron tokenizers."""
 
-from abc import ABC
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 from .bert_tokenization import FullTokenizer as FullBertTokenizer
 from .gpt2_tokenization import GPT2Tokenizer
+from .tokenization_llama_csharp import LlamaTokenizer as LlamaTokenizerCSharp
 
 
 def build_tokenizer(args):
@@ -38,14 +38,21 @@ def build_tokenizer(args):
         tokenizer = _GPTSentencePieceTokenizer(args.tokenizer_model)
     elif args.tokenizer_type == 'NullTokenizer':
         assert args.vocab_size is not None
-        tokenizer = _NullTokenizer(args.vocab_size)
+        tokenizer = _NullTokenizer(args.vocab_size) 
+    elif args.tokenizer_type == "HuggingFaceTokenizer":
+        tokenizer = _HuggingFaceTokenizer(args.tokenizer_model)
+        # tokenizer = _HFTokenizer(args.tokenizer_model, args.seq_length, False)
     else:
         raise NotImplementedError('{} tokenizer is not '
                                   'implemented.'.format(args.tokenizer_type))
-    
+
     # Add vocab size.
     args.padded_vocab_size = _vocab_size_with_padding(tokenizer.vocab_size,
                                                       args)
+    if args.mask_padded_vocab_in_ce_loss:
+        args.trained_vocab_size = tokenizer.vocab_size
+    else:
+        args.trained_vocab_size = args.padded_vocab_size
 
     return tokenizer
 
@@ -57,6 +64,9 @@ def _vocab_size_with_padding(orig_vocab_size, args):
     after = orig_vocab_size
     multiple = args.make_vocab_size_divisible_by * \
         args.tensor_model_parallel_size
+    # FIXME(lizhouyang): maintain this alignment when laoding ckpt.
+    if args.kaimm_vocab_in_pipeline_parallel:
+        multiple *= args.pipeline_model_parallel_size
     while (after % multiple) != 0:
         after += 1
     if args.rank == 0:
@@ -122,6 +132,174 @@ class AbstractTokenizer(ABC):
     def mask(self):
         raise NotImplementedError('MASK is not provided for {} '
                                   'tokenizer'.format(self.name))
+
+
+class _HFTokenizer(AbstractTokenizer):
+    """HF Tokenizer"""
+
+    def __init__(self, tokenizer_name_or_path, max_seq_len, trust_remote_code):
+        name = tokenizer_name_or_path
+        super().__init__(name)
+        try:
+            import transformers
+        except ImportError:
+            raise EnvironmentError(
+                "The transformers library must be installed to use huggingface_tokenizer_provider"
+            )
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(
+            tokenizer_name_or_path,
+            padding_side="right",
+            trust_remote_code=trust_remote_code,
+            use_fast=False,
+        )
+
+        DEFAULT_PAD_TOKEN = "[PAD]"
+        DEFAULT_EOS_TOKEN = "</s>"
+        DEFAULT_BOS_TOKEN = "<s>"
+        DEFAULT_UNK_TOKEN = "<unk>"
+        special_tokens_dict = dict()
+        if self.tokenizer.pad_token is None:
+            special_tokens_dict["pad_token"] = DEFAULT_PAD_TOKEN
+        if self.tokenizer.eos_token is None:
+            special_tokens_dict["eos_token"] = DEFAULT_EOS_TOKEN
+        if self.tokenizer.bos_token is None:
+            special_tokens_dict["bos_token"] = DEFAULT_BOS_TOKEN
+        if self.tokenizer.unk_token is None:
+            special_tokens_dict["unk_token"] = DEFAULT_UNK_TOKEN
+        self.tokenizer.add_special_tokens(special_tokens_dict)
+        self.tokenizer.model_max_length = max_seq_len
+        self.encoder = self.tokenizer.get_vocab()
+        self.decoder = {v: k for k, v in self.encoder.items()}
+
+    @property
+    def vocab_size(self):
+        return self.tokenizer.vocab_size
+
+    @property
+    def vocab(self):
+        return self.encoder
+
+    @property
+    def inv_vocab(self):
+        return self.decoder
+
+    def tokenize(self, text):
+        return self.tokenizer.encode(text)
+
+    def detokenize(self, token_ids):
+        return self.tokenizer.decode(token_ids)
+
+    @property
+    def bos(self):
+        return self.bos_token_id
+
+    @property
+    def bos_token_id(self):
+        candidate = self.tokenizer.eos_token_id
+        return self._check_token_candidate(candidate)
+
+    @property
+    def cls(self):
+        candidate = self.tokenizer.cls_token_id
+        return self._check_token_candidate(candidate)
+
+    @property
+    def sep(self):
+        candidate = self.tokenizer.sep_token_id
+        return self._check_token_candidate(candidate)
+
+    @property
+    def pad(self):
+        candidate = self.tokenizer.pad_token_id
+        return self._check_token_candidate(candidate)
+
+    @property
+    def eod(self):
+        candidate = self.tokenizer.eos_token_id
+        return self._check_token_candidate(candidate)
+
+    @property
+    def eos(self):
+        return self.eos_token_id
+
+    @property
+    def eos_token_id(self):
+        candidate = self.tokenizer.eos_token_id
+        return self._check_token_candidate(candidate)
+
+    @property
+    def mask(self):
+        candidate = self.tokenizer.mask_token_id
+        return self._check_token_candidate(candidate)
+
+    @property
+    def additional_special_tokens_ids(self):
+        return self.tokenizer.additional_special_tokens_ids
+
+    @staticmethod
+    def _check_token_candidate(candidate):
+        """Checks whether the candidate is None or not, and raises an exception if it is."""
+        if candidate is None:
+            raise AttributeError("Requested token doesn't exist in current tokenizer")
+        return candidate
+
+
+class _HuggingFaceTokenizer(AbstractTokenizer):
+    def __init__(self, pretrained_model_name_or_path, **kwargs):
+        super().__init__(pretrained_model_name_or_path, **kwargs)
+        try:
+            import transformers
+        except ImportError:
+            raise EnvironmentError(
+                "The transformers library must be installed to use huggingface_tokenizer_provider"
+            )
+
+        # TODO(bnorick): download tokenizer once to lustre and use force offline to make sure all tasks read it from there
+        self._tokenizer = transformers.AutoTokenizer.from_pretrained(
+            pretrained_model_name_or_path=pretrained_model_name_or_path, **kwargs
+        )
+        self._vocab = self._tokenizer.get_vocab()
+        self._inv_vocab = {token_id: token for token, token_id in self._vocab.items()}
+
+    @property
+    def vocab_size(self):
+        return self._tokenizer.vocab_size
+
+    @property
+    def vocab(self):
+        """Dictionary from vocab text token to id token."""
+        return self._vocab
+
+    @property
+    def inv_vocab(self):
+        """Dictionary from vocab id token to text token."""
+        return self._inv_vocab
+
+    @property
+    def decoder(self):
+        return self._inv_vocab
+
+    def tokenize(self, text, **kwargs):
+        return self._tokenizer(text, **kwargs).input_ids
+
+    def detokenize(self, token_ids, **kwargs):
+        return self._tokenizer.decode(token_ids, **kwargs)
+
+    def offsets(self, ids: list[int], text: str) -> list[int]:
+        retok_ids: "transformers.BatchEncoding" = self._tokenizer(text)
+        offsets, next_start_idx = [], 0
+        for i in range(len(ids)):
+            span = retok_ids.token_to_chars(i)
+            if span is not None:
+                offsets.append(span.start)
+                next_start_idx = span.end
+            else:
+                offsets.append(next_start_idx)
+        return offsets
+
+    @property
+    def eod(self):
+        return self._tokenizer.eos_token_id
 
 
 class _BertWordPieceTokenizer(AbstractTokenizer):
@@ -506,7 +684,7 @@ class _NullTokenizer:
     def __init__(self, vocab_size):
         vocab_size = int(vocab_size)
         self._eos_id = vocab_size
-        self.vocab_size = vocab_size+1
+        self.vocab_size = vocab_size
 
     def tokenize(self, text):
         return [int(x) for x in text.split(' ')]

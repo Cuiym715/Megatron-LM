@@ -5,7 +5,9 @@
 from abc import ABC
 from abc import abstractmethod
 from apex.multi_tensor_apply import multi_tensor_applier
+from typing import List
 import amp_C
+import math
 import torch
 from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
 from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
@@ -61,6 +63,7 @@ class MegatronOptimizer(ABC):
                  log_num_zeros_in_grad,
                  params_have_main_grad,
                  use_contiguous_buffers_in_local_ddp,
+                 is_expert_parallel,
                  models):
 
         """Input optimizer is the base optimizer for example Adam."""
@@ -71,6 +74,7 @@ class MegatronOptimizer(ABC):
         self.log_num_zeros_in_grad = log_num_zeros_in_grad
         self.params_have_main_grad = params_have_main_grad
         self.use_contiguous_buffers_in_local_ddp = use_contiguous_buffers_in_local_ddp
+        self.is_expert_parallel = is_expert_parallel
 
         # 'models' are retained for access to the contiguous grad buffers.
         # (see distributed optimizer)
@@ -110,6 +114,8 @@ class MegatronOptimizer(ABC):
 
     def get_model_parallel_group(self):
         """Default returned here, but the distributed optimizer overrides this."""
+        if self.is_expert_parallel:
+            return [mpu.get_model_parallel_group(), mpu.get_expert_model_parallel_group()]
         return mpu.get_model_parallel_group()
 
 
@@ -186,9 +192,14 @@ class MegatronOptimizer(ABC):
     param_groups = property(_get_param_groups, _set_param_groups)
 
 
-    @abstractmethod
     def step(self, args, timers):
-        pass
+        gen = self.two_phase_step(args, timers)
+        grad_norm = next(gen)
+        try:
+            gen.send(grad_norm)
+        except StopIteration as e:
+            return e.value
+        raise ValueError("unreachable code")
 
 
     def gather_model_params(self, args, timers):
@@ -199,7 +210,7 @@ class MegatronOptimizer(ABC):
         pass
 
 
-    def allreduce_word_embedding_grads(self, args):
+    def allreduce_word_embedding_grads(self, args, model_list=None):
         """
         All-reduce word embedding grads.
 
@@ -216,10 +227,12 @@ class MegatronOptimizer(ABC):
                 unwrapped_model = self.models[-1]
             else:  # We do not support the interleaved schedule for T5 yet.
                 unwrapped_model = self.models[0]
+            if model_list is not None and unwrapped_model not in model_list:
+                return
             unwrapped_model = unwrap_model(
                 unwrapped_model, (torchDDP, LocalDDP, Float16Module))
 
-            if unwrapped_model.share_word_embeddings:
+            if unwrapped_model.share_word_embeddings and not unwrapped_model.vocab_in_pp:
                 word_embeddings_weight = unwrapped_model.word_embeddings_weight()
                 if args.DDP_impl == 'local':
                     grad = word_embeddings_weight.main_grad
@@ -228,7 +241,7 @@ class MegatronOptimizer(ABC):
                 torch.distributed.all_reduce(grad, group=mpu.get_embedding_group())
 
 
-    def allreduce_position_embedding_grads(self, args):
+    def allreduce_position_embedding_grads(self, args, model_list=None):
         """
         All-reduce position_embeddings grad across first (encoder) and
         split (decoder) stages to ensure that position embeddings parameters
@@ -239,6 +252,8 @@ class MegatronOptimizer(ABC):
                 mpu.get_pipeline_model_parallel_world_size() > 1 and \
                 args.pipeline_model_parallel_split_rank is not None:
             unwrapped_model = self.models[0]
+            if model_list is not None and unwrapped_model not in model_list:
+                return
             unwrapped_model = unwrap_model(
                 unwrapped_model, (torchDDP, LocalDDP, Float16Module))
             assert args.DDP_impl == 'local', \
@@ -247,33 +262,63 @@ class MegatronOptimizer(ABC):
             torch.distributed.all_reduce(grad, group=mpu.get_position_embedding_group())
 
 
-    def allreduce_embedding_grads(self, args):
+    def allreduce_embedding_grads(self, args, model_list=None):
         """All-reduce both word and position embeddings."""
-        self.allreduce_word_embedding_grads(args)
-        self.allreduce_position_embedding_grads(args)
+        self.allreduce_word_embedding_grads(args, model_list)
+        self.allreduce_position_embedding_grads(args, model_list)
 
 
-    def allreduce_layernorm_grads(self, args):
+    def allreduce_layernorm_grads(self, args, model_list=None):
         """All-reduce layernorm grads (for sequence parallelism)."""
+        if model_list is None:
+            model_list = self.models
 
         # All-reduce layernorm parameters across model parallel nodes
         # when sequence parallelism is used
         if mpu.get_tensor_model_parallel_world_size() > 1 and \
                 args.sequence_parallel:
             grads = []
-            for model_module in self.models:
+            for model_module in model_list:
                 unwrapped_model = unwrap_model( 
                     model_module, (torchDDP, LocalDDP, Float16Module))
                 for param in unwrapped_model.parameters():
-                    if getattr(param, 'sequence_parallel', False):
+                    is_dense_param = getattr(param, 'allreduce', True)
+                    if getattr(param, 'sequence_parallel', False) and param.requires_grad and \
+                            model_module.track_expert_parallel_params == (not is_dense_param):
                         grad = param.main_grad if args.DDP_impl == 'local' else param.grad
-                        grads.append(grad.data)
-            coalesced = _flatten_dense_tensors(grads)
-            torch.distributed.all_reduce(
-                coalesced, group=mpu.get_tensor_model_parallel_group())
-            for buf, synced in zip(grads, _unflatten_dense_tensors(
-                    coalesced, grads)):
-                buf.copy_(synced)
+                        if grad is None or grad.data is None or grad.data.numel() == 0:
+                            print(f"Warning: Found an empty gradient in {param}")
+                        else:
+                            grads.append(grad.data)
+            if len(grads) > 0:
+                coalesced = _flatten_dense_tensors(grads)
+                torch.distributed.all_reduce(
+                    coalesced, group=mpu.get_tensor_model_parallel_group())
+                for buf, synced in zip(grads, _unflatten_dense_tensors(
+                        coalesced, grads)):
+                    buf.copy_(synced)
+
+
+    def allreduce_final_layernorm_grads(self, args, model_list=None):
+        """All-reduce final layernorm grads (for post_process in pipeline parallelism)."""
+        if not args.kaimm_vocab_in_pipeline_parallel:
+            return
+        unwrapped_model = self.models[0]
+        if model_list is not None and unwrapped_model not in model_list:
+            return
+        unwrapped_model = unwrap_model(
+            unwrapped_model, (torchDDP, LocalDDP, Float16Module))
+        assert unwrapped_model.vocab_in_pp
+        grads = []
+        for param in unwrapped_model.language_model.final_layernorm.parameters():
+            grad = param.main_grad if args.DDP_impl == 'local' else param.grad
+            if grad is None or grad.data is None or grad.data.numel() == 0:
+                print(f"Warning: Found an empty gradient in {param}")
+            else:
+                grads.append(grad.data)
+        for grad in grads:
+            with torch.distributed._coalescing_manager(mpu.get_pipeline_model_parallel_group()):
+                torch.distributed.all_reduce(grad, group=mpu.get_pipeline_model_parallel_group())
 
 
     def reduce_model_grads(self, args, timers):
@@ -283,6 +328,7 @@ class MegatronOptimizer(ABC):
         timers('layernorm-grads-all-reduce', log_level=1).start(
             barrier=args.barrier_with_L1_time)
         self.allreduce_layernorm_grads(args)
+        self.allreduce_final_layernorm_grads(args)
         timers('layernorm-grads-all-reduce').stop()
 
         # All-reduce if needed.
@@ -300,6 +346,39 @@ class MegatronOptimizer(ABC):
             barrier=args.barrier_with_L1_time)
         self.allreduce_embedding_grads(args)
         timers('embedding-grads-all-reduce').stop()
+
+
+    # Get data parallel group switch EP
+
+    def get_data_parallel_group(self):
+        if self.is_expert_parallel:
+            return mpu.get_data_modulo_expert_parallel_group()
+        else:
+            return mpu.get_data_parallel_group()
+
+    def get_data_parallel_group_slow(self):
+        if self.is_expert_parallel:
+            return mpu.get_data_modulo_expert_parallel_group_slow()
+        else:
+            return mpu.get_data_parallel_group_slow()
+
+    def get_data_parallel_group_gloo(self):
+        if self.is_expert_parallel:
+            return mpu.get_data_modulo_expert_parallel_group_gloo()
+        else:
+            return mpu.get_data_parallel_group_gloo()
+
+    def get_data_parallel_world_size(self):
+        if self.is_expert_parallel:
+            return mpu.get_data_modulo_expert_parallel_world_size()
+        else:
+            return mpu.get_data_parallel_world_size()
+
+    def get_data_parallel_rank(self):
+        if self.is_expert_parallel:
+            return mpu.get_data_modulo_expert_parallel_rank()
+        else:
+            return mpu.get_data_parallel_rank()
 
 
 class MixedPrecisionOptimizer(MegatronOptimizer):
@@ -335,12 +414,12 @@ class MixedPrecisionOptimizer(MegatronOptimizer):
 
     def __init__(self, optimizer, clip_grad, log_num_zeros_in_grad,
                  params_have_main_grad, use_contiguous_buffers_in_local_ddp,
-                 fp16, bf16, params_dtype, grad_scaler,
+                 fp16, bf16, params_dtype, grad_scaler, is_expert_parallel,
                  models):
 
         super().__init__(
             optimizer, clip_grad, log_num_zeros_in_grad,
-            params_have_main_grad, use_contiguous_buffers_in_local_ddp,
+            params_have_main_grad, use_contiguous_buffers_in_local_ddp, is_expert_parallel,
             models)
 
         self.fp16 = fp16
@@ -406,7 +485,7 @@ class MixedPrecisionOptimizer(MegatronOptimizer):
 
 
     @torch.no_grad()
-    def step(self, args, timers):
+    def two_phase_step(self, args, timers):
 
         # Copy gradients from model params to main params.
         timers('optimizer-copy-to-main-grad', log_level=1).start(
@@ -437,7 +516,9 @@ class MixedPrecisionOptimizer(MegatronOptimizer):
             barrier=args.barrier_with_L1_time)
         grad_norm = None
         if self.clip_grad > 0.0:
-            grad_norm = self.clip_grad_norm(self.clip_grad)
+            grad_norm = yield from self.clip_grad_norm(self.clip_grad)
+        else:
+            grad_norm = yield grad_norm
         timers('optimizer-clip-main-grad').stop()
 
         # Count the zeros in the grads.
@@ -495,12 +576,12 @@ class Float16OptimizerWithFloat16Params(MixedPrecisionOptimizer):
 
     def __init__(self, optimizer, clip_grad, log_num_zeros_in_grad,
                  params_have_main_grad, use_contiguous_buffers_in_local_ddp,
-                 fp16, bf16, params_dtype, grad_scaler, models):
+                 fp16, bf16, params_dtype, grad_scaler, is_expert_parallel, models):
 
         super().__init__(
             optimizer, clip_grad, log_num_zeros_in_grad,
             params_have_main_grad, use_contiguous_buffers_in_local_ddp,
-            fp16, bf16, params_dtype, grad_scaler, models)
+            fp16, bf16, params_dtype, grad_scaler, is_expert_parallel, models)
 
         # ======================
         # main parameter stuff
@@ -698,11 +779,12 @@ class FP32Optimizer(MegatronOptimizer):
                  log_num_zeros_in_grad,
                  params_have_main_grad,
                  use_contiguous_buffers_in_local_ddp,
+                 is_expert_parallel,
                  models):
 
         super(FP32Optimizer, self).__init__(
             optimizer, clip_grad, log_num_zeros_in_grad,
-            params_have_main_grad, use_contiguous_buffers_in_local_ddp,
+            params_have_main_grad, use_contiguous_buffers_in_local_ddp, is_expert_parallel,
             models)
 
         self._scale = torch.cuda.FloatTensor([1.0])
@@ -720,7 +802,7 @@ class FP32Optimizer(MegatronOptimizer):
 
 
     @torch.no_grad()
-    def step(self, args, timers):
+    def two_phase_step(self, args, timers):
         """Clip gradients (if needed) and step the base optimizer.
         Always return successful since there is no overflow."""
 
@@ -744,7 +826,9 @@ class FP32Optimizer(MegatronOptimizer):
             barrier=args.barrier_with_L1_time)
         grad_norm = None
         if self.clip_grad > 0.0:
-            grad_norm = self.clip_grad_norm(self.clip_grad)
+            grad_norm = yield from self.clip_grad_norm(self.clip_grad)
+        else:
+            grad_norm = yield grad_norm
         timers('optimizer-clip-main-grad').stop()
 
         # count the zeros in the grads
@@ -774,3 +858,247 @@ class FP32Optimizer(MegatronOptimizer):
 
     def load_state_dict(self, state_dict):
         self.optimizer.load_state_dict(state_dict)
+
+
+class ChainedOptimizer(MegatronOptimizer):
+    """ChainedOptimizer is designed for a collection of optimizers.
+    
+    These optimizers are responsible for different parts of multiple models for
+    a training task and will be executed one-by-one when the model is updated.
+
+    Args:
+        chained_optimizers: a list of optimizers.
+    """
+
+    # Remove these attributes which inherits from MegatronOptimizer.
+    state = None
+    param_groups = None
+
+    def __init__(self, chained_optimizers: List[MegatronOptimizer]):
+        self.chained_optimizers = chained_optimizers
+        self.param_groups = []
+        for optimizer in self.chained_optimizers:
+            self.param_groups += optimizer.param_groups
+
+    def zero_grad(self, set_to_none=True):
+        for optimizer in self.chained_optimizers:
+            optimizer.zero_grad(set_to_none)
+
+    def get_loss_scale(self):
+        return self.chained_optimizers[0].get_loss_scale()
+
+    def reload_model_params(self):
+        for optimizer in self.chained_optimizers:
+            optimizer.reload_model_params()
+
+    def state_dict(self):
+        return [optimizer.state_dict() for optimizer in self.chained_optimizers]
+
+    def load_state_dict(self, state_dict):
+        if len(self.chained_optimizers) != len(state_dict):
+            raise RuntimeError(
+                f'Expected {len(self.chained_optimizers)} entries'
+                f' in state dict, but got {len(state_dict)}.'
+            )
+        for optimizer, state in zip(self.chained_optimizers, state_dict):
+            optimizer.load_state_dict(state)
+
+        # Reset param_groups as load_state_dict reset chained optimizers's attribute.
+        self.param_groups = []
+        for optimizer in self.chained_optimizers:
+            self.param_groups += optimizer.param_groups
+
+    def step(self, args, timers):
+        """ChainedOptimizer will step all optimizers one by one.
+
+        Args:
+            args (argparse.Namespace): command-line arguments.
+            timers (Timers): timers used for profiling.
+        """
+
+        update_successful, grad_norm, num_zeros_in_grad = True, 0, 0
+        grad_norm_all_none = True
+        grad_norms = []
+        generators = [optimizer.two_phase_step(args, timers) for optimizer in self.chained_optimizers]
+        for gen in generators:
+            _grad_norm = next(gen)
+            grad_norm_all_none &= _grad_norm is None
+            grad_norms += [_grad_norm if _grad_norm else 0.0]
+        grad_norm = None if grad_norm_all_none else math.sqrt(sum([x ** 2 for x in grad_norms]))
+        for gen in generators:
+            try:
+                gen.send(grad_norm)
+            except StopIteration as e:
+                _update_successful, _, _num_zeros_in_grad = e.value
+            update_successful &= _update_successful
+            num_zeros_in_grad += _num_zeros_in_grad if _num_zeros_in_grad else 0
+            del _update_successful, _num_zeros_in_grad
+
+        return update_successful, grad_norm, num_zeros_in_grad
+
+    def save_parameter_state(self, filename: str):
+        """Save the distributed parameter states of all optimizers to a file.
+
+        Args:
+            filename (str): path to save parameter state to.
+        """
+        save_states = False
+        states = []
+        for optimizer in self.chained_optimizers:
+            if hasattr(optimizer, 'get_parameter_state_dp_zero'):
+                state_dict = optimizer.get_parameter_state_dp_zero()
+
+                # Save checkpoint economically, only when DP rank = 0, state dict
+                # needs to be saved.
+                if optimizer.get_data_parallel_rank() == 0:
+                    states.append(state_dict)
+                    save_states = True
+                else:
+                    states.append(None)
+            else:
+                states.append(None)
+                raise NotImplementedError(f"{type(optimizer)} has no get_parameter_state_dp_zero")
+
+        if save_states:
+            torch.save(states, filename)
+
+    def load_parameter_state(self, filename: str):
+        """Load the distributed parameter states of all optimizers from a file.
+
+        Args:
+            filename (str): path to load parameter state from.
+        """
+        states = None
+        for idx, optimizer in enumerate(self.chained_optimizers):
+            if not hasattr(optimizer, 'load_parameter_state_from_dp_zero'):
+                raise NotImplementedError(f"{type(optimizer)} has no load_parameter_state_from_dp_zero")
+
+            # Lazy loading checkpoint, state dict is needed only when DP rank = 0.
+            if optimizer.get_data_parallel_rank() == 0 and states is None:
+                states = torch.load(filename)
+
+            state_dict = states[idx] if states else None
+            optimizer.load_parameter_state_from_dp_zero(state_dict)
+
+    def finish_param_sync(self, model_index: int):
+        """Finish parameter synchronization for all optimizers.
+        """
+        for optimizer in self.chained_optimizers:
+            optimizer.finish_param_sync(model_index)
+
+    def gather_model_params(self, args, timers):
+        for optimizer in self.chained_optimizers:
+            optimizer.gather_model_params(args, timers)
+
+    def allreduce_layernorm_grads(self, args, model_list=None):
+        for optimizer in self.chained_optimizers:
+            optimizer.allreduce_layernorm_grads(args, model_list)
+
+    def reduce_model_grads(self, args, timers):
+        for optimizer in self.chained_optimizers:
+            optimizer.reduce_model_grads(args, timers)
+
+    def partition_into_sub_divisions(self, overlap_gather, overlap_reduce, gather_ratio, reduce_ratio):
+        gather_fast_jobs_all = list()
+        gather_slow_jobs_all = list()
+        reduce_slow_jobs_all = list()
+        reduce_fast_jobs_all = list()
+        for i, optimizer in enumerate(self.chained_optimizers):
+            gather_fast_jobs, gather_slow_jobs, reduce_slow_jobs, reduce_fast_jobs = \
+                optimizer.partition_into_sub_divisions(overlap_gather, overlap_reduce, gather_ratio, reduce_ratio)
+            gather_fast_jobs_all.append(gather_fast_jobs)
+            gather_slow_jobs_all.append(gather_slow_jobs)
+            reduce_slow_jobs_all.append(reduce_slow_jobs)
+            reduce_fast_jobs_all.append(reduce_fast_jobs)
+        if len(gather_fast_jobs_all[0]) != len(gather_fast_jobs_all[1]):
+            if len(gather_fast_jobs_all[0]) > len(gather_fast_jobs_all[1]):
+                gather_fast_jobs_all[1].append(None)
+            else:
+                gather_fast_jobs_all[0].append(None)
+        if len(gather_slow_jobs_all[0]) != len(gather_slow_jobs_all[1]):
+            if len(gather_slow_jobs_all[0]) > len(gather_slow_jobs_all[1]):
+                gather_slow_jobs_all[1].append(None)
+            else:
+                gather_slow_jobs_all[0].append(None)
+        if len(reduce_fast_jobs_all[0]) != len(reduce_fast_jobs_all[1]):
+            if len(reduce_fast_jobs_all[0]) > len(reduce_fast_jobs_all[1]):
+                reduce_fast_jobs_all[1].insert(0, None)
+            else:
+                reduce_fast_jobs_all[0].insert(0, None)
+        if len(reduce_slow_jobs_all[0]) != len(reduce_slow_jobs_all[1]):
+            if len(reduce_slow_jobs_all[0]) > len(reduce_slow_jobs_all[1]):
+                reduce_slow_jobs_all[1].insert(0, None)
+            else:
+                reduce_slow_jobs_all[0].insert(0, None)
+
+        gather_fast_jobs_out = list()
+        gather_slow_jobs_out = list()
+        reduce_slow_jobs_out = list()
+        reduce_fast_jobs_out = list()
+        for i in range(len(gather_fast_jobs_all[0])):
+            gather_fast_jobs_out.append(([gather_fast_jobs_all[j][i] for j in range(len(self.chained_optimizers))],))
+        for i in range(len(gather_slow_jobs_all[0])):
+            gather_slow_jobs_out.append(([gather_slow_jobs_all[j][i] for j in range(len(self.chained_optimizers))],))
+        for i in range(len(reduce_slow_jobs_all[0])):
+            reduce_slow_jobs_out.append(([reduce_slow_jobs_all[j][i] for j in range(len(self.chained_optimizers))],))
+        for i in range(len(reduce_fast_jobs_all[0])):
+            reduce_fast_jobs_out.append(([reduce_fast_jobs_all[j][i] for j in range(len(self.chained_optimizers))],))
+
+        return gather_fast_jobs_out, gather_slow_jobs_out, reduce_slow_jobs_out, reduce_fast_jobs_out
+
+
+    def gather_sub_division(self, args, timers, job_list, stream=None, ep_stream=None):
+        for i, optimizer in enumerate(self.chained_optimizers):
+            if job_list[i] != None:
+                if stream is not None and i==0:
+                    with torch.cuda.stream(stream):
+                        optimizer.gather_sub_division(args, timers, *(job_list[i]))
+                elif ep_stream is not None and i==1:
+                    with torch.cuda.stream(ep_stream):
+                        optimizer.gather_sub_division(args, timers, *(job_list[i]))
+                else:
+                    optimizer.gather_sub_division(args, timers, *(job_list[i]))
+
+
+    def post_gather_sub_division(self, args, timers, job_list):
+        clean_flag = False
+        model_index_flag = None
+        for i, optimizer in enumerate(self.chained_optimizers):
+            if job_list[i] != None:
+                (model_index, pbuf, start, end, slow, is_last_division) = job_list[i]
+                if is_last_division:
+                    clean_flag = True
+                    model_index_flag = model_index
+                optimizer.post_gather_sub_division(args, timers, model_index, pbuf, start, end, slow, False)
+        if clean_flag:
+            self.chained_optimizers[0].models[model_index_flag].zero_grad_buffer()
+
+
+    def is_largest_slow_gather(self, job_list):
+        if job_list[0] != None:
+            return self.chained_optimizers[0].is_largest_slow_gather(*(job_list[0]))
+        else:
+            return self.chained_optimizers[1].is_largest_slow_gather(*(job_list[1]))
+
+
+    def pre_reduce_sub_division(self, args, timers, job_list):
+        for i, optimizer in enumerate(self.chained_optimizers):
+            if job_list[i] != None:
+                (model_index, gbuf, start, end, slow, is_first_division) = job_list[i]
+                if i==1 and is_first_division:
+                    optimizer.pre_reduce_sub_division(args, timers, model_index, gbuf, start, end, slow, False)
+                else:
+                    optimizer.pre_reduce_sub_division(args, timers, *(job_list[i]))
+
+
+    def reduce_sub_division(self, args, timers, job_list, stream=None, ep_stream=None):
+        for i, optimizer in enumerate(self.chained_optimizers):
+            if job_list[i] != None:
+                if stream is not None and i==0:
+                    with torch.cuda.stream(stream):
+                        optimizer.reduce_sub_division(args, timers, *(job_list[i]))
+                elif ep_stream is not None and i==1:
+                    with torch.cuda.stream(ep_stream):
+                        optimizer.reduce_sub_division(args, timers, *(job_list[i]))
+                else:
+                    optimizer.reduce_sub_division(args, timers, *(job_list[i]))

@@ -1,5 +1,3 @@
-# Copyright (c) 2024, Kuaishou Technology. All rights reserved.
-
 import torch
 import wrap_gemm_cuda
 
@@ -11,6 +9,16 @@ def addmm_inplace(input, mat1, mat2):
     assert input.shape[:-1] == mat1.shape[:-1] and input.shape[-1] == mat2.shape[-1]
     if input.dtype == torch.bfloat16 and mat1.dtype == torch.bfloat16 and mat2.dtype == torch.bfloat16:
         wrap_gemm_cuda.wrap_gemm_bf16bf16bf16_f32_nn_beta1_cuda(
+            mat1.data_ptr(),
+            mat2.data_ptr(),
+            input.data_ptr(),
+            mat1.shape[:-1].numel(),
+            mat2.shape[-1],
+            mat2.shape[0],
+            torch.cuda.current_blas_handle(),
+        )
+    elif input.dtype == torch.float32 and mat1.dtype == torch.float32 and mat2.dtype == torch.float32:
+        wrap_gemm_cuda.wrap_gemm_f32f32f32_f32_nn_beta1_cuda(
             mat1.data_ptr(),
             mat2.data_ptr(),
             input.data_ptr(),

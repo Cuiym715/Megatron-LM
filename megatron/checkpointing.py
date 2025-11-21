@@ -8,6 +8,7 @@ import sys
 import numpy as np
 
 import torch
+import time
 
 from megatron import update_num_microbatches
 from megatron.core import mpu, tensor_parallel
@@ -79,12 +80,17 @@ def ensure_directory_exists(filename):
 
 def get_checkpoint_name(checkpoints_path, iteration, release=False,
                         pipeline_parallel=None,
-                        tensor_rank=None, pipeline_rank=None):
+                        tensor_rank=None, pipeline_rank=None,
+                        expert_parallel=None, expert_rank=None,
+                        return_base_dir=False):
     """Determine the directory name for this rank's checkpoint."""
     if release:
         directory = 'release'
     else:
         directory = 'iter_{:07d}'.format(iteration)
+    if return_base_dir:
+        common_path = os.path.join(checkpoints_path, directory)
+        return common_path
 
     # Use both the tensor and pipeline MP rank.
     if pipeline_parallel is None:
@@ -93,6 +99,10 @@ def get_checkpoint_name(checkpoints_path, iteration, release=False,
         tensor_rank = mpu.get_tensor_model_parallel_rank()
     if pipeline_rank is None:
         pipeline_rank = mpu.get_pipeline_model_parallel_rank()
+    if expert_parallel is None:
+        expert_parallel = (mpu.get_expert_model_parallel_world_size() > 1)
+    if expert_rank is None:
+        expert_rank = mpu.get_expert_model_parallel_rank()
 
     # Use both the tensor and pipeline MP rank. If using the distributed
     # optimizer, then the optimizer's path must additionally include the
@@ -102,7 +112,10 @@ def get_checkpoint_name(checkpoints_path, iteration, release=False,
                             f'mp_rank_{tensor_rank:02d}')
     else:
         common_path = os.path.join(checkpoints_path, directory,
-                        f'mp_rank_{tensor_rank:02d}_{pipeline_rank:03d}')
+                f'mp_rank_{tensor_rank:02d}_{pipeline_rank:03d}')
+
+    if expert_parallel:
+        common_path = common_path + f'_{expert_rank:03d}'
 
     return os.path.join(common_path, "model_optim_rng.pt")
 
@@ -111,31 +124,53 @@ def get_distributed_optimizer_checkpoint_name(model_checkpoint_name):
     return os.path.join(os.path.dirname(model_checkpoint_name),
                         "distrib_optim.pt")
 
+def get_dataloader_checkpoint_name(dataloader_checkpoint_name):
+    return os.path.join(os.path.dirname(dataloader_checkpoint_name),
+                        "dataloader.pt")
+
 
 def find_checkpoint_rank_0(checkpoints_path, iteration, release=False):
     """Finds the checkpoint for rank 0 without knowing if we are using
-    pipeline parallelism or not.
+    pipeline parallelism/expert parallelism or not.
 
-    Since the checkpoint naming scheme changes if pipeline parallelism
-    is present, we need to look for both naming schemes if we don't
-    know if the checkpoint has pipeline parallelism.
+    Since the checkpoint naming scheme changes if pipeline or expert
+    parallelism is present, we need to look for both naming schemes if
+    we don't know if the checkpoint has pipeline or expert parallelism.
     """
 
-    # Look for checkpoint with no pipelining
+    # Look for checkpoint with no pipelining and no expert parallelism
     filename = get_checkpoint_name(checkpoints_path, iteration, release,
                                    pipeline_parallel=False,
-                                   tensor_rank=0, pipeline_rank=0)
+                                   tensor_rank=0, pipeline_rank=0,
+                                   expert_parallel=False, expert_rank=0)
     if os.path.isfile(filename):
         return filename
 
-    # Look for checkpoint with pipelining
+    # Look for checkpoint with no pipelining and expert parallelism
+    filename = get_checkpoint_name(checkpoints_path, iteration, release,
+                                   pipeline_parallel=False,
+                                   tensor_rank=0, pipeline_rank=0,
+                                   expert_parallel=True, expert_rank=0)
+    if os.path.isfile(filename):
+        return filename
+
+    # Look for checkpoint with pipelining and no expert parallelism
     filename = get_checkpoint_name(checkpoints_path, iteration, release,
                                    pipeline_parallel=True,
-                                   tensor_rank=0, pipeline_rank=0)
+                                   tensor_rank=0, pipeline_rank=0,
+                                   expert_parallel=False, expert_rank=0)
     if os.path.isfile(filename):
         return filename
 
-    return None, None
+    # Look for checkpoint with pipelining and expert parallelism
+    filename = get_checkpoint_name(checkpoints_path, iteration, release,
+                                   pipeline_parallel=True,
+                                   tensor_rank=0, pipeline_rank=0,
+                                   expert_parallel=True, expert_rank=0)
+    if os.path.isfile(filename):
+        return filename
+
+    return None
 
 
 def get_checkpoint_tracker_filename(checkpoints_path):
@@ -160,8 +195,6 @@ def read_metadata(tracker_filename):
                 print_rank_0('ERROR: Invalid metadata file {}. Exiting'.format(
                     tracker_filename))
                 sys.exit()
-    assert iteration > 0 or release, 'error parsing metadata file {}'.format(
-        tracker_filename)
 
     # Get the max iteration retrieved across the ranks.
     if torch.distributed.is_initialized():
@@ -210,6 +243,9 @@ def get_rng_state():
 
     return rng_state_list
 
+def get_env_var_or_default(env_var_name, default_value):
+    return os.environ.get(env_var_name, default_value)
+
 
 def save_checkpoint(iteration, model, optimizer, opt_param_scheduler):
     """Save a model checkpoint."""
@@ -232,7 +268,8 @@ def save_checkpoint(iteration, model, optimizer, opt_param_scheduler):
         optim_checkpoint_name = \
             get_distributed_optimizer_checkpoint_name(checkpoint_name)
         ensure_directory_exists(optim_checkpoint_name)
-        optimizer.save_parameter_state(optim_checkpoint_name)
+        if optimizer is not None:
+            optimizer.save_parameter_state(optim_checkpoint_name)
     else:
         if any(isinstance(module, tensor_parallel.ColumnParallelLinear) and module.cp_overlap
                for m in model for module in m.modules()):
@@ -240,7 +277,7 @@ def save_checkpoint(iteration, model, optimizer, opt_param_scheduler):
 
     # Collect args, model, RNG.
     if not torch.distributed.is_initialized() \
-       or mpu.get_data_parallel_rank() == 0:
+       or mpu.get_data_modulo_expert_parallel_rank() == 0:
 
         # Arguments, iteration, and model.
         state_dict = {}
@@ -272,6 +309,10 @@ def save_checkpoint(iteration, model, optimizer, opt_param_scheduler):
         ensure_directory_exists(checkpoint_name)
         torch.save(state_dict, checkpoint_name)
         fix_query_key_value_ordering(model, state_dict['checkpoint_version'])
+
+    is_pipeline_last_stage = mpu.is_pipeline_last_stage(ignore_virtual=True)
+    tp = mpu.get_tensor_model_parallel_rank()
+    dp = mpu.get_data_parallel_rank()
 
     # Wait so everyone is done (necessary)
     if torch.distributed.is_initialized():
@@ -490,6 +531,8 @@ def load_args_from_checkpoint(args, load_arg='load'):
     _set_arg('seq_length')
     _set_arg('num_attention_heads')
     _set_arg('kv_channels')
+    _set_arg('group_query_attention', force=True)
+    _set_arg('num_query_groups', force=True)
     _set_arg('max_position_embeddings')
     _set_arg('add_position_embedding', force=True)
     _set_arg('use_rotary_position_embeddings', force=True)
@@ -501,7 +544,9 @@ def load_args_from_checkpoint(args, load_arg='load'):
     _set_arg('tokenizer_type')
     _set_arg('tokenizer_model')
     _set_arg('padded_vocab_size', force=True)
+    _set_arg('trained_vocab_size')
     _set_arg('make_vocab_size_divisible_by', force=True)
+    _set_arg('mask_padded_vocab_in_ce_loss')
     _set_arg('rms_norm', force=True)
     _set_arg('params_dtype')
     if checkpoint_version < 3.0:
@@ -512,6 +557,18 @@ def load_args_from_checkpoint(args, load_arg='load'):
         _set_arg('pipeline_model_parallel_size', force=True)
         _set_arg('virtual_pipeline_model_parallel_size', force=True)
         _set_arg('num_layers_per_virtual_pipeline_stage')
+    _set_arg('kaimm_num_layers_padding_front', force=True)
+    _set_arg('kaimm_num_layers_padding_back', force=True)
+    _set_arg('num_experts', force=True)
+    _set_arg('expert_model_parallel_size', force=True)
+    _set_arg('expert_hidden_size', force=True)
+    _set_arg('shared_expert_hidden_size', force=True)
+    _set_arg('shared_expert_combine_method', force=True)
+    _set_arg('moe_layer_interval', force=True)
+    _set_arg('moe_first', force=True)
+    _set_arg('moe_router_topk')
+    _set_arg('moe_grouped_gemm', force=True)
+    _set_arg('moe_te_grouped_gemm', force=True)
     return args, checkpoint_args
 
 
@@ -564,6 +621,8 @@ def load_checkpoint(model, optimizer, opt_param_scheduler, load_arg='load', stri
     if 'args' in state_dict and not args.finetune:
         checkpoint_args = state_dict['args']
         check_checkpoint_args(checkpoint_args)
+        args.old_seq_length = getattr(checkpoint_args,
+                                              'seq_length', 0)
         args.consumed_train_samples = getattr(checkpoint_args,
                                               'consumed_train_samples', 0)
         update_num_microbatches(consumed_samples=args.consumed_train_samples)
@@ -613,6 +672,7 @@ def load_checkpoint(model, optimizer, opt_param_scheduler, load_arg='load', stri
                     opt_param_scheduler.load_state_dict(state_dict['lr_scheduler'])
                 else:
                     opt_param_scheduler.load_state_dict(state_dict['opt_param_scheduler'])
+
         except KeyError:
             print_rank_0('Unable to load optimizer from checkpoint {}. '
                          'Specify --no-load-optim or --finetune to prevent '

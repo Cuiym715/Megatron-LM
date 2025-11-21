@@ -5,7 +5,6 @@
    with some changes. """
 
 import numbers
-import os
 import torch
 from torch.nn.parameter import Parameter
 from torch.nn import init
@@ -20,13 +19,6 @@ try:
 except:
     HAVE_PERSIST_LAYER_NORM = False
 
-try:
-    from transformer_engine.pytorch.module.rmsnorm import _RMSNorm as TERMSNormFN
-    HAVE_TE_RMS_NORM = True
-except ModuleNotFoundError:
-    raise
-
-
 from apex.normalization.fused_layer_norm import FusedLayerNormAffineFunction, FusedRMSNormAffineFunction
 
 
@@ -39,13 +31,16 @@ class MixedFusedLayerNorm(torch.nn.Module):
   def __init__(self, normalized_shape, eps=1e-5,
                no_persist_layer_norm=True,
                sequence_parallel=False,
-               apply_layernorm_1p=False):
+               apply_layernorm_1p=False,
+               memory_efficient=False):
         super(MixedFusedLayerNorm, self).__init__()
 
         self.apply_layernorm_1p = apply_layernorm_1p
+        self.memory_efficient = memory_efficient
 
         global fused_layer_norm_cuda
-        fused_layer_norm_cuda = importlib.import_module("fused_layer_norm_cuda")
+        if fused_layer_norm_cuda is None:
+            fused_layer_norm_cuda = importlib.import_module("fused_layer_norm_cuda")
 
         # List of hiddens sizes supported in the persistent layer norm kernel
         # If the hidden size is not supported, fall back to the non-persistent
@@ -86,9 +81,10 @@ class MixedFusedLayerNorm(torch.nn.Module):
     weight = self.weight + 1 if self.apply_layernorm_1p else self.weight
 
     if self.no_persist_layer_norm:
-        return FusedLayerNormAffineFunction.apply(input, weight, self.bias, self.normalized_shape, self.eps)
+        return FusedLayerNormAffineFunction.apply(input, weight, self.bias, self.normalized_shape,
+                                                  self.eps, self.memory_efficient)
     else:
-        output = FastLayerNormFN.apply(input, weight, self.bias, self.eps)
+        output = FastLayerNormFN.apply(input, weight, self.bias, self.eps, self.memory_efficient)
 
         # Apex's fast layer norm function outputs a 'view' tensor (i.e., has
         # a populated '_base' field). This will result in schedule.py's
@@ -104,10 +100,12 @@ class MixedFusedRMSNorm(torch.nn.Module):
     def __init__(self, normalized_shape, eps=1e-5,
                no_persist_rms_norm = True,
                sequence_parallel=False,
-               apply_layernorm_1p=False):
+               apply_layernorm_1p=False,
+               memory_efficient=False):
         super(MixedFusedRMSNorm, self).__init__()
 
         self.apply_layernorm_1p = apply_layernorm_1p
+        self.memory_efficient = memory_efficient
 
         global fused_layer_norm_cuda
         if fused_layer_norm_cuda is None:
@@ -130,9 +128,6 @@ class MixedFusedRMSNorm(torch.nn.Module):
         self.reset_parameters()
         self.sequence_parallel = sequence_parallel
 
-        self.fwd_rmsnorm_sm_margin = int(os.getenv("NVTE_FWD_LAYERNORM_SM_MARGIN", "0"))
-        self.bwd_rmsnorm_sm_margin = int(os.getenv("NVTE_BWD_LAYERNORM_SM_MARGIN", "0"))
-
         # set sequence parallelism flag on weight and bias parameters
         setattr(self.weight, 'sequence_parallel', self.sequence_parallel)
 
@@ -148,14 +143,11 @@ class MixedFusedRMSNorm(torch.nn.Module):
 
         weight = self.weight + 1 if self.apply_layernorm_1p else self.weight
 
-        if HAVE_TE_RMS_NORM:
-            return TERMSNormFN.apply(input, weight, self.eps, self.fwd_rmsnorm_sm_margin, self.bwd_rmsnorm_sm_margin,
-                                     self.apply_layernorm_1p, torch.is_grad_enabled(), input.dtype)
-
         if self.no_persist_rms_norm:
-            return FusedRMSNormAffineFunction.apply(input, weight, self.normalized_shape, self.eps)
+            return FusedRMSNormAffineFunction.apply(input, weight, self.normalized_shape,
+                                                    self.eps, self.memory_efficient)
         else:
-            output = FastRMSNormFN.apply(input, weight, self.eps)
+            output = FastRMSNormFN.apply(input, weight, self.eps, self.memory_efficient)
             # Apex's fast rms norm function outputs a 'view' tensor (i.e., has
             # a populated '_base' field). This will result in schedule.py's
             # deallocate_output_tensor() throwing an error, so a viewless tensor is

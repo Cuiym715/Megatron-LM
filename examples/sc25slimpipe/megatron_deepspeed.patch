@@ -1,0 +1,414 @@
+From ad4eab41115e72654cb6eeadf821bd770fc79424 Mon Sep 17 00:00:00 2001
+From: Wei Zhang <zhangwei45@kuaishou.com>
+Date: Sun, 16 Mar 2025 13:13:58 +0800
+Subject: [PATCH 1/4] [PATCH 1/2] Add mpirun support
+
+---
+ megatron/arguments.py | 24 +++++++++++++++++++-----
+ 1 file changed, 19 insertions(+), 5 deletions(-)
+
+diff --git a/megatron/arguments.py b/megatron/arguments.py
+index fbd0a59..cc4bd01 100644
+--- a/megatron/arguments.py
++++ b/megatron/arguments.py
+@@ -7,16 +7,17 @@ import argparse
+ import dataclasses
+ import json
+ import os
+-import torch
+-import deepspeed
+ import types
+-from packaging import version
+ 
++import deepspeed
++import torch
+ import torch.nn.functional as F
+-from megatron.global_vars import set_retro_args, get_retro_args
+-from tools.retro.utils import get_args_path as get_retro_args_path
++from packaging import version
+ 
+ from megatron.core.transformer import TransformerConfig
++from megatron.global_vars import get_retro_args, set_retro_args
++from tools.retro.utils import get_args_path as get_retro_args_path
++
+ 
+ def parse_args(extra_args_provider=None, ignore_unknown_args=False):
+     """Parse all arguments."""
+@@ -66,6 +67,16 @@ def parse_args(extra_args_provider=None, ignore_unknown_args=False):
+     args.rank = int(os.getenv('RANK', '0'))
+     args.world_size = int(os.getenv("WORLD_SIZE", '1'))
+ 
++    # launch from mpi
++    if int(os.getenv("OMPI_COMM_WORLD_SIZE", "0")) > 0:
++        args.rank = int(os.environ["OMPI_COMM_WORLD_RANK"])
++        args.local_rank = int(os.environ["OMPI_COMM_WORLD_LOCAL_RANK"])
++        args.world_size = int(os.environ["OMPI_COMM_WORLD_SIZE"])
++        addr, port = args.master_addr.split(":")
++        os.environ["MASTER_ADDR"] = addr
++        os.environ["MASTER_PORT"] = port
++        delattr(args, "master_addr")
++
+     return args
+ 
+ def validate_args(args, defaults={}):
+@@ -1146,6 +1157,9 @@ def _add_mixed_precision_args(parser):
+ def _add_distributed_args(parser):
+     group = parser.add_argument_group(title='distributed')
+ 
++    group.add_argument(
++        "--master-addr", type=str, default="127.0.0.1:8389", help="master add."
++    )
+     group.add_argument('--tensor-model-parallel-size', type=int, default=1,
+                        help='Degree of tensor model parallelism.')
+     group.add_argument('--enable-expert-tensor-parallelism', action='store_true',
+-- 
+2.25.1
+
+
+From 50e5e93a866426c06e300f0e64ae4a613880c1eb Mon Sep 17 00:00:00 2001
+From: Wei Zhang <zhangwei45@kuaishou.com>
+Date: Sun, 16 Mar 2025 13:18:47 +0800
+Subject: [PATCH 2/4] [PATCH 2/2] Report memory in first 2 iters
+
+---
+ megatron/training.py | 96 +++++++++++++++++++++++++-------------------
+ 1 file changed, 54 insertions(+), 42 deletions(-)
+
+diff --git a/megatron/training.py b/megatron/training.py
+index 0aeaabe..acfddc1 100644
+--- a/megatron/training.py
++++ b/megatron/training.py
+@@ -3,62 +3,70 @@
+ 
+ """Pretrain utilities."""
+ 
+-from datetime import datetime
++import json
+ import math
+ import sys
+ import time
+-import json
++from datetime import datetime
++
+ try:
+     import wandb
+ except (ImportError, ModuleNotFoundError):
+     wandb = None
+ # The earliest we can measure the start time.
+ _TRAIN_START_TIME = time.time()
+-import torch
+ from collections import OrderedDict
+-from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
+ from enum import Enum
+ 
+-from megatron import get_args
+-from megatron import get_signal_handler
+-from megatron import get_timers
+-from megatron import get_tensorboard_writer
+-from megatron import get_wandb_writer
+-from megatron import get_current_global_batch_size
+-from megatron import get_num_microbatches
+-from megatron import is_last_rank
+-from megatron import update_num_microbatches
+-from megatron.core import mpu, tensor_parallel
+-from megatron import print_rank_0, is_rank_0
+-from megatron import print_rank_last
+-from megatron.checkpointing import load_checkpoint
+-from megatron.checkpointing import save_checkpoint
+-from megatron.model import Float16Module
+-from megatron.model import GPTModel
+-from megatron.core.enums import ModelType
+-from megatron.optimizer import get_megatron_optimizer
+-from megatron.initialize import initialize_megatron
+-from megatron.initialize import write_args_to_tensorboard
+-from megatron.initialize import set_jit_fusion_options
+-from megatron.optimizer_param_scheduler import OptimizerParamScheduler
+-from megatron.model import DistributedDataParallel as LocalDDP
+-from megatron.utils import check_adlr_autoresume_termination
+-from megatron.utils import unwrap_model, found_kill_switch
+-from megatron.data.data_samplers import build_pretraining_data_loader
+-from megatron.utils import calc_params_l2_norm
+-from megatron.core.pipeline_parallel import get_forward_backward_func
+-from megatron.utils import report_memory, throughput_calculator, checkpoint_throughput_calculator, update_rotary_pos_emb
+-from megatron.model.vision.knn_monitor import compute_feature_bank
+-from megatron.arguments import core_transformer_config_from_args
+-from megatron.profiler import setup_profiler, trigger, on_step_begin, on_step_end
+-
+ import deepspeed
++import torch
+ from deepspeed.accelerator import get_accelerator
+ from deepspeed.compression.compress import init_compression, redundancy_clean
+ from deepspeed.runtime.data_pipeline.data_routing.helper import convert_to_random_ltd
++from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
++
++from megatron import (
++    get_args,
++    get_current_global_batch_size,
++    get_num_microbatches,
++    get_signal_handler,
++    get_tensorboard_writer,
++    get_timers,
++    get_wandb_writer,
++    is_last_rank,
++    print_rank_0,
++    print_rank_last,
++    update_num_microbatches,
++)
++from megatron.arguments import core_transformer_config_from_args
++from megatron.checkpointing import load_checkpoint, save_checkpoint
++from megatron.core import mpu, tensor_parallel
++from megatron.core.enums import ModelType
++from megatron.core.pipeline_parallel import get_forward_backward_func
++from megatron.data.data_samplers import build_pretraining_data_loader
++from megatron.initialize import (
++    initialize_megatron,
++    set_jit_fusion_options,
++    write_args_to_tensorboard,
++)
++from megatron.model import DistributedDataParallel as LocalDDP
++from megatron.model import Float16Module, GPTModel
+ from megatron.model.transformer import ParallelTransformerLayer
++from megatron.model.vision.knn_monitor import compute_feature_bank
++from megatron.optimizer import get_megatron_optimizer
++from megatron.optimizer_param_scheduler import OptimizerParamScheduler
++from megatron.profiler import on_step_begin, on_step_end, setup_profiler, trigger
++from megatron.utils import (
++    calc_params_l2_norm,
++    check_adlr_autoresume_termination,
++    checkpoint_throughput_calculator,
++    found_kill_switch,
++    report_memory,
++    throughput_calculator,
++    unwrap_model,
++    update_rotary_pos_emb,
++)
+ 
+-from deepspeed import comm as dist
+ 
+ def print_datetime(string):
+     """Note that this call will sync across all ranks."""
+@@ -160,8 +168,9 @@ def pretrain(train_valid_test_dataset_provider,
+             args.curriculum_learning_legacy = args.deepspeed_config_dict[ \
+                 "curriculum_learning"]["enabled"]
+         if args.curriculum_learning_legacy and not args.no_pipeline_parallel:
+-            from deepspeed.runtime.data_pipeline.curriculum_scheduler \
+-                import CurriculumScheduler
++            from deepspeed.runtime.data_pipeline.curriculum_scheduler import (
++                CurriculumScheduler,
++            )
+             args.curriculum_scheduler = CurriculumScheduler( \
+                 args.deepspeed_config_dict["curriculum_learning"])
+         if "compression_training" in args.deepspeed_config_dict:
+@@ -1035,7 +1044,9 @@ def training_log(loss_dict, total_loss_dict, learning_rate, iteration,
+ 
+             #TODO(billishyahao): Remove me after bf16_optimizer promotes its state.
+             if not hasattr(optimizer, "state"):
+-                assert hasattr(optimizer, "optimizer"), f"Optimizer must have optimizer property."
++                assert hasattr(optimizer, "optimizer"), (
++                    "Optimizer must have optimizer property."
++                )
+                 optimizer.state = optimizer.optimizer.state
+ 
+             for _, group in enumerate(optimizer.param_groups):
+@@ -1189,7 +1200,8 @@ def training_log(loss_dict, total_loss_dict, learning_rate, iteration,
+         if report_memory_flag and learning_rate > 0.:
+             # Report memory after optimizer state has been initialized.
+             report_memory('(after {} iterations)'.format(iteration))
+-            report_memory_flag = False
++            # report_memory_flag = False
++            report_memory_flag = iteration < 2
+         timers.log(timers_to_log, normalizer=args.log_interval)
+ 
+     return report_memory_flag
+-- 
+2.25.1
+
+
+From 53a5b299d63f6f23bd6425582f998c97d4dc2d6c Mon Sep 17 00:00:00 2001
+From: Wei Zhang <zhangwei45@kuaishou.com>
+Date: Sun, 16 Mar 2025 15:32:32 +0800
+Subject: [PATCH 3/4] Add another HuggingFaceTokenizer implementation
+
+---
+ megatron/arguments.py           | 26 ++++++++------
+ megatron/tokenizer/tokenizer.py | 61 +++++++++++++++++++++++++++++++--
+ 2 files changed, 74 insertions(+), 13 deletions(-)
+
+diff --git a/megatron/arguments.py b/megatron/arguments.py
+index cc4bd01..89dc4f0 100644
+--- a/megatron/arguments.py
++++ b/megatron/arguments.py
+@@ -1310,16 +1310,22 @@ def _add_data_args(parser):
+                        help='Warm up mmap files.')
+     group.add_argument('--num-workers', type=int, default=2,
+                        help="Dataloader number of workers.")
+-    group.add_argument('--tokenizer-type', type=str,
+-                       default=None,
+-                       choices=['BertWordPieceLowerCase',
+-                                'BertWordPieceCase',
+-                                'GPT2BPETokenizer',
+-                                'SentencePieceTokenizer',
+-                                'GPTSentencePieceTokenizer',
+-                                'HFTokenizer',
+-                                'NullTokenizer'],
+-                       help='What type of tokenizer to use.')
++    group.add_argument(
++        "--tokenizer-type",
++        type=str,
++        default=None,
++        choices=[
++            "BertWordPieceLowerCase",
++            "BertWordPieceCase",
++            "GPT2BPETokenizer",
++            "SentencePieceTokenizer",
++            "GPTSentencePieceTokenizer",
++            "HFTokenizer",
++            "HuggingFaceTokenizer",
++            "NullTokenizer",
++        ],
++        help="What type of tokenizer to use.",
++    )
+     group.add_argument('--tokenizer-model', type=str, default=None,
+                        help='Sentencepiece tokenizer model.')
+     group.add_argument('--trust-remote-code', action='store_true', default=False,
+diff --git a/megatron/tokenizer/tokenizer.py b/megatron/tokenizer/tokenizer.py
+index 7edef90..c5edd6a 100644
+--- a/megatron/tokenizer/tokenizer.py
++++ b/megatron/tokenizer/tokenizer.py
+@@ -3,12 +3,14 @@
+ 
+ """Megatron tokenizers."""
+ 
+-from abc import ABC
+-from abc import abstractmethod
++from abc import ABC, abstractmethod
+ 
+ from transformers import AutoTokenizer
++
+ from .bert_tokenization import FullTokenizer as FullBertTokenizer
+ from .gpt2_tokenization import GPT2Tokenizer
++
++
+ def build_tokenizer(args):
+     """Initialize tokenizer."""
+     if args.rank == 0:
+@@ -39,11 +41,13 @@ def build_tokenizer(args):
+     elif args.tokenizer_type == 'NullTokenizer':
+         assert args.vocab_size is not None
+         tokenizer = _NullTokenizer(args.vocab_size)
+-    elif args.tokenizer_type == 'HFTokenizer':
++    elif args.tokenizer_type == "HFTokenizer":
+         assert args.tokenizer_model is not None
+         tokenizer = _HFTokenizer(args.tokenizer_model,
+                                  args.seq_length,
+                                  args.trust_remote_code)
++    elif args.tokenizer_type == "HuggingFaceTokenizer":
++        tokenizer = _HuggingFaceTokenizer(args.tokenizer_model)
+     else:
+         raise NotImplementedError('{} tokenizer is not '
+                                   'implemented.'.format(args.tokenizer_type))
+@@ -642,3 +646,54 @@ class _HFTokenizer(AbstractTokenizer):
+         if candidate is None:
+             raise AttributeError("Requested token doesn't exist in current tokenizer")
+         return candidate
++
++class _HuggingFaceTokenizer(AbstractTokenizer):
++    def __init__(self, pretrained_model_name_or_path, **kwargs):
++        super().__init__(pretrained_model_name_or_path, **kwargs)
++
++        # TODO(bnorick): download tokenizer once to lustre and use force offline to make sure all tasks read it from there
++        self._tokenizer = AutoTokenizer.from_pretrained(
++            pretrained_model_name_or_path=pretrained_model_name_or_path, **kwargs
++        )
++        self._vocab = self._tokenizer.get_vocab()
++        self._inv_vocab = {token_id: token for token, token_id in self._vocab.items()}
++
++    @property
++    def vocab_size(self):
++        return len(self._tokenizer)
++
++    @property
++    def vocab(self):
++        """Dictionary from vocab text token to id token."""
++        return self._vocab
++
++    @property
++    def inv_vocab(self):
++        """Dictionary from vocab id token to text token."""
++        return self._inv_vocab
++
++    @property
++    def decoder(self):
++        return self._inv_vocab
++
++    def tokenize(self, text, **kwargs):
++        return self._tokenizer(text, **kwargs).input_ids
++
++    def detokenize(self, token_ids, **kwargs):
++        return self._tokenizer.decode(token_ids, **kwargs)
++
++    def offsets(self, ids: list[int], text: str) -> list[int]:
++        retok_ids: "transformers.BatchEncoding" = self._tokenizer(text)
++        offsets, next_start_idx = [], 0
++        for i in range(len(ids)):
++            span = retok_ids.token_to_chars(i)
++            if span is not None:
++                offsets.append(span.start)
++                next_start_idx = span.end
++            else:
++                offsets.append(next_start_idx)
++        return offsets
++
++    @property
++    def eod(self):
++        return self._tokenizer.eos_token_id
+-- 
+2.25.1
+
+
+From 15b6960d493b3ebfd592ef641da321393da1f0a7 Mon Sep 17 00:00:00 2001
+From: Wei Zhang <zhangwei45@kuaishou.com>
+Date: Thu, 27 Mar 2025 16:03:35 +0800
+Subject: [PATCH 4/4] Remove the fpdt parameter for attention operation
+
+---
+ megatron/model/transformer.py | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/megatron/model/transformer.py b/megatron/model/transformer.py
+index 8956f8b..4d9b6db 100644
+--- a/megatron/model/transformer.py
++++ b/megatron/model/transformer.py
+@@ -726,7 +726,7 @@ class ParallelAttention(MegatronModule):
+             mixed_x_layer, _ = self.query_key_value(hidden_states)
+             
+             if self.enable_ds_sequence_parallel:
+-                assert self.projection_size == self.kv_projection_size
++                # assert self.projection_size == self.kv_projection_size
+                 seq_len, bs = mixed_x_layer.shape[0], mixed_x_layer.shape[1]
+                 query_layer = mixed_x_layer[:, :, :self.projection_size].reshape(seq_len, bs, -1, self.head_dim)
+                 key_layer = mixed_x_layer[:, :, self.projection_size:self.projection_size+self.kv_projection_size].reshape(seq_len, bs, -1, self.head_dim)
+@@ -1332,13 +1332,13 @@ class ParallelTransformerLayer(MegatronModule):
+ 
+         # Self attention.
+         try:
+-            attention_output, attention_bias = \
+-                self.self_attention(
+-                    layernorm_output,
+-                    attention_mask,
+-                    inference_params=inference_params,
+-                    rotary_pos_emb=rotary_pos_emb,
+-                    cpu_offloading=self.ds_sequence_parallel_fpdt_offloading)
++            attention_output, attention_bias = self.self_attention(
++                layernorm_output,
++                attention_mask,
++                inference_params=inference_params,
++                rotary_pos_emb=rotary_pos_emb,
++                # cpu_offloading=self.ds_sequence_parallel_fpdt_offloading,
++            )
+         except TypeError:
+             attention_output, attention_bias = \
+                 self.self_attention(
+-- 
+2.25.1
+

@@ -54,14 +54,19 @@ def clip_grad_norm_fp32(parameters, grads_for_norm,
     norm_type = float(norm_type)
     total_norm = 0.0
 
+    # model parallel groups
+    if not isinstance(model_parallel_group, (tuple, list)):
+        model_parallel_group = [model_parallel_group]
+
     # Calculate norm.
     if norm_type == inf:
         total_norm = max(grad.abs().max() for grad in grads_for_norm)
         total_norm_cuda = torch.cuda.FloatTensor([float(total_norm)])
         # Take max across all model-parallel GPUs.
-        torch.distributed.all_reduce(total_norm_cuda,
-                                     op=torch.distributed.ReduceOp.MAX,
-                                     group=model_parallel_group)
+        for group in model_parallel_group:
+            torch.distributed.all_reduce(total_norm_cuda,
+                                         op=torch.distributed.ReduceOp.MAX,
+                                         group=group)
         total_norm = total_norm_cuda[0].item()
 
     else:
@@ -89,14 +94,18 @@ def clip_grad_norm_fp32(parameters, grads_for_norm,
                 total_norm += grad_norm ** norm_type
 
         # Sum across all model-parallel GPUs.
-        torch.distributed.all_reduce(total_norm,
-                                     op=torch.distributed.ReduceOp.SUM,
-                                     group=model_parallel_group)
+        for group in model_parallel_group:
+            torch.distributed.all_reduce(total_norm,
+                                         op=torch.distributed.ReduceOp.SUM,
+                                         group=group)
         total_norm = total_norm.item() ** (1.0 / norm_type)
+
+    # Total norm may be accumulated by the ChainedOptimizer
+    total_norm = yield total_norm
 
     # Scale.
     clip_coeff = max_norm / (total_norm + 1.0e-6)
-    if clip_coeff < 1.0:
+    if clip_coeff < 1.0 and len(grads) > 0:  # If all parameters are frozen, len(grads) may be 0.
         dummy_overflow_buf = torch.cuda.IntTensor([0])
         multi_tensor_applier(amp_C.multi_tensor_scale,
                              dummy_overflow_buf,

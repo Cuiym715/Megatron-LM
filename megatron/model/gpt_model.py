@@ -10,7 +10,7 @@ from megatron.profile_utils import annotate_forward_backward
 from .module import MegatronModule
 
 from .enums import AttnMaskType
-from .language_model import parallel_lm_logits
+from .language_model import parallel_lm_logits, slice_post_lm_processing
 from .language_model import get_language_model
 from .utils import init_method_normal
 from .utils import scaled_init_method_normal
@@ -21,6 +21,22 @@ from .utils import slice_lm_inputs_along_cp, gather_post_lm_output_along_cp
 def post_language_model_processing(lm_output, labels, logit_weights,
                                    parallel_output,
                                    fp16_lm_cross_entropy):
+    args = get_args()
+    if args.kaimm_post_lm_processing_slice_size:
+        return slice_post_lm_processing(post_language_model_processing_inner,
+                                        args.kaimm_post_lm_processing_slice_size // args.context_parallel_size,
+                                        lm_output, labels, logit_weights,
+                                        parallel_output,
+                                        fp16_lm_cross_entropy)
+    else:
+        return post_language_model_processing_inner(lm_output, labels, logit_weights,
+                                                    parallel_output,
+                                                    fp16_lm_cross_entropy)
+
+
+def post_language_model_processing_inner(lm_output, labels, logit_weights,
+                                         parallel_output,
+                                         fp16_lm_cross_entropy):
 
     # Output. Format [s b h]
     output = parallel_lm_logits(

@@ -11,6 +11,7 @@ from megatron import get_args
 from megatron import get_timers
 from megatron import print_rank_0
 from megatron.core import mpu, tensor_parallel
+from megatron.core.utils import get_attr_wrapped_model
 from megatron.model.module import param_is_not_shared
 
 from .optimizer import MixedPrecisionOptimizer, _zero_grad_group_helper
@@ -130,8 +131,7 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
         return param_range_map
 
 
-    @classmethod
-    def build_model_gbuf_range(cls, model, dtype):
+    def build_model_gbuf_range(self, model, dtype):
         """
         Build mapping between params and their grad buffers.
 
@@ -142,8 +142,8 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
         reduce-scatter and all-gather.
         """
 
-        data_parallel_rank = mpu.get_data_parallel_rank()
-        data_parallel_world_size = mpu.get_data_parallel_world_size()
+        data_parallel_rank = self.get_data_parallel_rank()
+        data_parallel_world_size = self.get_data_parallel_world_size()
 
         # Grad buffer range.
         grad_buffer = model._grad_buffers[dtype]
@@ -163,9 +163,9 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
         gbuf_local_range = gbuf_world_range.normalize()
 
         # Get each param's ranges.
-        param_range_map = cls.build_model_gbuf_param_range_map(model,
-                                                               dtype,
-                                                               gbuf_world_range)
+        param_range_map = self.build_model_gbuf_param_range_map(model,
+                                                                dtype,
+                                                                gbuf_world_range)
 
         # Group into dict.
         data = {
@@ -179,14 +179,13 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
         return data
 
 
-    @classmethod
-    def build_model_gbuf_range_map(cls, model):
+    def build_model_gbuf_range_map(self, model):
         """
         Create param-to-grad-buffer mappings, for grad buffer data types
         within a specific virtual model.
         """
         return {
-            dtype : cls.build_model_gbuf_range(model, dtype)
+            dtype : self.build_model_gbuf_range(model, dtype)
             for dtype in model._grad_buffers
         }
 
@@ -363,7 +362,7 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
 
     def __init__(self, optimizer, clip_grad, log_num_zeros_in_grad,
                  params_have_main_grad, use_contiguous_buffers_in_local_ddp,
-                 fp16, bf16, params_dtype, grad_scaler, models):
+                 fp16, bf16, params_dtype, grad_scaler, is_expert_parallel, models):
         """
         See top of class definition for argument descriptions.
 
@@ -377,7 +376,7 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
         super().__init__(
             optimizer, clip_grad, log_num_zeros_in_grad,
             params_have_main_grad, use_contiguous_buffers_in_local_ddp,
-            fp16, bf16, params_dtype, grad_scaler, models)
+            fp16, bf16, params_dtype, grad_scaler, is_expert_parallel, models)
 
         # Verify that contiguous buffers are being used.
         # - Note: this should already be checked in arguments.py.
@@ -419,17 +418,22 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
 
                 # Handle older/newer method for getting untyped storage.
                 try:
-                    storage = grad_buffer.data.storage()._untyped()
+                    storage = grad_buffer.data.untyped_storage()
                 except:
-                    storage = grad_buffer.data.storage().untyped()
+                    try:
+                        storage = grad_buffer.data.storage()._untyped()
+                    except:
+                        storage = grad_buffer.data.storage().untyped()
 
                 # Typed param buffer.
                 param_buffer = torch.tensor(
                     storage if params_dtype == grad_buffer.data.dtype else storage[:storage.nbytes()//2],
                     dtype = params_dtype,
                     device = grad_buffer.data.device)
+                # param_buffer = param_buffer[:grad_buffer.numel_padded]
                 current_param_buffers[dtype] = param_buffer
             self.param_buffers.append(current_param_buffers)
+        self.params_may_be_dirty = False
 
         # Update optimizer groups.
         # - Also, leverage state_dict() and load_state_dict() to
@@ -526,6 +530,18 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
             "params" : list(inner_state_dict["param_groups"][idx]["params"]),
         } for idx, group in enumerate(state_dict["optimizer"]["param_groups"])]
 
+        # Set the "step".
+        # - For param_groups with an empty "params" list, the "step" might not
+        #   increase. Although it's acceptable if "params" is empty, all DP
+        #   ranks load the same optimizer state_dict. If the "step" is not
+        #   up-to-date for some groups where "params" is not empty, this could
+        #   cause issues. To address this, we set the "steps" to the maximum
+        #   value.
+        step = max(group.get("step", 0) for group in state_dict_param_groups)
+        if step:
+            for group in state_dict_param_groups:
+                group["step"] = step
+
         # Allocate 'dummy' data for optimizer state (i.e., torch.empty() below)
         # - Real data is overwritten during load_parameter_state().
         state_dict_state = []
@@ -577,23 +593,22 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
                              'Skipping loading grad scaler ...')
 
 
-    def save_parameter_state(self, filename):
-        """Save parameter state (i.e., parameter & optimizer tensors).
+    def get_parameter_state_dp_zero(self):
+        """Get parameter state (i.e., parameter & optimizer tensors).
 
-        This method performs three steps:
+        This method performs two steps:
         - For each DP rank, copy param & optimizer shards to contiguous CPU
-          buffers. (e.g., one buffer each for main_param, exp_avg, and
+          buffers (e.g., one buffer each for main_param, exp_avg, and
           exp_avg_sq).
         - Gather contiguous buffers on DP rank 0 and concatenate to world
           buffers.
-        - Save world buffers to disk (i.e., distrib_opt.pt).
         """
 
         # Data parallelism variables.
-        data_parallel_world_size = mpu.get_data_parallel_world_size()
-        data_parallel_rank = mpu.get_data_parallel_rank()
-        data_parallel_group_gloo = mpu.get_data_parallel_group_gloo()
-        data_parallel_global_ranks = list(mpu._DATA_PARALLEL_GLOBAL_RANKS)
+        data_parallel_world_size = self.get_data_parallel_world_size()
+        data_parallel_rank = self.get_data_parallel_rank()
+        data_parallel_group_gloo = self.get_data_parallel_group_gloo()
+        data_parallel_global_ranks = torch.distributed.get_process_group_ranks(data_parallel_group_gloo)
 
         # Collect param states.
         state = {}
@@ -601,7 +616,8 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
 
             # Iterate grad buffers (by data type).
             dtype_state = {}
-            assert len(gbuf_range_maps) == 1, "single dtype supported, for now."
+            # If no parameters require grad, then model_gbuf_ranges will be empty.
+            assert len(gbuf_range_maps) <= 1, "single dtype supported, for now."
             for dtype, gbuf_range_map in gbuf_range_maps.items():
 
                 # Compute local DP contiguous shard's size.
@@ -637,7 +653,7 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
                             .data.copy_(tensors[key].detach().cpu())
 
                 # Gather contiguous shards on DP rank 0.
-                world_tensors = {}
+                world_tensors_tight = {}
                 for key, send_tensor in local_shards.items():
                     
                     # Gather tensor list.
@@ -659,49 +675,102 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
 
                     # Concatenate.
                     if data_parallel_rank == 0:
-                        world_tensors[key] = torch.cat(recv_tensors)
+                        world_tensor = torch.cat(recv_tensors)
+                        del recv_tensors
 
                         for module in model.modules():
                             if isinstance(module, tensor_parallel.ColumnParallelLinear) and module.cp_overlap:
                                 param = module.weight
+                                if param not in model._grad_buffer_param_index_map[dtype]:
+                                    raise not NotImplementedError("CP overlap + EP is not implemented")
                                 hidden_size_per_attention_head = module.hidden_size_per_attention_head
                                 param_world_start, param_world_end = model._grad_buffer_param_index_map[dtype][param]
-                                world_tensor = world_tensors[key]
                                 world_tensor_slice = world_tensor[param_world_start:param_world_end]
                                 world_tensor_slice.copy_(world_tensor_slice.clone()
                                                          .view(3, -1, hidden_size_per_attention_head, param.shape[1])
                                                          .transpose(0, 1).reshape(-1))
 
+                        language_model = get_attr_wrapped_model(model, "language_model")
+                        if language_model.vocab_in_pp:
+                            param = language_model.output_layer.weight
+                            param_world_start, param_world_end = model._grad_buffer_param_index_map[dtype][param]
+                            assert param_world_start == 0, f"output layer weight should be at the beginning of world tensor."
+                            output_weight_slice = world_tensor[param_world_start:param_world_end]
+                            if mpu.is_pipeline_last_stage(ignore_virtual=True):
+                                output_weight_list = [torch.empty_like(output_weight_slice, dtype=torch.float32, device="cpu")
+                                                for _ in range(mpu.get_pipeline_model_parallel_world_size())]
+                            else:
+                                output_weight_list = None
+                            # Gather.
+                            torch.distributed.gather(
+                                output_weight_slice,
+                                output_weight_list,
+                                mpu.get_pipeline_model_parallel_last_rank(),
+                                mpu.get_pipeline_model_parallel_group_gloo(),
+                            )
+                            # Extend world_tensor from front.
+                            if mpu.is_pipeline_last_stage(ignore_virtual=True):
+                                output_weight_list[-1] = world_tensor
+                                world_tensor = torch.cat(output_weight_list)
+                            else:
+                                world_tensor = world_tensor[param_world_end:]
+                            del output_weight_list
+
+                        if all(model._grad_buffer_param_index_map[dtype][param] == model._grad_buffer_param_index_map_tight[dtype][param]
+                               for param in model._grad_buffer_param_index_map[dtype]):
+                            world_tensor_tight = world_tensor
+                        else:
+                            gbuf_world_numel_tight = max(param_world_end_tight for _, param_world_end_tight in model._grad_buffer_param_index_map_tight[dtype].values())
+                            world_tensor_tight = torch.empty((gbuf_world_numel_tight,), dtype=world_tensor.dtype, device=world_tensor.device)
+                            for param in model._grad_buffer_param_index_map[dtype]:
+                                param_world_start, param_world_end = model._grad_buffer_param_index_map[dtype][param]
+                                param_world_start_tight, param_world_end_tight = model._grad_buffer_param_index_map_tight[dtype][param]
+                                world_tensor_tight[param_world_start_tight:param_world_end_tight].copy_(world_tensor[param_world_start:param_world_end])
+                        world_tensors_tight[key] = world_tensor_tight
+                        del world_tensor
+
                 # Collect world state.
-                dtype_state[dtype] = world_tensors
+                dtype_state[dtype] = world_tensors_tight
             state[model_idx] = dtype_state
 
-        # Save param state.
-        if data_parallel_rank == 0:
-            torch.save(state, filename)
+        return state
 
 
-    def load_parameter_state(self, filename):
-        """Load parameter state (i.e., parameter & optimizer tensors).
+    def save_parameter_state(self, filename: str):
+        """Save the distributed parameter state on DP rank 0.
 
-        This method performs the reverse of save_parameter_state():
-        - Load world buffers from disk (i.e., distrib_opt.pt).
+        Args:
+            filename (str): path to save parameter state to.
+        """
+
+        state_dict = self.get_parameter_state_dp_zero()
+        if self.get_data_parallel_rank() == 0:
+            torch.save(state_dict, filename)
+
+
+    def load_parameter_state_from_dp_zero(self, state_dict):
+        """Load parameter state (i.e., parameter & optimizer tensors) from DP 0 rank.
+
+        This method performs the reverse of get_parameter_state_dp_zero():
         - Scatter contiguous buffers from DP rank 0 to each DP rank (each DP
           rank receives its relevant subset of the world buffers).
         - For each DP rank, copy param & optimizer shards from contiguous CPU
           buffers. (e.g., one buffer each for main_param, exp_avg, and
           exp_avg_sq).
         """
+        if state_dict is not None and "per_bucket_numel_unpadded" in state_dict:
+            per_bucket_numel_unpadded_in_checkpoint = state_dict["per_bucket_numel_unpadded"]
+            assert self.per_bucket_numel_unpadded == per_bucket_numel_unpadded_in_checkpoint, (
+                f"Number of unpadded elements in each bucket need to be the same in current run "
+                f"({self.per_bucket_numel_unpadded}) and checkpoint "
+                f"({per_bucket_numel_unpadded_in_checkpoint})"
+            )
 
         # Data parallelism variables.
-        data_parallel_world_size = mpu.get_data_parallel_world_size()
-        data_parallel_rank = mpu.get_data_parallel_rank()
-        data_parallel_group_gloo = mpu.get_data_parallel_group_gloo()
-        data_parallel_global_ranks = list(mpu._DATA_PARALLEL_GLOBAL_RANKS)
-
-        # Load on DP rank 0.
-        if data_parallel_rank == 0:
-            loaded_state = torch.load(filename)
+        data_parallel_world_size = self.get_data_parallel_world_size()
+        data_parallel_rank = self.get_data_parallel_rank()
+        data_parallel_group_gloo = self.get_data_parallel_group_gloo()
+        data_parallel_global_ranks = torch.distributed.get_process_group_ranks(data_parallel_group_gloo)
 
         # Scatter tensors to all DP ranks.
         for model_idx, gbuf_range_maps in enumerate(self.model_gbuf_ranges):
@@ -718,25 +787,62 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
                                                 device="cpu")
                                 for key in ("param", "exp_avg", "exp_avg_sq")}
 
-                if data_parallel_rank == 0:
-                    for module in model.modules():
-                        if isinstance(module, tensor_parallel.ColumnParallelLinear) and module.cp_overlap:
-                            param = module.weight
-                            hidden_size_per_attention_head = module.hidden_size_per_attention_head
-                            param_world_start, param_world_end = model._grad_buffer_param_index_map[dtype][param]
-                            for key in local_shards:
-                                world_tensor = loaded_state[model_idx][dtype][key]
-                                world_tensor_slice = world_tensor[param_world_start:param_world_end]
-                                world_tensor_slice.copy_(world_tensor_slice.clone()
-                                                         .view(-1, 3,hidden_size_per_attention_head, param.shape[1])
-                                                         .transpose(0, 1).reshape(-1))
-
                 # Scatter local shards from DP rank 0.
                 for key, recv_tensor in local_shards.items():
                     
                     # Scatter tensor list.
                     if data_parallel_rank == 0:
-                        world_tensor = loaded_state[model_idx][dtype][key]
+                        world_tensor_tight = state_dict[model_idx][dtype][key]
+                        if all(model._grad_buffer_param_index_map[dtype][param] == model._grad_buffer_param_index_map_tight[dtype][param]
+                               for param in model._grad_buffer_param_index_map[dtype]):
+                            world_tensor = world_tensor_tight
+                        else:
+                            world_tensor = torch.empty((gbuf_world_numel,), dtype=world_tensor_tight.dtype, device=world_tensor_tight.device)
+                            for param in model._grad_buffer_param_index_map[dtype]:
+                                param_world_start, param_world_end = model._grad_buffer_param_index_map[dtype][param]
+                                param_world_start_tight, param_world_end_tight = model._grad_buffer_param_index_map_tight[dtype][param]
+                                world_tensor[param_world_start:param_world_end].copy_(world_tensor_tight[param_world_start_tight:param_world_end_tight])
+
+                        language_model = get_attr_wrapped_model(model, "language_model")
+                        if language_model.vocab_in_pp:
+                            param = language_model.output_layer.weight
+                            param_world_start, param_world_end = model._grad_buffer_param_index_map[dtype][param]
+                            assert param_world_start == 0, f"output layer weight should be at the beginning of world tensor."
+                            output_weight_slice = torch.empty(param_world_end - param_world_start, dtype=torch.float32, device="cpu")
+                            if mpu.is_pipeline_last_stage(ignore_virtual=True):
+                                output_weight = world_tensor[param_world_start:param_world_end * mpu.get_pipeline_model_parallel_world_size()]
+                                output_weight_list = list(output_weight.chunk(mpu.get_pipeline_model_parallel_world_size()))
+                            else:
+                                output_weight_list = None
+                            # Scatter.
+                            torch.distributed.scatter(
+                                output_weight_slice,
+                                output_weight_list,
+                                mpu.get_pipeline_model_parallel_last_rank(),
+                                mpu.get_pipeline_model_parallel_group_gloo(),
+                            )
+                            # Shrink world_tensor from front.
+                            if mpu.is_pipeline_last_stage(ignore_virtual=True):
+                                world_tensor = world_tensor[param_world_end * (mpu.get_pipeline_model_parallel_world_size() - 1):]
+                                # offset = -param_world_end * (mpu.get_pipeline_model_parallel_world_size() - 1)
+                            else:
+                                world_tensor = torch.cat([output_weight_slice, world_tensor])
+                                # offset = output_weight_slice.numel()
+                            del output_weight_slice
+
+                        for module in model.modules():
+                            if isinstance(module, tensor_parallel.ColumnParallelLinear) and module.cp_overlap:
+                                param = module.weight
+                                if param not in model._grad_buffer_param_index_map[dtype]:
+                                    raise not NotImplementedError("CP overlap + EP is not implemented")
+                                hidden_size_per_attention_head = module.hidden_size_per_attention_head
+                                param_world_start, param_world_end = model._grad_buffer_param_index_map[dtype][param]
+                                world_tensor_slice = world_tensor[param_world_start:param_world_end]
+                                world_tensor_slice.copy_(world_tensor_slice.clone()
+                                                         .view(-1, 3,hidden_size_per_attention_head, param.shape[1])
+                                                         .transpose(0, 1).reshape(-1))
+                                del world_tensor_slice
+
                         gbuf_start_idxs = \
                             list(range(0, gbuf_world_numel, gbuf_local_numel))
                         send_tensors = [world_tensor[i:(i+gbuf_local_numel)]
@@ -751,6 +857,7 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
                             send_tensors.append(world_tensor[last_idx: last_idx + gbuf_local_numel])
                         else:
                             send_tensors.append(world_tensor[last_idx:])
+                        del world_tensor
                     else:
                         send_tensors = None
 
@@ -761,6 +868,7 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
                         data_parallel_global_ranks[0],
                         data_parallel_group_gloo,
                     )
+                    del send_tensors
 
                 # Copy local contiguous shards to param/optim shards.
                 for model_param, param_range_map in \
@@ -786,6 +894,19 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
                             local_shards[key][gbuf_local_start:gbuf_local_end])
 
 
+    def load_parameter_state(self, filename: str):
+        """Load the distributed parameter state from disk.
+
+        Args:
+            filename (str): path to load parameter state from.
+        """
+        state_dict = None
+        if self.get_data_parallel_rank() == 0:
+            state_dict = torch.load(filename)
+
+        self.load_parameter_state_from_dp_zero(state_dict)
+
+
     def zero_grad(self, set_to_none=True):
         """
         Zero grads.
@@ -806,8 +927,7 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
                 _zero_grad_group_helper(group, set_to_none)
 
 
-    @staticmethod
-    def get_model_buffer_dp_views(model_buffers):
+    def get_model_buffer_dp_views(self, model_buffers):
         """
         Get shard views of each of the DDP's param/grad buffers.
 
@@ -823,7 +943,7 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
         in _reduce_scatter_base and _all_gather_base.
         """
 
-        data_parallel_world_size = mpu.get_data_parallel_world_size()
+        data_parallel_world_size = self.get_data_parallel_world_size()
 
         # Buffer views.
         view_items = []
@@ -865,6 +985,7 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
         timers('layernorm-grads-all-reduce', log_level=1).start(
             barrier=args.barrier_with_L1_time)
         self.allreduce_layernorm_grads(args)
+        self.allreduce_final_layernorm_grads(args)
         timers('layernorm-grads-all-reduce').stop()
 
         # All-reduce embedding grads.
@@ -876,28 +997,35 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
         # Reduce-scatter setup.
         timers('grads-reduce-scatter', log_level=1).start(
             barrier=args.barrier_with_L1_time)
-        data_parallel_rank = mpu.get_data_parallel_rank()
-        data_parallel_world_size = mpu.get_data_parallel_world_size()
-        data_parallel_group = mpu.get_data_parallel_group()
+        data_parallel_rank = self.get_data_parallel_rank()
+        data_parallel_world_size = self.get_data_parallel_world_size()
+        data_parallel_group = self.get_data_parallel_group()
         context_parallel_world_size = mpu.get_context_parallel_world_size()
 
         # Scale grad buffers by '1 / data_parallel_world_size'.
+        grad_den = mpu.get_data_parallel_world_size() // context_parallel_world_size
         for model in self.models:
             for dtype, gbuf in model._grad_buffers.items():
-                gbuf.data /= data_parallel_world_size // context_parallel_world_size
+                gbuf.data /= grad_den
 
         # Reduce-scatter all grads.
         gbuf_view_items = self.get_model_grad_buffer_dp_views()
         for index, (model_index, dtype, gbuf, gbuf_views) \
             in enumerate(gbuf_view_items):
 
-            torch.distributed._reduce_scatter_base(
+            torch.distributed.reduce_scatter_tensor(
                 gbuf_views[data_parallel_rank],
                 gbuf,
                 group = data_parallel_group,
             )
 
         timers('grads-reduce-scatter').stop()
+
+
+    def two_phase_step(self, *args, **kwargs):
+        update_successful, grad_norm, num_zeros_in_grad = yield from super().two_phase_step(*args, **kwargs)
+        self.params_may_be_dirty = update_successful
+        return update_successful, grad_norm, num_zeros_in_grad
 
 
     def gather_model_params(self, args, timers):
@@ -909,11 +1037,14 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
         can be copied from the param buffer to the param.
         """
 
+        if not self.params_may_be_dirty:
+            return
+
         timers('params-all-gather', log_level=1).start(
             barrier=args.barrier_with_L1_time)
 
-        data_parallel_rank = mpu.get_data_parallel_rank()
-        data_parallel_group = mpu.get_data_parallel_group()
+        data_parallel_rank = self.get_data_parallel_rank()
+        data_parallel_group = self.get_data_parallel_group()
 
         # All-gather updated main params.
         # - All param buffer views are guaranteed to have the same num elements
@@ -925,7 +1056,7 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
         for index, (model_index, dtype, pbuf, pbuf_views) \
             in enumerate(pbuf_view_items):
 
-            torch.distributed._all_gather_base(
+            torch.distributed.all_gather_into_tensor(
                 pbuf,
                 pbuf_views[data_parallel_rank],
                 group = data_parallel_group,
@@ -938,8 +1069,196 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
                     param_buf = self.param_buffers[model_id][dtype]
                     param_buf_shard = param_buf[buf_start:buf_end]
                     param.view(-1).detach().copy_(param_buf_shard)
+        self.params_may_be_dirty = False
 
         timers('params-all-gather').stop()
+
+
+    def partition_into_sub_divisions(self, overlap_gather, overlap_reduce, gather_ratio, reduce_ratio):
+        DP = self.get_data_parallel_world_size()
+        PP = mpu.get_pipeline_model_parallel_world_size()
+        gbuf_view_items = self.get_model_grad_buffer_dp_views()
+        pbuf_view_items = self.get_model_param_buffer_dp_views()
+        numel_base = math.ceil(min(gbuf.numel() for model_index, dtype, gbuf, gbuf_views in gbuf_view_items) / DP)  # TODO: every rank should get the same value
+        if overlap_gather:
+            maxlen_slow_all_gather = self.maxlen_slow_all_gather = round_up(math.ceil(numel_base * gather_ratio), 1024)  # gather x% gbuf once
+            max_num_overlapped_all_gather = min(PP, up_div(numel_base, maxlen_slow_all_gather))
+        if overlap_reduce:
+            maxlen_slow_reduce_scatter = self.maxlen_slow_reduce_scatter = round_up(math.ceil(numel_base * reduce_ratio), 1024)  # reduce x% gbuf once
+            max_num_overlapped_reduce_scatter = min(PP, up_div(numel_base, maxlen_slow_reduce_scatter))
+
+        gather_fast_jobs_queue = list()
+        gather_slow_jobs_queue = list()
+        reduce_slow_jobs_stack = list()
+        reduce_fast_jobs_stack = list()
+        contiguous_buffer_size = 0
+
+        if overlap_gather:
+            itemsize = torch.empty(1, dtype=self.params_dtype).element_size()
+            for pbuf_index, (model_index, dtype, pbuf, pbuf_views) in enumerate(pbuf_view_items):
+                assert pbuf_index == model_index
+                numel = pbuf.numel() // DP
+                if model_index == 0:
+                    num_slow_all_gather = 0
+                else:
+                    num_slow_all_gather = min(max_num_overlapped_all_gather, up_div(numel, maxlen_slow_all_gather))
+                    buffer_len = DP * max(min(numel, maxlen_slow_all_gather), numel - num_slow_all_gather * maxlen_slow_all_gather)
+                    buffer_bytes = buffer_len * itemsize
+                    contiguous_buffer_size = max(contiguous_buffer_size, buffer_bytes)
+                has_fast_all_gather = num_slow_all_gather * maxlen_slow_all_gather < numel
+                gather_slow_jobs_queue.extend([(
+                        model_index,
+                        pbuf,
+                        i * maxlen_slow_all_gather,
+                        min((i + 1) * maxlen_slow_all_gather, numel),
+                        True,
+                        i == num_slow_all_gather - 1)
+                    for i in range(num_slow_all_gather)])
+                if has_fast_all_gather:
+                    gather_fast_jobs_queue.append((
+                        model_index,
+                        pbuf,
+                        num_slow_all_gather * maxlen_slow_all_gather,
+                        numel,
+                        False,
+                        num_slow_all_gather == 0))
+
+        if overlap_reduce:
+            for gbuf_index, (model_index, dtype, gbuf, gbuf_views) in enumerate(gbuf_view_items):
+                assert gbuf_index == model_index
+                numel = gbuf.numel() // DP
+                if model_index == 0:
+                    num_slow_reduce_scatter = 0
+                else:
+                    num_slow_reduce_scatter = min(max_num_overlapped_reduce_scatter, up_div(numel, maxlen_slow_reduce_scatter))
+                    buffer_len = DP * max(min(numel, maxlen_slow_reduce_scatter), numel - num_slow_reduce_scatter * maxlen_slow_reduce_scatter)
+                    itemsize = torch.empty(1, dtype=dtype).element_size()
+                    buffer_bytes = buffer_len * itemsize
+                    contiguous_buffer_size = max(contiguous_buffer_size, buffer_bytes)
+                has_fast_reduce_scatter = num_slow_reduce_scatter * maxlen_slow_reduce_scatter < numel
+                reduce_slow_jobs_stack.extend([(
+                        model_index,
+                        gbuf,
+                        i * maxlen_slow_reduce_scatter,
+                        min((i + 1) * maxlen_slow_reduce_scatter, numel),
+                        True,
+                        i == num_slow_reduce_scatter - 1)
+                    for i in range(num_slow_reduce_scatter)])
+                if has_fast_reduce_scatter:
+                    reduce_fast_jobs_stack.append((
+                        model_index,
+                        gbuf,
+                        num_slow_reduce_scatter * maxlen_slow_reduce_scatter,
+                        numel,
+                        False,
+                        num_slow_reduce_scatter == 0))
+
+        contiguous_buffer_size = round_up(contiguous_buffer_size, 8)
+        if not hasattr(self, "contiguous_buffer") or self.contiguous_buffer.numel() != contiguous_buffer_size:
+            self.contiguous_buffer = torch.empty(contiguous_buffer_size, dtype=torch.uint8, device="cuda")
+        return gather_fast_jobs_queue, gather_slow_jobs_queue, reduce_slow_jobs_stack[::-1], reduce_fast_jobs_stack[::-1]
+
+
+    def gather_sub_division(self, args, timers, model_index, pbuf, start, end, slow, is_last_division):
+        if not self.params_may_be_dirty:
+            return
+        DP = self.get_data_parallel_world_size()
+        data_parallel_rank = self.get_data_parallel_rank()
+        output_slice = pbuf.view(DP, -1)[:, start:end]
+        if output_slice.is_contiguous():
+            output_slice_contiguous = output_slice
+        else:
+            output_slice_contiguous = self.contiguous_buffer.view(self.params_dtype)[:DP * (end - start)]
+        input_slice = pbuf.view(DP, -1)[data_parallel_rank][start:end]
+        torch.distributed.all_gather_into_tensor(
+            output_slice_contiguous,
+            input_slice,
+            group=self.get_data_parallel_group_slow() if slow else self.get_data_parallel_group(),
+        )
+
+
+    def post_gather_sub_division(self, args, timers, model_index, pbuf, start, end, slow, is_last_division):
+        DP = self.get_data_parallel_world_size()
+        output_slice = pbuf.view(DP, -1)[:, start:end]
+        if output_slice.is_contiguous():
+            output_slice_contiguous = output_slice
+        else:
+            output_slice_contiguous = self.contiguous_buffer.view(self.params_dtype)[:DP * (end - start)]
+        model = self.models[model_index]
+        assert len(model._grad_buffer_param_index_map) == 1
+        param_map = list(model._grad_buffer_param_index_map.values())[0]
+        # 1. Copy to params
+        if self.params_may_be_dirty:
+            if output_slice.is_contiguous():
+                self._copy_slice_to_params(
+                    src=output_slice_contiguous.view(-1),
+                    src_offset=start,
+                    param_map=param_map)
+            else:
+                numel_per_rank = pbuf.numel() // DP
+                for i in range(DP):
+                    self._copy_slice_to_params(
+                        src=output_slice_contiguous.view(DP, -1)[i],
+                        src_offset=i * numel_per_rank + start,
+                        param_map=param_map)
+        # 2. zero_grad_buffer
+        if is_last_division:
+            model.zero_grad_buffer()
+
+
+    def is_largest_slow_gather(self, model_index, pbuf, start, end, slow, is_last_division):
+        return slow and end - start == self.maxlen_slow_all_gather
+
+
+    def pre_reduce_sub_division(self, args, timers, model_index, gbuf, start, end, slow, is_first_division):
+        DP = self.get_data_parallel_world_size()
+        data_parallel_rank = self.get_data_parallel_rank()
+        CP = mpu.get_context_parallel_world_size()
+        if is_first_division:
+            model = self.models[model_index]
+            self.allreduce_layernorm_grads(args, [model])
+            self.allreduce_final_layernorm_grads(args, [model])
+            self.allreduce_embedding_grads(args, [model])
+        output_slice = gbuf.view(DP, -1)[data_parallel_rank][start:end]
+        input_slice = gbuf.view(DP, -1)[:, start:end]
+        # Fused contiguous + div
+        grad_den = mpu.get_data_parallel_world_size() // CP
+        if input_slice.is_contiguous():
+            input_slice_contiguous = input_slice
+            input_slice_contiguous /= grad_den
+        else:
+            input_slice_contiguous = self.contiguous_buffer.view(input_slice.dtype)[:input_slice.numel()]
+            torch.div(input_slice, grad_den, out=input_slice_contiguous.view(input_slice.shape))
+
+
+    def reduce_sub_division(self, args, timers, model_index, gbuf, start, end, slow, is_first_division):
+        DP = self.get_data_parallel_world_size()
+        data_parallel_rank = self.get_data_parallel_rank()
+        output_slice = gbuf.view(DP, -1)[data_parallel_rank][start:end]
+        input_slice = gbuf.view(DP, -1)[:, start:end]
+        if input_slice.is_contiguous():
+            input_slice_contiguous = input_slice
+        else:
+            input_slice_contiguous = self.contiguous_buffer.view(input_slice.dtype)[:input_slice.numel()]
+        torch.distributed.reduce_scatter_tensor(
+            output_slice,
+            input_slice_contiguous,
+            group=self.get_data_parallel_group_slow() if slow else self.get_data_parallel_group(),
+        )
+
+
+    def is_largest_slow_reduce(self, model_index, gbuf, start, end, slow, is_last_division):
+        return slow and end - start == self.maxlen_slow_reduce_scatter
+
+
+    @staticmethod
+    def _copy_slice_to_params(src, src_offset, param_map):
+        for param, (buf_start, buf_end) in param_map.items():
+            overlap_start = max(src_offset, buf_start)
+            overlap_end = min(src_offset + src.numel(), buf_end)
+            if overlap_start < overlap_end:
+                param.view(-1)[overlap_start - buf_start:overlap_end - buf_start].detach() \
+                    .copy_(src[overlap_start - src_offset:overlap_end - src_offset])
 
 
     def _collect_main_grad_data_for_unscaling(self):

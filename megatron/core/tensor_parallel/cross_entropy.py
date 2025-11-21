@@ -2,7 +2,9 @@
 
 import torch
 
+from megatron import get_args
 from megatron.core.parallel_state import (
+    get_model_parallel_group,
     get_tensor_model_parallel_group,
     get_tensor_model_parallel_rank,
     get_tensor_model_parallel_world_size
@@ -14,21 +16,27 @@ from .utils import VocabUtility
 class _VocabParallelCrossEntropy(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, vocab_parallel_logits, target, label_smoothing=0.0):
+    def forward(ctx, vocab_parallel_logits, target, label_smoothing=0.0, pipeline_parallel=False):
+        group = get_model_parallel_group() if pipeline_parallel else get_tensor_model_parallel_group()
+        rank = torch.distributed.get_rank(group)
+        world_size = torch.distributed.get_world_size(group)
+
+        # mask padded vocab_size
+        args = get_args()
+        partition_vocab_size = vocab_parallel_logits.size()[-1]
+        vocab_parallel_logits[..., args.trained_vocab_size - partition_vocab_size * rank:] = -torch.inf
 
         # Maximum value along vocab dimension across all GPUs.
         logits_max = torch.max(vocab_parallel_logits, dim=-1)[0]
         torch.distributed.all_reduce(logits_max,
                                      op=torch.distributed.ReduceOp.MAX,
-                                     group=get_tensor_model_parallel_group())
-        # Subtract the maximum value.
-        vocab_parallel_logits = vocab_parallel_logits - logits_max.unsqueeze(dim=-1)
+                                     group=group)
+        # In-place subtraction reduces memory pressure.
+        vocab_parallel_logits -= logits_max.unsqueeze(dim=-1)
 
         # Get the partition's vocab indecies
         get_vocab_range = VocabUtility.vocab_range_from_per_partition_vocab_size
         partition_vocab_size = vocab_parallel_logits.size()[-1]
-        rank = get_tensor_model_parallel_rank()
-        world_size = get_tensor_model_parallel_world_size()
         vocab_start_index, vocab_end_index = get_vocab_range(
             partition_vocab_size, rank, world_size)
 
@@ -51,7 +59,7 @@ class _VocabParallelCrossEntropy(torch.autograd.Function):
         # All reduce is needed to get the chunks from other GPUs.
         torch.distributed.all_reduce(predicted_logits,
                                      op=torch.distributed.ReduceOp.SUM,
-                                     group=get_tensor_model_parallel_group())
+                                     group=group)
 
         # Sum of exponential of logits along vocab dimension across all GPUs.
         exp_logits = vocab_parallel_logits
@@ -59,7 +67,7 @@ class _VocabParallelCrossEntropy(torch.autograd.Function):
         sum_exp_logits = exp_logits.sum(dim=-1)
         torch.distributed.all_reduce(sum_exp_logits,
                                      op=torch.distributed.ReduceOp.SUM,
-                                     group=get_tensor_model_parallel_group())
+                                     group=group)
 
         # Loss = log(sum(exp(logits))) - predicted-logit.
         loss = torch.log(sum_exp_logits) - predicted_logits
@@ -87,7 +95,7 @@ class _VocabParallelCrossEntropy(torch.autograd.Function):
             loss = (1.0 - smoothing) * loss - smoothing * mean_log_probs
 
         ctx.label_smoothing, ctx.vocab_size = label_smoothing, vocab_size
-        ctx.save_for_backward(exp_logits, target_mask, masked_target_1d)
+        # ctx.save_for_backward(exp_logits, target_mask, masked_target_1d)
 
         # Store softmax, target-mask and masked-target for backward pass.
         ctx.save_for_backward(exp_logits, target_mask, masked_target_1d)
@@ -124,20 +132,20 @@ class _VocabParallelCrossEntropy(torch.autograd.Function):
         # Finally elementwise multiplication with the output gradients.
         grad_input.mul_(grad_output.unsqueeze(dim=-1))
 
-        return grad_input, None, None
+        return grad_input, None, None, None
 
 
-def vocab_parallel_cross_entropy(vocab_parallel_logits, target, label_smoothing=0.0):
+def vocab_parallel_cross_entropy(vocab_parallel_logits, target, label_smoothing=0.0, pipeline_parallel=False):
     """
     Performs cross entropy loss when logits are split across tensor parallel ranks
 
     Arguments:
         vocab_parallel_logits: logits split across tensor parallel ranks
-                               dimension is [sequence_length, batch_size, hidden_size]
+                               dimension is [sequence_length, batch_size, vocab_size/num_parallel_ranks]
 
         target: correct vocab ids of dimseion [sequence_length, micro_batch_size]
 
         lobal_smoothing: smoothing factor, must be in range [0.0, 1.0)
                          default is no smoothing (=0.0)
     """
-    return _VocabParallelCrossEntropy.apply(vocab_parallel_logits, target, label_smoothing)
+    return _VocabParallelCrossEntropy.apply(vocab_parallel_logits, target, label_smoothing, pipeline_parallel)

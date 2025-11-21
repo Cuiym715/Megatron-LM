@@ -1,0 +1,451 @@
+From 98b7c17200510ab27a99f5ba5a2b8a1518413f26 Mon Sep 17 00:00:00 2001
+From: zhangwei45 <zhangwei45@kuaishou.com>
+Date: Wed, 19 Feb 2025 15:41:47 +0800
+Subject: [PATCH 1/6] Add training script for Llama-7B
+
+---
+ examples/gpt3/gpt_config.yaml               |  44 ++++---
+ examples/gpt3/train_llama_7b_distributed.sh | 123 ++++++++++++++++++++
+ 2 files changed, 150 insertions(+), 17 deletions(-)
+ create mode 100755 examples/gpt3/train_llama_7b_distributed.sh
+
+diff --git a/examples/gpt3/gpt_config.yaml b/examples/gpt3/gpt_config.yaml
+index 116d5d77..282b397d 100644
+--- a/examples/gpt3/gpt_config.yaml
++++ b/examples/gpt3/gpt_config.yaml
+@@ -1,12 +1,12 @@
+ # WARNING: Yaml configs is currently an experimental feature
+ language_model:
+   # model architecture
+-  num_layers: 24
+-  hidden_size: 1024
+-  num_attention_heads: 16
++  num_layers: 32
++  hidden_size: 4096
++  num_attention_heads: 32
+   num_query_groups: null
+ 
+-  ffn_hidden_size: null
++  ffn_hidden_size: 11008
+   kv_channels: null
+   hidden_dropout: 0.0
+   attention_dropout: 0.0
+@@ -42,10 +42,10 @@ language_model:
+   apply_rope_fusion: True
+ 
+   # activation recomputation
+-  recompute_granularity: null
+-  recompute_method: null
+-  recompute_num_layers: null
+-  distribute_saved_activations: null
++  recompute_granularity: full
++  recompute_method: uniform
++  recompute_num_layers: 1
++  distribute_saved_activations: False
+ 
+   # fp8 related
+   fp8: null
+@@ -73,7 +73,7 @@ model_parallel:
+   # Model parallelism
+   tensor_model_parallel_size: 1
+   context_parallel_size: 1
+-  pipeline_model_parallel_size: 1
++  pipeline_model_parallel_size: 8
+   virtual_pipeline_model_parallel_size: null
+   sequence_parallel: True
+   expert_model_parallel_size: 1
+@@ -134,11 +134,13 @@ model_parallel:
+ # training:
+ use_legacy_models: False
+ spec: null
+-micro_batch_size: 2
+-global_batch_size: 128
++micro_batch_size: 8192
++global_batch_size: 65536
++decrease_batch_size_if_needed: False
+ rampup_batch_size: [32, 32, 65324160] 
+ check_for_nan_in_loss_and_grad: True
+ num_layers_per_virtual_pipeline_stage: null
++account_for_embedding_in_pipeline_split: False
+ 
+ encoder_num_layers: null
+ decoder_num_layers: null
+@@ -201,6 +203,7 @@ no_load_rng: null
+ finetune: False
+ use_checkpoint_args: False
+ exit_on_missing_checkpoint: False
++ckpt_convert_format: null
+ 
+ # loss arguments
+ loss_scale: null
+@@ -242,8 +245,8 @@ manual_gc_eval: True
+ tp_comm_overlap_cfg: null
+ 
+ #data
+-data_path: null
+-split: '99,1,0'
++data_path: "/share/yuantailing/Datasets/sample_enwiki_32005/my-llama_text_document"
++split: '949,50,1'
+ train_data_path: null
+ valid_data_path: null
+ test_data_path: null
+@@ -253,7 +256,7 @@ vocab_size: null
+ vocab_file: null
+ merge_file: null
+ vocab_extra_ids: 0
+-seq_length: 4096
++seq_length: 2048
+ encoder_seq_length: null
+ decoder_seq_length: null
+ retriever_seq_length: 256
+@@ -261,8 +264,8 @@ sample_rate: 1.0
+ mask_prob: 0.15
+ short_seq_prob: 0.1
+ num_workers: 2
+-tokenizer_type: GPTSentencePieceTokenizer
+-tokenizer_model: null
++tokenizer_type: SentencePieceTokenizer
++tokenizer_model: /share/yuantailing/Datasets/sample_enwiki_32005/llama-13b-hf/tokenizer.model
+ reset_position_ids: False
+ reset_attention_mask: False
+ eod_mask_loss: False
+@@ -295,8 +298,15 @@ log_loss_scale_to_tensorboard: True
+ wandb_project: ''
+ wandb_exp_name: ''
+ wandb_save_dir: ''
+-enable_one_logger: True
++enable_one_logger: False
+ one_logger_project: megatron-lm
+ one_logger_run_name: null
+ log_interval: 100
+ tensorboard_dir: null
++logging_level: 20
++
++# rerun
++rerun_mode: disabled
++error_injection_type: transient_error
++error_injection_rate: 0
++result_rejected_tracker_filename: null
+diff --git a/examples/gpt3/train_llama_7b_distributed.sh b/examples/gpt3/train_llama_7b_distributed.sh
+new file mode 100755
+index 00000000..77cb43b2
+--- /dev/null
++++ b/examples/gpt3/train_llama_7b_distributed.sh
+@@ -0,0 +1,123 @@
++#!/bin/bash
++
++# Runs the "Llama-7B" parameter model
++
++export CUDA_DEVICE_MAX_CONNECTIONS=1
++
++GPUS_PER_NODE=8
++# Change for multinode config
++MASTER_ADDR=localhost
++MASTER_PORT=6000
++NUM_NODES=1
++NODE_RANK=0
++WORLD_SIZE=$(($GPUS_PER_NODE*$NUM_NODES))
++
++DIR=`pwd`
++DATETIME=`date +'date_%y-%m-%d_time_%H-%M-%S'`
++
++CHECKPOINT_PATH="$DIR/save"
++TENSORBOARD_LOGS_PATH="$DIR/local"
++DATA_PATH="/share/yuantailing/Datasets/sample_enwiki_32005/my-llama_text_document"
++TOKENIZER="/share/zhangwei/Llama-2-7b-hf/tokenizer.model"
++
++DISTRIBUTED_ARGS=(
++    --nproc_per_node $GPUS_PER_NODE
++    --nnodes $NUM_NODES
++    --master_addr $MASTER_ADDR
++    --master_port $MASTER_PORT
++)
++
++SEQ_LENGTH_BASE=88
++SEQ_LENGTH=$(($SEQ_LENGTH_BASE*1024))
++
++GPT_MODEL_ARGS=(
++    --num-layers 32
++    --hidden-size 4096
++    --ffn-hidden-size 11008
++    --num-attention-heads 32
++    --seq-length $SEQ_LENGTH
++    --max-position-embeddings $SEQ_LENGTH
++    --position-embedding-type rope
++    --swiglu
++    --normalization RMSNorm
++    --disable-bias-linear
++    --untie-embeddings-and-output-weights
++    --hidden-dropout 0.
++    --attention-dropout 0.
++    --accumulate-allreduce-grads-in-fp32
++    --seed 9527
++)
++
++MICRO_BATCH_SIZE=1
++GLOBAL_BATCH_SIZE=8
++
++LR=3e-4
++MIN_LR=3e-5
++LR_DECAY_ITERS=$(( 2**40 / (4 * 2**20) ))  # 1T / 4M
++
++TRAINING_ARGS=(
++    --micro-batch-size $MICRO_BATCH_SIZE
++    --global-batch-size $GLOBAL_BATCH_SIZE
++    --train-iters 1000
++    --weight-decay 0.1
++    --optimizer adam
++    --adam-beta1 0.9
++    --adam-beta2 0.95
++    --adam-eps 1e-5
++    --init-method-std 0.006
++    --clip-grad 1.0
++    --bf16
++    --lr $LR
++    --min-lr $MIN_LR
++    --lr-decay-style cosine
++    --min-lr 6.0e-6
++    --lr-warmup-iters 2000
++    --lr-decay-iters $LR_DECAY_ITERS
++)
++
++NUM_VIRTUAL_STAGES=1
++    # --num-virtual-stages-per-pipeline-rank $NUM_VIRTUAL_STAGES
++MODEL_PARALLEL_ARGS=(
++	--tensor-model-parallel-size 1
++    --context-parallel-size 1
++	--pipeline-model-parallel-size 8
++)
++
++DATA_ARGS=(
++    --data-path $DATA_PATH
++    --tokenizer-type SentencePieceTokenizer
++    --tokenizer-model $TOKENIZER
++    --split 100,0,0
++    --no-create-attention-mask-in-dataloader
++)
++
++PERFORMANCE_ARGS=(
++    --recompute-granularity full
++    --recompute-method uniform
++    --recompute-num-layers 1
++    --use-flash-attn
++)
++
++LOG_INTERVAL=2
++
++EVAL_AND_LOGGING_ARGS=(
++    --log-interval $LOG_INTERVAL
++    --eval-iters 0
++    --log-throughput
++    --tensorboard-dir $TENSORBOARD_LOGS_PATH
++    --wandb-project megatron
++    --wandb-exp-name 1f1b-${GLOBAL_BATCH_SIZE}-${SEQ_LENGTH_BASE}k
++    --wandb-save-dir wandb
++)
++
++LOG_DIR=$DIR/logs
++LOG_FILE=$LOG_DIR/${DATETIME}-1f1b-${GLOBAL_BATCH_SIZE}-${SEQ_LENGTH_BASE}k
++exec &> >(tee "$LOG_FILE")
++
++torchrun ${DISTRIBUTED_ARGS[@]} pretrain_gpt.py \
++    ${GPT_MODEL_ARGS[@]} \
++    ${TRAINING_ARGS[@]} \
++    ${MODEL_PARALLEL_ARGS[@]} \
++    ${DATA_ARGS[@]} \
++    ${PERFORMANCE_ARGS[@]} \
++    ${EVAL_AND_LOGGING_ARGS[@]}
+-- 
+2.25.1
+
+
+From 2fb96b97f599409acbb97a38777d02aa417def24 Mon Sep 17 00:00:00 2001
+From: zhangwei45 <zhangwei45@kuaishou.com>
+Date: Wed, 26 Feb 2025 15:30:42 +0800
+Subject: [PATCH 2/6] Add mpirun support
+
+---
+ megatron/training/arguments.py | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/megatron/training/arguments.py b/megatron/training/arguments.py
+index 89ed8c19..73f8773b 100644
+--- a/megatron/training/arguments.py
++++ b/megatron/training/arguments.py
+@@ -71,6 +71,16 @@ def parse_args(extra_args_provider=None, ignore_unknown_args=False):
+     args.rank = int(os.getenv('RANK', '0'))
+     args.world_size = int(os.getenv("WORLD_SIZE", '1'))
+ 
++    # launch from mpi
++    if int(os.getenv('OMPI_COMM_WORLD_SIZE', '0')) > 0:
++        args.rank = int(os.environ['OMPI_COMM_WORLD_RANK'])
++        args.local_rank = int(os.environ['OMPI_COMM_WORLD_LOCAL_RANK'])
++        args.world_size = int(os.environ['OMPI_COMM_WORLD_SIZE'])
++        addr, port = args.master_addr.split(':')
++        os.environ['MASTER_ADDR'] = addr
++        os.environ['MASTER_PORT'] = port
++        delattr(args, 'master_addr')
++
+     return args
+ 
+ 
+@@ -1389,7 +1399,8 @@ def _add_mixed_precision_args(parser):
+ 
+ def _add_distributed_args(parser):
+     group = parser.add_argument_group(title='distributed')
+-
++    group.add_argument('--master-addr', type=str, default='127.0.0.1:8389',
++                       help='master add.')
+     group.add_argument('--tensor-model-parallel-size', type=int, default=1,
+                        help='Degree of tensor model parallelism.')
+     group.add_argument('--pipeline-model-parallel-size', type=int, default=1,
+-- 
+2.25.1
+
+
+From d2f0115d753294bcf1ed16bc94ddb2f27d154e7a Mon Sep 17 00:00:00 2001
+From: zhangwei45 <zhangwei45@kuaishou.com>
+Date: Wed, 26 Feb 2025 17:18:44 +0800
+Subject: [PATCH 3/6] Report memory in first 2 iters
+
+---
+ megatron/training/training.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/megatron/training/training.py b/megatron/training/training.py
+index bc156e4c..6a611b7b 100644
+--- a/megatron/training/training.py
++++ b/megatron/training/training.py
+@@ -878,8 +878,8 @@ def training_log(loss_dict, total_loss_dict, learning_rate, decoupled_learning_r
+             if torch.distributed.get_rank() == 0:
+                 num_microbatches = get_num_microbatches()
+                 report_theoretical_memory(args, num_microbatches=num_microbatches, verbose=True)
+-            report_memory('(after {} iterations)'.format(iteration))
+-            report_memory_flag = False
++            report_memory(f'(after {iteration} iterations)')
++            report_memory_flag = iteration < 2
+         timers.log(timers_to_log, normalizer=args.log_interval)
+ 
+     return report_memory_flag
+-- 
+2.25.1
+
+
+From eae5adccffcef6a87f8c7135ea82aa127e303d9f Mon Sep 17 00:00:00 2001
+From: zhangwei45 <zhangwei45@kuaishou.com>
+Date: Wed, 5 Mar 2025 00:07:23 +0800
+Subject: [PATCH 4/6] [PATCH] [MoE EA] Force load balancing for benchmark.
+
+---
+ megatron/core/transformer/moe/router.py         | 3 +++
+ megatron/core/transformer/transformer_config.py | 3 +++
+ megatron/training/arguments.py                  | 2 ++
+ 3 files changed, 8 insertions(+)
+
+diff --git a/megatron/core/transformer/moe/router.py b/megatron/core/transformer/moe/router.py
+index eee1aa25..495ee76b 100644
+--- a/megatron/core/transformer/moe/router.py
++++ b/megatron/core/transformer/moe/router.py
+@@ -292,6 +292,9 @@ class TopKRouter(Router):
+         else:
+             raise ValueError(f"Unsupported MoE routing type: {self.routing_type}")
+ 
++        if self.config.moe_router_force_load_balancing:
++            indices = torch.arange(indices.numel(), device=indices.device).view_as(indices) % self.num_experts
++
+         return scores, indices
+ 
+     def forward(self, input: torch.Tensor):
+diff --git a/megatron/core/transformer/transformer_config.py b/megatron/core/transformer/transformer_config.py
+index f2c5f7c4..1ad1af8f 100644
+--- a/megatron/core/transformer/transformer_config.py
++++ b/megatron/core/transformer/transformer_config.py
+@@ -270,6 +270,9 @@ class TransformerConfig(ModelParallelConfig):
+     moe_layer_recompute: bool = False
+     """Memory optimization: checkpointing moe_layer to save actiavtion memory."""
+ 
++    moe_router_force_load_balancing: bool = False
++    """moe_router_force_load_balancing(bool): Enforce load balancing for dropless MoE routing."""
++
+     ####################
+     # miscellaneous
+     ####################
+diff --git a/megatron/training/arguments.py b/megatron/training/arguments.py
+index 73f8773b..aa1807de 100644
+--- a/megatron/training/arguments.py
++++ b/megatron/training/arguments.py
+@@ -1773,6 +1773,8 @@ def _add_moe_args(parser):
+                        help='Enable checkpointing for moe_layer, should be used when memory is not sufficient.')
+     group.add_argument('--moe-extended-tp', action='store_true',
+                        help='Alternative to expert parallelism, all experts are sharded across TPXEP domain.')
++    group.add_argument('--moe-router-force-load-balancing', action='store_true',
++                       help = 'Enforce load balancing for dropless MoE routing.')
+ 
+     return parser
+ 
+-- 
+2.25.1
+
+
+From 83b9a7749159c575a6fc740062d334d7d6b2f63a Mon Sep 17 00:00:00 2001
+From: Wei Zhang <zhangwei45@kuaishou.com>
+Date: Thu, 20 Mar 2025 11:42:48 +0800
+Subject: [PATCH 5/6] Use all_gather for CP
+
+---
+ .../core/transformer/custom_layers/transformer_engine.py    | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/megatron/core/transformer/custom_layers/transformer_engine.py b/megatron/core/transformer/custom_layers/transformer_engine.py
+index 2af62bdd..5786f851 100644
+--- a/megatron/core/transformer/custom_layers/transformer_engine.py
++++ b/megatron/core/transformer/custom_layers/transformer_engine.py
+@@ -18,7 +18,10 @@ from megatron.core.parallel_state import (
+     get_context_parallel_group,
+     get_tensor_model_parallel_group,
+ )
+-from megatron.core.tensor_parallel import get_cuda_rng_tracker, get_expert_parallel_rng_tracker_name
++from megatron.core.tensor_parallel import (
++    get_cuda_rng_tracker,
++    get_expert_parallel_rng_tracker_name,
++)
+ from megatron.core.tensor_parallel.utils import divide
+ from megatron.core.transformer.enums import AttnMaskType
+ from megatron.core.transformer.transformer_config import TransformerConfig
+@@ -462,6 +465,7 @@ class TEDotProductAttention(te.pytorch.DotProductAttention):
+                 check_initialized=False
+             )
+             extra_kwargs["cp_stream"] = TEDotProductAttention.cp_stream
++            extra_kwargs["cp_comm_type"] = "all_gather"
+         else:
+             assert (
+                 self.config.context_parallel_size == 1
+-- 
+2.25.1
+
+
+From 364a2d010e1449bd10098d673cf60192c683bdcc Mon Sep 17 00:00:00 2001
+From: Wei Zhang <zhangwei45@kuaishou.com>
+Date: Tue, 8 Apr 2025 22:35:12 +0800
+Subject: [PATCH 6/6] Ignore SFT tokens in tokenizer
+
+---
+ megatron/training/tokenizer/tokenizer.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/megatron/training/tokenizer/tokenizer.py b/megatron/training/tokenizer/tokenizer.py
+index fa266af7..7b676e98 100644
+--- a/megatron/training/tokenizer/tokenizer.py
++++ b/megatron/training/tokenizer/tokenizer.py
+@@ -114,7 +114,7 @@ class _HuggingFaceTokenizer(MegatronTokenizer):
+ 
+     @property
+     def vocab_size(self):
+-        return len(self._tokenizer)
++        return self._tokenizer.vocab_size
+ 
+     @property
+     def vocab(self):
+-- 
+2.25.1
+

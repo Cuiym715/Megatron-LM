@@ -1,0 +1,6 @@
+DATA_ARGS="
+    --data-path ./dataset/owt-sample_text_document \
+    --tokenizer-type HuggingFaceTokenizer \
+    --tokenizer-model ./Llama-3.2-1B \
+    --split 100,0,0 \
+"

@@ -1,5 +1,3 @@
-// Copyright (c) 2024, Kuaishou Technology. All rights reserved.
-
 #pragma once
 
 #include <cuda_runtime.h>

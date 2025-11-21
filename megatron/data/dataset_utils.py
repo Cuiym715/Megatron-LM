@@ -20,6 +20,7 @@
 
 import math
 import os
+import sysconfig
 import time
 import collections
 
@@ -79,13 +80,34 @@ def get_datasets_weights_and_num_samples(data_prefix,
     return prefixes, weights, datasets_train_valid_test_num_samples
 
 
+def get_datasets_weights(data_prefix):
+
+    # The data prefix should be in the format of:
+    #   weight-1, data-prefix-1, weight-2, data-prefix-2, ..
+    assert len(data_prefix) % 2 == 0
+    num_datasets = len(data_prefix) // 2
+    weights = [0]*num_datasets
+    prefixes = [0]*num_datasets
+    for i in range(num_datasets):
+        weights[i] = float(data_prefix[2*i])
+        prefixes[i] = (data_prefix[2*i+1]).strip()
+    # Normalize weights
+    weight_sum = 0.0
+    for weight in weights:
+        weight_sum += weight
+    assert weight_sum > 0.0
+    weights = [weight / weight_sum for weight in weights]
+
+    return prefixes, weights
+
+
 def compile_helper():
     """Compile helper function ar runtime. Make sure this
     is invoked on a single process."""
     import os
     import subprocess
     path = os.path.abspath(os.path.dirname(__file__))
-    ret = subprocess.run(['make', '-C', path])
+    ret = subprocess.run(['make', '-C', path, 'LIBEXT=' + sysconfig.get_config_var('EXT_SUFFIX')])
     if ret.returncode != 0:
         print("Making C++ dataset helpers module failed, exiting.")
         import sys

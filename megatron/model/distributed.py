@@ -39,6 +39,15 @@ class MemoryBuffer:
         return buffer_tensor
 
 
+def aligned_numel(numel, dtype, num_bytes_divisible_by):
+    element_size = torch.empty(0, dtype=dtype).element_size()
+    if element_size % num_bytes_divisible_by == 0:
+        return numel
+    if num_bytes_divisible_by % element_size != 0:
+        raise ValueError(f"num_bytes_divisible_by ({num_bytes_divisible_by}) should be multiple of element_size ({element_size})")
+    numel_divisible_by = num_bytes_divisible_by // element_size
+    return (numel + numel_divisible_by - 1) // numel_divisible_by * numel_divisible_by
+
 
 class DistributedDataParallelBase(MegatronModule, ABC):
     """Abstract class for DDP."""
@@ -86,17 +95,23 @@ class DistributedDataParallel(DistributedDataParallelBase):
             true, we require `use_contiguous_buffers` to be true too.
         use_contiguous_buffers: if true, use a contiguous buffer to store the
             gradients.
+        track_expert_parallel_params: if true, create grad buffers based on
+            expert parallel parameters; if false, create grad buffers based on
+            dense parameters.
     """
 
     def __init__(self, module,
                  accumulate_allreduce_grads_in_fp32,
-                 use_contiguous_buffers):
+                 use_contiguous_buffers,
+                 make_main_grad_addresss_divisible_by,
+                 track_expert_parallel_params=False):
 
         super(DistributedDataParallel, self).__init__(module)
 
         self.accumulate_allreduce_grads_in_fp32 \
             = accumulate_allreduce_grads_in_fp32
         self.use_contiguous_buffers = use_contiguous_buffers
+        self.track_expert_parallel_params = track_expert_parallel_params
         # If we are using fp32-accumulate-allreduce explicitly
         # this means we need main grads in a continous buffer.
         if self.accumulate_allreduce_grads_in_fp32:
@@ -108,10 +123,15 @@ class DistributedDataParallel(DistributedDataParallelBase):
         # ===================================
         self._grad_buffers = None
         self._grad_buffer_param_index_map = None
+        self._grad_buffer_param_index_map_tight = None
         if self.use_contiguous_buffers:
             self._grad_buffers = {}
             self._grad_buffer_param_index_map = {}
-            data_parallel_world_size = mpu.get_data_parallel_world_size()
+            self._grad_buffer_param_index_map_tight = {}
+            if track_expert_parallel_params:
+                data_parallel_world_size = mpu.get_data_modulo_expert_parallel_world_size()
+            else:
+                data_parallel_world_size = mpu.get_data_parallel_world_size()
 
             # Simple function to define buffer type.
             def _get_buffer_type(param):
@@ -120,11 +140,15 @@ class DistributedDataParallel(DistributedDataParallelBase):
 
             # First calculate total number of elements per type.
             type_num_elements = {}
+            type_num_elements_tight = {}
             for param in self.module.parameters():
-                if param.requires_grad:
+                is_dense_param = getattr(param, 'allreduce', True)
+                if param.requires_grad and track_expert_parallel_params == (not is_dense_param):
                     dtype = _get_buffer_type(param)
                     type_num_elements[dtype] = type_num_elements.get(dtype, 0) \
-                                               + param.data.nelement()
+                                               + aligned_numel(param.data.nelement(), dtype, make_main_grad_addresss_divisible_by)
+                    type_num_elements_tight[dtype] = type_num_elements_tight.get(dtype, 0) \
+                                                     + param.data.nelement()
 
             # Allocate the buffer.
             for dtype, num_elements in type_num_elements.items():
@@ -144,9 +168,11 @@ class DistributedDataParallel(DistributedDataParallelBase):
             # Assume the back prop order is reverse the params order,
             # store the start index for the gradients.
             for param in self.module.parameters():
-                if param.requires_grad:
+                is_dense_param = getattr(param, 'allreduce', True)
+                if param.requires_grad and track_expert_parallel_params == (not is_dense_param):
                     dtype = _get_buffer_type(param)
-                    type_num_elements[dtype] -= param.data.nelement()
+                    type_num_elements[dtype] -= aligned_numel(param.data.nelement(), dtype, make_main_grad_addresss_divisible_by)
+                    type_num_elements_tight[dtype] -= param.data.nelement()
                     param.main_grad = self._grad_buffers[dtype].get(
                         param.data.shape, type_num_elements[dtype])
                     if dtype not in self._grad_buffer_param_index_map:
@@ -155,6 +181,12 @@ class DistributedDataParallel(DistributedDataParallelBase):
                         type_num_elements[dtype],
                         type_num_elements[dtype] + param.data.nelement(),
                     )
+                    if dtype not in self._grad_buffer_param_index_map_tight:
+                        self._grad_buffer_param_index_map_tight[dtype] = {}
+                    self._grad_buffer_param_index_map_tight[dtype][param] = (
+                        type_num_elements_tight[dtype],
+                        type_num_elements_tight[dtype] + param.data.nelement(),
+                    )
 
             # Backward hook.
             # Accumalation function for the gradients. We need
@@ -162,13 +194,22 @@ class DistributedDataParallel(DistributedDataParallelBase):
             self.grad_accs = []
             # Loop over all the parameters in the model.
             for param in self.module.parameters():
-                if param.requires_grad:
+                is_dense_param = getattr(param, 'allreduce', True)
+                if param.requires_grad and track_expert_parallel_params == (not is_dense_param):
                     # Expand so we get access to grad_fn.
                     param_tmp = param.expand_as(param)
                     # Get the gradient accumulator functtion.
                     grad_acc = param_tmp.grad_fn.next_functions[0][0]
                     grad_acc.register_hook(self._make_param_hook(param))
                     self.grad_accs.append(grad_acc)
+
+        if not track_expert_parallel_params:
+            # Use `model_ep' to build _grad_buffers for parallel MoE params.
+            self.model_ep = DistributedDataParallel(module,
+                                                    accumulate_allreduce_grads_in_fp32,
+                                                    use_contiguous_buffers,
+                                                    make_main_grad_addresss_divisible_by,
+                                                    track_expert_parallel_params=True)
 
 
     def _make_param_hook(self, param):
@@ -190,25 +231,37 @@ class DistributedDataParallel(DistributedDataParallelBase):
         assert self._grad_buffers is not None, 'buffers are not initialized.'
         for _, buffer_ in self._grad_buffers.items():
             buffer_.zero()
+        assert self.model_ep._grad_buffers is not None, 'buffers are not initialized.'
+        for _, buffer_ in self.model_ep._grad_buffers.items():
+            buffer_.zero()
 
 
     def broadcast_params(self):
         for param in self.module.parameters():
-            torch.distributed.broadcast(param.data,
-                                        src=mpu.get_data_parallel_src_rank(),
-                                        group=mpu.get_data_parallel_group())
+            if getattr(param, 'allreduce', True):
+                torch.distributed.broadcast(param.data,
+                                            src=mpu.get_data_parallel_src_rank(),
+                                            group=mpu.get_data_parallel_group())
+            else:
+                raise NotImplementedError("EP + --data-parallel-random-init is not implemented")
 
 
     def allreduce_gradients(self):
         """Reduce gradients across data parallel ranks."""
         # If we have buffers, simply reduce the data in the buffer.
         if self._grad_buffers is not None:
+            if self.track_expert_parallel_params:
+                data_parallel_group = mpu.get_data_modulo_expert_parallel_group()
+            else:
+                data_parallel_group = mpu.get_data_parallel_group()
             for _, buffer_ in self._grad_buffers.items():
                 buffer_.data /= mpu.get_data_parallel_world_size() // mpu.get_context_parallel_world_size()
                 torch.distributed.all_reduce(
-                    buffer_.data, group=mpu.get_data_parallel_group())
+                    buffer_.data, group=data_parallel_group)
         else:
             # Otherwise, bucketize and all-reduce
+            if self.track_expert_parallel_params:
+                raise NotImplementedError("EP w/o use_contiguous_buffers is not implemented")
             buckets = {}
             # Pack the buckets.
             for param in self.module.parameters():

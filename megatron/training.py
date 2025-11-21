@@ -6,6 +6,7 @@ from datetime import datetime
 import gc
 import math
 import sys
+import os
 import time
 # The earliest we can measure the start time.
 _TRAIN_START_TIME = time.time()
@@ -20,9 +21,10 @@ from megatron import get_current_global_batch_size
 from megatron import get_num_microbatches
 from megatron import is_last_rank
 from megatron import update_num_microbatches
-from megatron.core import mpu, tensor_parallel
+from megatron.core import mpu, parallel_state, tensor_parallel
 from megatron import print_rank_0
 from megatron import print_rank_last
+from megatron import reference
 from megatron.checkpointing import load_checkpoint
 from megatron.checkpointing import save_checkpoint
 from megatron.model import Float16Module
@@ -33,15 +35,19 @@ from megatron.initialize import initialize_megatron
 from megatron.initialize import write_args_to_tensorboard
 from megatron.initialize import set_jit_fusion_options
 from megatron.optimizer_param_scheduler import OptimizerParamScheduler
+from megatron.optimizer_param_scheduler import CustomOptimizerParamScheduler
 from megatron.model import DistributedDataParallel as LocalDDP
 from megatron.utils import check_adlr_autoresume_termination
 from megatron.utils import unwrap_model
 from megatron.data.data_samplers import build_pretraining_data_loader
 from megatron.utils import calc_params_l2_norm
+from megatron.core.transformer.moe.moe_utils import track_moe_metrics
 from megatron.core.pipeline_parallel import get_forward_backward_func
+from megatron.core.kv_cache import FakeCache, KVCache, Growth
 from megatron.utils import report_memory
 from megatron.profile_utils import annotate_range, enable_perf_model, perf_model_summary, perf_model_clear
 from megatron.model.vision.knn_monitor import compute_feature_bank
+from functools import partial
 
 
 def print_datetime(string):
@@ -55,6 +61,8 @@ def pretrain(train_valid_test_dataset_provider,
              model_provider,
              model_type,
              forward_step_func,
+             get_batch_func=None,
+             no_wd_decay_cond=None,
              process_non_loss_data_func=None,
              extra_args_provider=None,
              args_defaults={}):
@@ -97,7 +105,9 @@ def pretrain(train_valid_test_dataset_provider,
     # This will be closer to what scheduler will see (outside of
     # image ... launches.
     global _TRAIN_START_TIME
-    start_time_tensor = torch.cuda.DoubleTensor([_TRAIN_START_TIME])
+    start_time_tensor = torch.tensor([_TRAIN_START_TIME],
+                                     dtype=torch.double,
+                                     device='cuda')
     torch.distributed.all_reduce(start_time_tensor,
                                  op=torch.distributed.ReduceOp.MIN)
     _TRAIN_START_TIME = start_time_tensor.item()
@@ -111,7 +121,7 @@ def pretrain(train_valid_test_dataset_provider,
     # Model, optimizer, and learning rate.
     timers('model-and-optimizer-setup', log_level=0).start(barrier=True)
     model, optimizer, opt_param_scheduler = setup_model_and_optimizer(
-        model_provider, model_type)
+        model_provider, model_type, no_wd_decay_cond=no_wd_decay_cond)
     timers('model-and-optimizer-setup').stop()
     print_datetime('after model, optimizer, and learning rate '
                    'scheduler are built')
@@ -138,6 +148,9 @@ def pretrain(train_valid_test_dataset_provider,
     timers('train/valid/test-data-iterators-setup').stop()
     print_datetime('after dataloaders are built')
 
+    if args.train_golden_model:
+        reference.adapter.setup(args, model, get_tensorboard_writer())
+
     # Print setup timing.
     print_rank_0('done with setup ...')
     timers.log(['model-and-optimizer-setup',
@@ -151,7 +164,7 @@ def pretrain(train_valid_test_dataset_provider,
         print_rank_0("retro cyclic train iters : %d" % args.train_iters)
 
     if args.do_train and args.train_iters > 0:
-        iteration = train(forward_step_func,
+        iteration = train(forward_step_func, get_batch_func,
                           model, optimizer, opt_param_scheduler,
                           train_data_iterator, valid_data_iterator,
                           process_non_loss_data_func)
@@ -300,7 +313,8 @@ def get_model(model_provider_func, model_type=ModelType.encoder_or_decoder, wrap
         elif args.DDP_impl == 'local':
             model = [LocalDDP(model_module,
                               args.accumulate_allreduce_grads_in_fp32,
-                              args.use_contiguous_buffers_in_local_ddp)
+                              args.use_contiguous_buffers_in_local_ddp,
+                              args.make_main_grad_addresss_divisible_by)
                      for model_module in model]
             # broad cast params from data parallel src rank to other data parallel ranks
             if args.data_parallel_random_init:
@@ -349,6 +363,7 @@ def get_optimizer_param_scheduler(optimizer):
         optimizer,
         max_lr=args.lr,
         min_lr=args.min_lr,
+        warmup_init_lr=args.warmup_init_lr,
         lr_warmup_steps=lr_warmup_steps,
         lr_decay_steps=lr_decay_steps,
         lr_decay_style=args.lr_decay_style,
@@ -402,37 +417,263 @@ def setup_model_and_optimizer(model_provider_func,
     return model, optimizer, opt_param_scheduler
 
 
+_OPTIMIZER_OVERLAP_STREAM = None
 
-def train_step(forward_step_func, data_iterator,
-               model, optimizer, opt_param_scheduler):
+
+def get_optimizer_overlap_stream():
+    global _OPTIMIZER_OVERLAP_STREAM
+    if _OPTIMIZER_OVERLAP_STREAM is None:
+        _OPTIMIZER_OVERLAP_STREAM = torch.cuda.Stream()
+    return _OPTIMIZER_OVERLAP_STREAM
+
+
+_OPTIMIZER_EXPERT_OVERLAP_STREAM = None
+
+
+def get_optimizer_expert_overlap_stream():
+    global _OPTIMIZER_EXPERT_OVERLAP_STREAM
+    if _OPTIMIZER_EXPERT_OVERLAP_STREAM is None:
+        _OPTIMIZER_EXPERT_OVERLAP_STREAM = torch.cuda.Stream()
+    return _OPTIMIZER_EXPERT_OVERLAP_STREAM
+
+
+def make_optimizer_overlap_func(models, optimizer, args, timers, skipped_last_iter, overlap_gather, overlap_reduce, gather_ratio, reduce_ratio):
+    # 1. Partition optimizer jobs
+    gather_fast_jobs, gather_slow_jobs, reduce_slow_jobs, reduce_fast_jobs = \
+        optimizer.partition_into_sub_divisions(overlap_gather, overlap_reduce, gather_ratio, reduce_ratio)
+
+    # 3. Schedule all jobs.
+    opt_stream = get_optimizer_overlap_stream()
+    opt_expert_stream = get_optimizer_expert_overlap_stream()
+    opt_event = torch.cuda.Event()
+    gather_event_pairs = list()
+    reduce_event_pairs = list()
+
+    def opt_prepare_func():
+        if overlap_gather and skipped_last_iter:
+            for model in models:
+                model.zero_grad_buffer()
+        if overlap_gather and not skipped_last_iter:
+            for job in gather_fast_jobs:
+                optimizer.gather_sub_division(args, timers, *job)
+                optimizer.post_gather_sub_division(args, timers, *job)
+            for _ in range(mpu.get_pipeline_model_parallel_rank()):
+                if gather_slow_jobs:
+                    job = gather_slow_jobs.pop(0)
+                    optimizer.gather_sub_division(args, timers, *job)
+                    optimizer.post_gather_sub_division(args, timers, *job)
+
+    def pre_p2p_func():
+        for event_pairs in [gather_event_pairs, reduce_event_pairs]:
+            if event_pairs and event_pairs[-1][3] is None:
+                t4 = torch.cuda.Event(enable_timing=True)
+                t4.record()
+                event_pairs[-1][3] = t4
+        opt_event.wait()
+
+    post_gather_slow_jobs = []
+
+    def post_p2p_async_func(p2p_wait_handles, num_backward=0):
+        while post_gather_slow_jobs:
+            job = post_gather_slow_jobs.pop(0)
+            optimizer.post_gather_sub_division(args, timers, *job)
+        if overlap_gather and not skipped_last_iter and gather_slow_jobs:
+            job = gather_slow_jobs.pop(0)
+            tune = args.kaimm_overlap_tune_ratio and optimizer.is_largest_slow_gather(*job)
+            opt_event.record()
+            with torch.cuda.stream(opt_stream):
+                opt_event.wait()
+                if p2p_wait_handles:
+                    for req in p2p_wait_handles:
+                        req.wait()
+                    if not args.kaimm_overlap_optimizer_no_barrier:
+                        x = torch.empty(1, device="cuda")
+                        torch.distributed.all_reduce(x, group=mpu.get_network_barrier_group())
+                if tune:
+                    t1 = torch.cuda.Event(enable_timing=True)
+                    t1.record()
+            if isinstance(job[0], list):
+                optimizer.gather_sub_division(args, timers, *job, stream=opt_stream, ep_stream=opt_expert_stream)
+            else:
+                with torch.cuda.stream(opt_stream):
+                    optimizer.gather_sub_division(args, timers, *job)
+            with torch.cuda.stream(opt_stream):
+                if tune:
+                    t2 = torch.cuda.Event(enable_timing=True)
+                    t2.record()
+                opt_event.record()
+            if tune:
+                t3 = torch.cuda.Event(enable_timing=True)
+                if p2p_wait_handles:
+                    # event starts after p2p
+                    for req in p2p_wait_handles:
+                        req.wait()
+                t3.record()
+                gather_event_pairs.append([t1, t2, t3, None])
+            post_gather_slow_jobs.append(job)
+        if len(reduce_slow_jobs) >= num_backward > 0:
+            job = reduce_slow_jobs.pop(0)
+            tune = args.kaimm_overlap_tune_ratio and optimizer.is_largest_slow_reduce(*job)
+            optimizer.pre_reduce_sub_division(args, timers, *job)
+            opt_event.record()
+            with torch.cuda.stream(opt_stream):
+                opt_event.wait()
+                if p2p_wait_handles:
+                    for req in p2p_wait_handles:
+                        req.wait()
+                    if not args.kaimm_overlap_optimizer_no_barrier:
+                        x = torch.empty(1, device="cuda")
+                        torch.distributed.all_reduce(x, group=mpu.get_network_barrier_group())
+                if tune:
+                    t1 = torch.cuda.Event(enable_timing=True)
+                    t1.record()
+            if isinstance(job[0], list):
+                optimizer.reduce_sub_division(args, timers, *job, stream=opt_stream, ep_stream=opt_expert_stream)
+            else:
+                with torch.cuda.stream(opt_stream):
+                    optimizer.reduce_sub_division(args, timers, *job)
+            with torch.cuda.stream(opt_stream):
+                if tune:
+                    t2 = torch.cuda.Event(enable_timing=True)
+                    t2.record()
+                opt_event.record()
+            if tune:
+                t3 = torch.cuda.Event(enable_timing=True)
+                if p2p_wait_handles:
+                    # event starts after p2p
+                    for req in p2p_wait_handles:
+                        req.wait()
+                t3.record()
+                reduce_event_pairs.append([t1, t2, t3, None])
+
+    def opt_remained_func():
+        opt_event.wait()
+        for job in reduce_slow_jobs:
+            optimizer.pre_reduce_sub_division(args, timers, *job)
+            optimizer.reduce_sub_division(args, timers, *job)
+        for job in reduce_fast_jobs:
+            optimizer.pre_reduce_sub_division(args, timers, *job)
+            optimizer.reduce_sub_division(args, timers, *job)
+
+    def get_overlap_time_pairs():
+        gather_time_pairs = [
+            (max(t1.elapsed_time(t2), t3.elapsed_time(t2)), t3.elapsed_time(t4))
+            for t1, t2, t3, t4 in gather_event_pairs
+            if t4 is not None
+        ]
+        reduce_time_pairs = [
+            (max(t1.elapsed_time(t2), t3.elapsed_time(t2)), t3.elapsed_time(t4))
+            for t1, t2, t3, t4 in reduce_event_pairs
+            if t4 is not None
+        ]
+        return gather_time_pairs, reduce_time_pairs
+
+    return opt_prepare_func, pre_p2p_func, post_p2p_async_func, opt_remained_func, get_overlap_time_pairs
+
+
+def optimizer_overlap_tuning_suggest_ratio(current_ratio, target_time_ratio, time_pairs_all, PP):
+    time_pairs_all_nz = time_pairs_all[(time_pairs_all[:, 0] > 0).nonzero().flatten()]
+    if len(time_pairs_all_nz) == 0:
+        return None, None, None
+    p90_comm_time = torch.quantile(time_pairs_all_nz[:, 0].sort().values, .90).item()
+    min_calc_time = time_pairs_all_nz[:, 1].min().item()
+    capacity_ratio = target_time_ratio / (p90_comm_time / min_calc_time) * current_ratio
+    suggested_ratio = capacity_ratio
+    if capacity_ratio * PP > 1:
+        comm_times = math.ceil(1 / capacity_ratio)
+        suggested_ratio = 1 / comm_times
+    msg = f"current_ratio {current_ratio:.6f} " + \
+        f"p90_comm_time {p90_comm_time:.3f} " + \
+        f"min_calc_time {min_calc_time:.3f} " + \
+        f"target_time_ratio {target_time_ratio:.6f} " + \
+        f"capacity_ratio {capacity_ratio:.6f} " + \
+        f"suggested_ratio {math.ceil(suggested_ratio * 10 ** 6) / 10 ** 6:.6f}"
+    return capacity_ratio, suggested_ratio, msg
+
+
+def get_kv_cache_class(args):
+    dtype = args.params_dtype
+    kv_length = args.micro_seq_length // parallel_state.get_context_parallel_world_size()
+    num_heads = args.num_query_groups if args.group_query_attention else args.num_attention_heads
+    num_heads //= mpu.get_tensor_model_parallel_world_size()
+    shape = (kv_length, args.micro_batch_size, num_heads, args.kv_channels)
+    if args.micro_seq_length:
+        if args.kaimm_kv_cache_impl == 'chunked':
+            growth = None   # chunked cache, no growth.
+        elif args.kaimm_kv_cache_impl == 'extended':
+            growth = Growth(growth_rate=2)    # geometry growth by 2.
+            # growth = Growth(growth_seq_length=args.pipeline_model_parallel_size * args.micro_seq_length)  # linear growth by p.
+        return partial(KVCache, dtype, shape, growth)
+    else:
+        return FakeCache
+
+
+def train_step(forward_step_func, get_batch_func, data_iterator,
+               model, optimizer, opt_param_scheduler, skipped_last_iter):
     """Single training step."""
     args = get_args()
     timers = get_timers()
 
+    # Register backward hooks
+    overlap_optimizer_communication = args.kaimm_overlap_optimizer_communication and mpu.get_data_parallel_world_size() >= 2
+    if overlap_optimizer_communication:
+        if args.DDP_impl != "local" or not args.use_contiguous_buffers_in_local_ddp:
+            raise ValueError("Can not use kaimm_overlap_optimizer_communication without use_contiguous_buffers_in_local_ddp")
+        if not args.use_distributed_optimizer:
+            raise ValueError("Can not use kaimm_overlap_optimizer_communication without use_distributed_optimizer")
+        if args.virtual_pipeline_model_parallel_size is None:
+            raise ValueError("Can not use kaimm_overlap_optimizer_communication without PP interleaving")
+        if not args.untie_embeddings_and_output_weights and not args.kaimm_vocab_in_pipeline_parallel:
+            raise ValueError("Can not use kaimm_overlap_optimizer_communication without untie_embeddings_and_output_weights")
+        gather_ratio = args.kaimm_overlap_gather_ratio
+        reduce_ratio = args.kaimm_overlap_reduce_ratio
+        overlap_gather = bool(gather_ratio)
+        overlap_reduce = bool(reduce_ratio)
+        if not overlap_gather and not overlap_reduce:
+            raise ValueError("both gather ratio and reduce ratio are zero")
+        opt_prepare_func, pre_p2p_func, post_p2p_async_func, opt_remained_func, get_overlap_time_pairs = \
+            make_optimizer_overlap_func(model, optimizer, args, timers, skipped_last_iter, overlap_gather, overlap_reduce, gather_ratio, reduce_ratio)
+    else:
+        pre_p2p_func = None
+        post_p2p_async_func = None
+
     # Set grad to zero.
     if args.DDP_impl == 'local' and args.use_contiguous_buffers_in_local_ddp:
-        for partition in model:
-            partition.zero_grad_buffer()
+        if not (overlap_optimizer_communication and overlap_gather):
+            for partition in model:
+                partition.zero_grad_buffer()
     optimizer.zero_grad()
+
+    if overlap_optimizer_communication:
+        opt_prepare_func()
 
     # Forward pass.
     timers('forward-backward', log_level=1).start(
         barrier=args.barrier_with_L1_time)
-    forward_backward_func = get_forward_backward_func()
+    forward_backward_func = get_forward_backward_func(args.micro_seq_length)
     fwd_bwd_timers = timers if args.timing_log_level > 1 else None
     losses_reduced = forward_backward_func(
         forward_step_func=forward_step_func,
+        get_batch_func=get_batch_func,
         data_iterator=data_iterator,
         model=model,
         num_microbatches=get_num_microbatches(),
+        micro_seq_length=args.micro_seq_length,
+        kv_cache_class=get_kv_cache_class(args),
         dtype=args.params_dtype,
-        tensor_shape=(args.seq_length // args.context_parallel_size, args.micro_batch_size, args.hidden_size),
+        tensor_shape=(args.seq_length, args.micro_batch_size, args.hidden_size),
         grad_scaler=optimizer.scale_loss,
         sequence_parallel=args.sequence_parallel,
         overlap_p2p_comm=args.overlap_p2p_comm,
         batch_p2p_comm=not args.overlap_p2p_comm,
+        attn_balance=args.kaimm_pipeline_attn_balance,
+        vocab_in_pp=args.kaimm_vocab_in_pipeline_parallel,
         forward_only=False,
-        timers=fwd_bwd_timers)
+        timers=fwd_bwd_timers,
+        pre_p2p_func=pre_p2p_func,
+        post_p2p_async_func=post_p2p_async_func,
+        offload_ratio=args.kaimm_offload_activation_ratio,
+        offload_delay_to_next_stage=args.kaimm_offload_delay_to_next_stage)
     timers('forward-backward').stop()
 
     # Empty unused memory.
@@ -440,7 +681,13 @@ def train_step(forward_step_func, data_iterator,
         torch.cuda.empty_cache()
 
     # Reduce gradients.
-    optimizer.reduce_model_grads(args, timers)
+    if overlap_optimizer_communication and overlap_reduce:
+        opt_remained_func()
+    else:
+        optimizer.reduce_model_grads(args, timers)
+
+    if args.train_golden_model:
+        reference.adapter.step()
 
     # Vision gradients.
     if args.vision_pretraining and args.vision_pretraining_type == "dino":
@@ -454,7 +701,7 @@ def train_step(forward_step_func, data_iterator,
     timers('optimizer').stop()
 
     # Gather params.
-    if update_successful:
+    if update_successful and not (overlap_optimizer_communication and overlap_gather):
         optimizer.gather_model_params(args, timers)
 
     # Vision momentum.
@@ -473,6 +720,37 @@ def train_step(forward_step_func, data_iterator,
         skipped_iter = 0
     else:
         skipped_iter = 1
+
+    if overlap_optimizer_communication and args.kaimm_overlap_tune_ratio:
+        TP = mpu.get_tensor_model_parallel_world_size()
+        PP = mpu.get_pipeline_model_parallel_world_size()
+        DP = mpu.get_data_parallel_world_size()
+        torch.cuda.synchronize()
+        gather_time_pairs, reduce_time_pairs = get_overlap_time_pairs()
+        len_padded_time_pairs = PP * len(model)
+        for time_pairs, ratio_option_name in [
+                (gather_time_pairs, "kaimm_overlap_gather_ratio"),
+                (reduce_time_pairs, "kaimm_overlap_reduce_ratio"),]:
+            time_pairs_cuda = torch.nn.functional.pad(torch.tensor(time_pairs, device="cuda").view(-1, 2),
+                                                      [0, 0, 0, len_padded_time_pairs - len(time_pairs)])
+            time_pairs_all = torch.empty((PP, DP, TP, *time_pairs_cuda.shape),
+                                         dtype=time_pairs_cuda.dtype, device=time_pairs_cuda.device)
+            torch.distributed.all_gather_into_tensor(time_pairs_all, time_pairs_cuda)
+            next_ratio = 0.
+            if torch.distributed.get_rank() == 0:
+                current_ratio = getattr(args, ratio_option_name)
+                target_time_ratio = args.kaimm_overlap_tuning_target_time_ratio
+                time_pairs_all = time_pairs_all.reshape(-1, time_pairs_all.shape[-1])
+                capacity_ratio, suggested_ratio, msg = \
+                    optimizer_overlap_tuning_suggest_ratio(current_ratio, target_time_ratio, time_pairs_all, PP)
+                if capacity_ratio is not None:
+                    print(f"{ratio_option_name} {msg}")
+                    next_ratio = min(1., current_ratio * .8 + capacity_ratio * .2)
+            next_ratio_cuda = torch.tensor(next_ratio, device="cuda")
+            torch.distributed.broadcast(next_ratio_cuda, src=0)
+            next_ratio = next_ratio_cuda.item()
+            if next_ratio > 0.:
+                setattr(args, ratio_option_name, next_ratio)
 
     # Empty unused memory.
     if args.empty_unused_memory_level >= 2:
@@ -617,6 +895,16 @@ def training_log(loss_dict, total_loss_dict, learning_rate, iteration,
                 mem_stats["allocation.all.current"],
                 iteration,
             )
+    if args.num_experts is not None:
+        moe_loss_scale = 1 / get_num_microbatches()
+        moe_loss_dict = {}
+        track_moe_metrics(moe_loss_scale, args.num_layers, args.moe_layer_interval, args.moe_first, iteration, writer, wandb_writer, moe_loss_dict, args.moe_per_layer_logging)
+        loss_dict.update(moe_loss_dict)
+        for key, value in moe_loss_dict.items():
+            if key in total_loss_dict:
+                total_loss_dict[key] += value
+            else:
+                total_loss_dict[key] = value
 
     if iteration % args.log_interval == 0:
         elapsed_time = timers('interval-time').elapsed(barrier=True)
@@ -635,8 +923,9 @@ def training_log(loss_dict, total_loss_dict, learning_rate, iteration,
             args.consumed_train_samples)
         log_string += ' elapsed time per iteration (ms): {:.1f} |'.format(
             elapsed_time_per_iteration * 1000.0)
-        log_string += ' tokens per sec per gpu: {:.5f} |'.format(tokens_per_sec_per_replica)
-        log_string += ' learning rate: {:.3E} |'.format(learning_rate)
+        log_string += ' samples per second: {:.3f} |'.format(samples_per_second)
+        log_string += ' tokens per sec per replica: {:.5f} |'.format(tokens_per_sec_per_replica)
+        log_string += ' learning rate: {:.8E} |'.format(learning_rate)
         log_string += ' global batch size: {:5d} |'.format(batch_size)
         for key in total_loss_dict:
             if key not in [advanced_iters_key, skipped_iters_key,
@@ -676,14 +965,16 @@ def save_checkpoint_and_time(iteration, model, optimizer, opt_param_scheduler):
     # Extra barrier is added to make sure
     # all ranks report the max time.
     timers('save-checkpoint', log_level=0).start(barrier=True)
-    save_checkpoint(iteration, model, optimizer, opt_param_scheduler)
+    # Copy optimizer params to model params in need when `overlap_gather`
+    optimizer.gather_model_params(args, timers)
+    save_checkpoint(iteration, model, optimizer, opt_param_scheduler, train_data_iterator)
     timers('save-checkpoint').stop(barrier=True)
     timers.log(['save-checkpoint'])
     if args.kaimm_gc_interval > 0:
         gc.collect()
 
 
-def train(forward_step_func, model, optimizer, opt_param_scheduler,
+def train(forward_step_func, get_batch_func, model, optimizer, opt_param_scheduler,
           train_data_iterator, valid_data_iterator,
           process_non_loss_data_func):
     """Train the model function."""
@@ -699,6 +990,11 @@ def train(forward_step_func, model, optimizer, opt_param_scheduler,
 
     # Tracking loss.
     total_loss_dict = {}
+
+    # The flag to mark whether update_successful or not in the last iter.
+    # If true, skip all_gather before forward.
+    # Only used in --kaimm-overlap-optimizer-communication.
+    skipped_iter = True
 
     # Manual GC
     if args.kaimm_gc_interval > 0:
@@ -722,10 +1018,12 @@ def train(forward_step_func, model, optimizer, opt_param_scheduler,
         with annotate_range(f"train_step rank_{torch.distributed.get_rank()} it_{iteration}"):
             loss_dict, skipped_iter, grad_norm, num_zeros_in_grad = \
                 train_step(forward_step_func,
+                           get_batch_func,
                            train_data_iterator,
                            model,
                            optimizer,
-                           opt_param_scheduler)
+                           opt_param_scheduler,
+                           skipped_iter)
         iteration += 1
         args.consumed_train_samples += mpu.get_data_parallel_for_sample_world_size() * \
                                        args.micro_batch_size * \
@@ -804,6 +1102,9 @@ def train(forward_step_func, model, optimizer, opt_param_scheduler,
     if args.kaimm_gc_interval > 0:
         gc.enable()
 
+    # Copy optimizer params to model params in need when `overlap_gather`
+    optimizer.gather_model_params(args, timers)
+
     return iteration
 
 
@@ -832,15 +1133,19 @@ def evaluate(forward_step_func,
                 print_rank_0('Evaluating iter {}/{}'.format(iteration,
                                                             args.eval_iters))
 
-            forward_backward_func = get_forward_backward_func()
+            forward_backward_func = get_forward_backward_func(args.micro_seq_length)
             loss_dicts = forward_backward_func(
                 forward_step_func=forward_step_func,
                 data_iterator=data_iterator,
                 model=model,
                 num_microbatches=get_num_microbatches(),
+                micro_seq_length=args.micro_seq_length,
+                kv_cache_class=get_kv_cache_class(args),
                 dtype=args.params_dtype,
                 tensor_shape=(args.seq_length, args.micro_batch_size, args.hidden_size),
                 sequence_parallel=args.sequence_parallel,
+                attn_balance=args.kaimm_pipeline_attn_balance,
+                vocab_in_pp=args.kaimm_vocab_in_pipeline_parallel,
                 forward_only=True,
                 timers=None)
 

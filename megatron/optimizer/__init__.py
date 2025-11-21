@@ -7,26 +7,46 @@ from megatron import get_args
 
 from .distrib_optimizer import DistributedOptimizer
 from .grad_scaler import ConstantGradScaler, DynamicGradScaler
-from .optimizer import Float16OptimizerWithFloat16Params, FP32Optimizer
+from .optimizer import ChainedOptimizer, Float16OptimizerWithFloat16Params, FP32Optimizer
+from .sophia import SophiaG
 
 
-def get_param_groups(modules,
-                     no_weight_decay_cond,
-                     scale_lr_cond,
-                     lr_mult):
-    """creates param groups based on weight decay condition (regularized vs non regularized)
-       and learning rate scale condition (args.lr vs lr_mult * args.lr)
-       scale_lr_cond is used during finetuning where head of the network requires a scaled
-       version of the base learning rate. 
+def get_param_groups(model_chunks, no_weight_decay_cond, scale_lr_cond, lr_mult):
+    """Create parameter groups for optimizer.
+
+    Creates parameter groups based on weight decay condition (regularized vs
+    non regularized), learning rate scale condition (lr vs lr_mult * lr),
+    and whether it is expert parameters. scale_lr_cond is used during finetuning
+    where head of the network requires a scaled version of the base learning rate.
+
+    Args:
+        model_chunks (List[MegatronModule]): model chunks to create parameter
+            groups for.
+        no_weight_decay_cond (func): function to determine whether a parameter
+            should not perform weight decay.
+        scale_lr_cond (func): function to determine whether a parameter
+            should have a scaled learning rate.
+        lr_mult (float): learning rate multiplier for parameters that
+            satisfy scale_lr_cond.
     """
-    wd_no_scale_lr = []
-    wd_scale_lr = []
-    no_wd_no_scale_lr = []
-    no_wd_scale_lr = []
-    for module in modules:
-        for name, param in module.named_parameters():
+    # map (wd_mult, lr_mult, is_expert_parallel) to params
+    params_map = {
+        (1.0, 1.0, False): [],
+        (1.0, 1.0, True): [],
+        (1.0, lr_mult, False): [],
+        (1.0, lr_mult, True): [],
+        (0.0, 1.0, False): [],
+        (0.0, 1.0, True): [],
+        (0.0, lr_mult, False): [],
+        (0.0, lr_mult, True): [],
+    }
+
+    for model_chunk in model_chunks:
+        for name, param in model_chunk.named_parameters():
             if not param.requires_grad:
                 continue
+
+            is_expert_parallel = not getattr(param, 'allreduce', True)
 
             if no_weight_decay_cond is not None:
                 no_wd = no_weight_decay_cond(name, param)
@@ -40,30 +60,41 @@ def get_param_groups(modules,
                 scale_lr = False
 
             if not no_wd and not scale_lr:
-                wd_no_scale_lr.append(param)
+                wd_mult, _lr_mult = 1.0, 1.0
             elif not no_wd and scale_lr:
-                wd_scale_lr.append(param)
+                wd_mult, _lr_mult = 1.0, lr_mult
             elif no_wd and not scale_lr:
-                no_wd_no_scale_lr.append(param)
+                wd_mult, _lr_mult = 0.0, 1.0
             else:
-                no_wd_scale_lr.append(param)
+                wd_mult, _lr_mult = 0.0, lr_mult
+
+            params_map[(wd_mult, _lr_mult, is_expert_parallel)].append(param)
 
     param_groups = []
-    if len(wd_no_scale_lr):
-        param_groups.append({'params': wd_no_scale_lr, 'wd_mult': 1.0, 'lr_mult': 1.0})
-    if len(wd_scale_lr):
-        param_groups.append({'params': wd_scale_lr, 'wd_mult': 1.0, 'lr_mult': lr_mult})
-    if len(no_wd_no_scale_lr):
-        param_groups.append({'params': no_wd_no_scale_lr, 'wd_mult': 0.0, 'lr_mult': 1.0})
-    if len(no_wd_scale_lr):
-        param_groups.append({'params': no_wd_scale_lr, 'wd_mult': 0.0, 'lr_mult': lr_mult})
+    for (wd_mult, _lr_mult, is_expert_parallel), params in params_map.items():
+        if len(params) == 0:
+            continue
+        param_groups.append(
+            {
+                'params': params,
+                'wd_mult': wd_mult,
+                'lr_mult': _lr_mult,
+                'is_expert_parallel': is_expert_parallel,
+            }
+        )
+
+    # Add a dummy param_group since apex FusedAdam and FusedSGD do not allow empty param_groups
+    if len(param_groups) == 0:
+        param_groups.append({'params': [], 'wd_mult': 1.0, 'lr_mult': 1.0})
 
     return param_groups
 
-def get_megatron_optimizer(model,
-                           no_weight_decay_cond=None,
-                           scale_lr_cond=None,
-                           lr_mult=1.0):
+
+def get_megatron_optimizer_switch_moe(model,
+                                      is_expert_parallel,
+                                      no_weight_decay_cond=None,
+                                      scale_lr_cond=None,
+                                      lr_mult=1.0):
     args = get_args()
 
     # Base optimizer.
@@ -71,6 +102,11 @@ def get_megatron_optimizer(model,
                                     no_weight_decay_cond,
                                     scale_lr_cond,
                                     lr_mult)
+    param_groups = [
+        param
+        for param in param_groups
+        if param["is_expert_parallel"] == is_expert_parallel
+    ]
 
     if args.optimizer == 'adam':
         optimizer = Adam(param_groups,
@@ -83,6 +119,12 @@ def get_megatron_optimizer(model,
                         lr=args.lr,
                         weight_decay=args.weight_decay,
                         momentum=args.sgd_momentum)
+    elif args.optimizer == 'sophia':
+        optimizer = SophiaG(param_groups,
+                        lr=args.lr,
+                        weight_decay=args.weight_decay,
+                        betas=(args.sophia_beta1, args.sophia_beta2),
+                        rho=args.sophia_rho)
     else:
         raise Exception('{} optimizer is not supported.'.format(
             args.optimizer))
@@ -134,6 +176,7 @@ def get_megatron_optimizer(model,
                       args.bf16,
                       args.params_dtype,
                       grad_scaler,
+                      is_expert_parallel,
                       model)
 
     # FP32.
@@ -141,4 +184,18 @@ def get_megatron_optimizer(model,
                          args.log_num_zeros_in_grad,
                          params_have_main_grad,
                          args.use_contiguous_buffers_in_local_ddp,
+                         is_expert_parallel,
                          model)
+
+
+def get_megatron_optimizer(model,
+                           no_weight_decay_cond=None,
+                           scale_lr_cond=None,
+                           lr_mult=1.0):
+    args = get_args()
+    dense_optimizer = get_megatron_optimizer_switch_moe(model, is_expert_parallel=False, no_weight_decay_cond=no_weight_decay_cond, scale_lr_cond=scale_lr_cond, lr_mult=lr_mult)
+    if args.num_experts == 1 or args.expert_model_parallel_size == 1:
+        return dense_optimizer
+    model_ep = [m.model_ep for m in model]
+    moe_optimizer = get_megatron_optimizer_switch_moe(model_ep, is_expert_parallel=True, no_weight_decay_cond=no_weight_decay_cond, scale_lr_cond=scale_lr_cond, lr_mult=lr_mult)
+    return ChainedOptimizer([dense_optimizer, moe_optimizer])

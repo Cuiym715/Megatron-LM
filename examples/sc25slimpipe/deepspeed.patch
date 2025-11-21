@@ -1,0 +1,107 @@
+From 68a1ebf77b6b02258f8726ae397fea713e57647a Mon Sep 17 00:00:00 2001
+From: Wei Zhang <zhangwei45@kuaishou.com>
+Date: Sun, 16 Mar 2025 14:45:50 +0800
+Subject: [PATCH 1/2] Force rebalance MoE top2 routing
+
+---
+ deepspeed/moe/sharded_moe.py | 33 ++++++++++++++++++++++++---------
+ 1 file changed, 24 insertions(+), 9 deletions(-)
+
+diff --git a/deepspeed/moe/sharded_moe.py b/deepspeed/moe/sharded_moe.py
+index a00d694f..1d51e343 100644
+--- a/deepspeed/moe/sharded_moe.py
++++ b/deepspeed/moe/sharded_moe.py
+@@ -15,16 +15,17 @@ The file has been adapted from two fairscale files:
+ # This source code is licensed under the BSD license found in the
+ # LICENSE file in the root directory of this source tree.
+ 
+-from deepspeed.utils.timer import SynchronizedWallClockTimer
+-from deepspeed.utils import logger
+-from deepspeed.utils.bwc import bwc_tensor_model_parallel_world_size
+-from typing import Callable, Dict, TYPE_CHECKING, Any, Optional, Tuple, Union
++from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple, Union
+ 
+ import torch
++import torch.nn.functional as F
+ from torch import Tensor
+ from torch.nn import Module
+-import torch.nn.functional as F
+-from deepspeed.utils import groups
++
++from deepspeed.utils import groups, logger
++from deepspeed.utils.bwc import bwc_tensor_model_parallel_world_size
++from deepspeed.utils.timer import SynchronizedWallClockTimer
++
+ from .mappings import drop_tokens, gather_tokens
+ 
+ if TYPE_CHECKING:
+@@ -300,7 +301,14 @@ def top2gating(logits: Tensor,
+     # Create a mask for 1st's expert per token
+     indices1_s = torch.argmax(gates, dim=1)
+     num_experts = int(gates.shape[1])
+-    mask1 = F.one_hot(indices1_s, num_classes=num_experts)
++    # Force rebalance of expert assignments
++    balanced_indices1_s = (
++        torch.arange(0, indices1_s.numel(), step=2, device=indices1_s.device).view_as(
++            indices1_s
++        )
++        % num_experts
++    )
++    mask1 = F.one_hot(balanced_indices1_s, num_classes=num_experts)
+ 
+     if top2_2nd_expert_sampling:
+         # Create a mask for 2nd's expert per token using Gumbel-max trick
+@@ -310,7 +318,14 @@ def top2gating(logits: Tensor,
+     # Replace top-expert with min value
+     logits_except1 = logits.masked_fill(mask1.bool(), float("-inf"))
+     indices2_s = torch.argmax(logits_except1, dim=1)
+-    mask2 = F.one_hot(indices2_s, num_classes=num_experts)
++    # Force rebalance of expert assignments
++    balanced_indices2_s = (
++        torch.arange(
++            1, indices2_s.numel() + 1, step=2, device=indices1_s.device
++        ).view_as(indices2_s)
++        % num_experts
++    )
++    mask2 = F.one_hot(balanced_indices2_s, num_classes=num_experts)
+ 
+     # Compute locations in capacity buffer
+     locations1 = torch.cumsum(mask1, dim=0) - 1
+@@ -493,7 +508,7 @@ class TopKGate(Module):
+         self.top2_2nd_expert_sampling = top2_2nd_expert_sampling
+ 
+     def _set_ep_group(self, ep_group):
+-        assert self.ep_group is None, f'Attempting to override an existing ep_group'
++        assert self.ep_group is None, "Attempting to override an existing ep_group"
+         self.ep_group = ep_group
+ 
+     def forward(self,
+-- 
+2.25.1
+
+
+From 0e08e64aba17bc4f71f5c6eb2bcb2a00f57744f1 Mon Sep 17 00:00:00 2001
+From: Wei Zhang <zhangwei45@kuaishou.com>
+Date: Mon, 17 Mar 2025 15:39:49 +0800
+Subject: [PATCH 2/2] Update version info
+
+---
+ deepspeed/git_version_info.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/deepspeed/git_version_info.py b/deepspeed/git_version_info.py
+index 70c536d2..f56f0fe8 100644
+--- a/deepspeed/git_version_info.py
++++ b/deepspeed/git_version_info.py
+@@ -12,7 +12,7 @@ except ModuleNotFoundError:
+         # Will be missing from checkouts that haven't been installed (e.g., readthedocs)
+         version = open('version.txt', 'r').read().strip()
+     else:
+-        version = "0.0.0"
++        version = "0.16.5"
+     git_hash = '[none]'
+     git_branch = '[none]'
+ 
+-- 
+2.25.1
+

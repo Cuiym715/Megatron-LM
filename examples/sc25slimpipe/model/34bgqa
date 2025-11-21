@@ -1,0 +1,8 @@
+SEQ_LENGTH=4096
+NUM_LAYERS=48          # https://huggingface.co/codellama/CodeLlama-34b-hf/blob/main/config.json
+HIDDEN_SIZE=8192
+FFN_HIDDEN_SIZE=22016  # https://huggingface.co/codellama/CodeLlama-34b-hf/blob/main/config.json
+NUM_ATTENTION_HEADS=$((HIDDEN_SIZE / 128))
+GQA=1
+NUM_QUERY_GROUPS=8     # https://huggingface.co/codellama/CodeLlama-34b-hf/blob/main/config.json
+POSITION_EMBEDDING=rope

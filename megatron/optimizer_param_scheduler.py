@@ -5,11 +5,14 @@
 import math
 
 from megatron import print_rank_0
+from torch.optim.lr_scheduler import CosineAnnealingLR as _CosineAnnealingLR
+from torch.optim.lr_scheduler import _LRScheduler
+
 
 class OptimizerParamScheduler(object):
     """Anneals learning rate and weight decay"""
 
-    def __init__(self, optimizer, max_lr, min_lr,
+    def __init__(self, optimizer, max_lr, min_lr, warmup_init_lr,
                  lr_warmup_steps, lr_decay_steps, lr_decay_style,
                  start_wd, end_wd, wd_incr_steps, wd_incr_style,
                  use_checkpoint_opt_param_scheduler=True,
@@ -23,6 +26,7 @@ class OptimizerParamScheduler(object):
         assert self.min_lr >= 0.0
         assert self.max_lr >= self.min_lr
 
+        self.warmup_init_lr = warmup_init_lr
         self.lr_warmup_steps = lr_warmup_steps
         self.num_steps = 0
         self.lr_decay_steps = lr_decay_steps
@@ -80,7 +84,7 @@ class OptimizerParamScheduler(object):
 
         # Use linear warmup for the initial part.
         if self.lr_warmup_steps > 0 and self.num_steps <= self.lr_warmup_steps:
-            return self.max_lr * float(self.num_steps) / \
+            return self.warmup_init_lr + (self.max_lr - self.warmup_init_lr) * float(self.num_steps) / \
                 float(self.lr_warmup_steps)
 
         # If the learning rate is constant, just return the initial value.
@@ -137,7 +141,8 @@ class OptimizerParamScheduler(object):
             'start_wd': self.start_wd,
             'end_wd': self.end_wd,
             'wd_incr_style': self.wd_incr_style,
-            'wd_incr_steps': self.wd_incr_steps
+            'wd_incr_steps': self.wd_incr_steps,
+            'warmup_init_lr': self.warmup_init_lr
         }
         return state_dict
 
@@ -169,6 +174,10 @@ class OptimizerParamScheduler(object):
         
         self.min_lr = self._check_and_set(self.min_lr, sd['min_lr'],
                                           'minimum learning rate')
+
+        self.warmup_init_lr = self._check_and_set(self.warmup_init_lr,
+                                                  sd['warmup_init_lr'],
+                                                  'warmup init learning rate')
 
         if 'warmup_iter' in sd:
             lr_warmup_steps_ = sd['warmup_iter']
@@ -219,7 +228,42 @@ class OptimizerParamScheduler(object):
                                                 "weight decay incr style")
             
 
+class CustomOptimizerParamScheduler(_LRScheduler):
+    """
+    Linearly warming-up and then cosine annealing.
+    """
 
+    def __init__(self, optimizer, total_steps, warmup_steps, warmup_init_lr, eta_min, last_epoch=-1):
+        assert warmup_steps > 1
+        self.warmup_init_lr = warmup_init_lr
+        self.warmup_steps = warmup_steps
+        self._base_scheduler = _CosineAnnealingLR(optimizer.optimizer, total_steps - warmup_steps, eta_min=eta_min,
+                                                  last_epoch=last_epoch)
+        super().__init__(optimizer.optimizer)
+
+    def state_dict(self):
+        state = super().state_dict()
+        state['_base_scheduler'] = self._base_scheduler.state_dict()
+        return state
+
+    def load_state_dict(self, state):
+        if '_base_scheduler' in state:
+            self._base_scheduler.load_state_dict(state['_base_scheduler'])
+            del state['_base_scheduler']
+        else:
+            self._base_scheduler.last_epoch = state['last_epoch']
+            self._base_scheduler._step_count = state['_step_count']
+            self._base_scheduler._last_lr = state['_last_lr']
+        super().load_state_dict(state)
+
+    def get_lr(self):
+        step = self.last_epoch + 1
+        if step <= self.warmup_steps:
+            return [self.warmup_init_lr + (lr - self.warmup_init_lr) * (step - 1) / (self.warmup_steps - 1) for lr in
+                    self.base_lrs]
+        if step <= self._base_scheduler.T_max + self.warmup_steps:
+            self._base_scheduler.step(step - self.warmup_steps)
+        return self._base_scheduler.get_last_lr()
 
 
 

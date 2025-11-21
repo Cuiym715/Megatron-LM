@@ -1,0 +1,28 @@
+# Llama-1: Page 3, https://arxiv.org/pdf/2302.13971v1.pdf
+
+if [ "$NUM_LAYERS" -le 40 ]; then
+    LR=3e-4
+    LR_DECAY_ITERS=$(( 2**40 / (4 * 2**20) ))  # 1T / 4M
+    MIN_LR=3e-5
+else
+    LR=1.5e-4
+    LR_DECAY_ITERS=$(( (2**40 * 14/10) / (4 * 2**20) ))  # 1.4T / 4M
+    MIN_LR=1.5e-5
+fi
+
+OPTIMIZER_ARGS="
+    --optimizer adam \
+    --adam-beta1 0.9 \
+    --adam-beta2 0.95 \
+    --adam-eps 1e-5 \
+    --lr $LR \
+    --lr-decay-iters $LR_DECAY_ITERS \
+    --lr-decay-style cosine \
+    --lr-warmup-iters 2000 \
+    --min-lr $MIN_LR \
+    --weight-decay 0.1 \
+    --clip-grad 1.0 \
+    --init-method-std 0.005
+"
+    # `if [[ "$MODEL" == "150bgqa" ]]; then echo ''; fi` \
+    # `if [[ "$MODEL" == "8x22b" ]]; then echo '--init-method-std 0.005'; fi`

@@ -1,8 +1,25 @@
-# Copyright (c) 2024, Kuaishou Technology. All rights reserved.
-
 import contextlib
 import functools
 import torch
+
+
+try:
+    import nvtx
+except ModuleNotFoundError:
+    class nvtx:
+        @staticmethod
+        def push_range(msg, color):
+            return torch.cuda.nvtx.range_push(msg)
+
+        @staticmethod
+        def pop_range():
+            return torch.cuda.nvtx.range_pop()
+
+
+DEFAULT_COLOR = 0xBFBFBF
+FORWARD_COLOR = "purple"
+BACKWARD_COLOR = "orange"
+BACKWARD_RANGE_DEPTH = 0
 
 
 PERF_MODEL = False
@@ -10,22 +27,25 @@ GLOBAL_EVENTS = list()
 
 
 def record_event(arg):
-    ev = torch.cuda.Event(enable_timing=True)
-    ev.record()
     if PERF_MODEL:
+        ev = torch.cuda.Event(enable_timing=True)
+        ev.record()
         GLOBAL_EVENTS.append((arg, ev))
-
 
 class WrapInputsFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, msg, *args):
         ctx.msg = msg
+        nvtx.push_range(msg, color=FORWARD_COLOR)
         record_event((msg, "forward", "begin"))
         return args
 
     @staticmethod
     def backward(ctx, *grads):
         record_event((ctx.msg, "backward", "end"))
+        nvtx.pop_range()
+        global BACKWARD_RANGE_DEPTH
+        BACKWARD_RANGE_DEPTH -= 1
         return None, *grads
 
 
@@ -34,11 +54,15 @@ class WrapOutputsFunction(torch.autograd.Function):
     def forward(ctx, msg, *args):
         ctx.msg = msg
         record_event((msg, "forward", "end"))
+        nvtx.pop_range()
         return args
 
     @staticmethod
     def backward(ctx, *grads):
+        nvtx.push_range(ctx.msg, color=BACKWARD_COLOR)
         record_event((ctx.msg, "backward", "begin"))
+        global BACKWARD_RANGE_DEPTH
+        BACKWARD_RANGE_DEPTH += 1
         return None, *grads
 
 
@@ -46,16 +70,14 @@ def annotate_forward_backward(forward_msg, backward_msg):
     def decorator(forward_orig):
         @functools.wraps(forward_orig)
         def wrapper(*args, **kwargs):
-            inputs_tuple = args + tuple(kwargs.values())
-            inputs_tuple_applied = list(WrapInputsFunction.apply(forward_msg, *inputs_tuple))
-            for i, (a, b) in enumerate(zip(inputs_tuple, inputs_tuple_applied)):
-                if isinstance(a, torch.nn.Parameter):
-                    b = torch.nn.Parameter(b, requires_grad=a.requires_grad)
-                if hasattr(a, "main_grad"):
-                    b.main_grad = a.main_grad
-                inputs_tuple_applied[i] = b
-            args = inputs_tuple_applied[:len(args)]
-            kwargs = dict(zip(kwargs.keys(), inputs_tuple_applied[len(args):]))
+            kwargs_items = list(kwargs.items())
+            inputs_list = list(args) + [t[1] for t in kwargs_items]
+            inputs_mask = [torch.is_tensor(x) and not isinstance(x, torch.nn.Parameter) for x in inputs_list]  # mask=True means should be applied
+            inputs_list_masked = [x if mask else None for mask, x in zip(inputs_mask, inputs_list)]
+            inputs_list_masked_applied = WrapInputsFunction.apply(forward_msg, *inputs_list_masked)
+            inputs_list_applied = [x_applied if mask else x for mask, x, x_applied in zip(inputs_mask, inputs_list, inputs_list_masked_applied)]
+            args = inputs_list_applied[:len(args)]
+            kwargs = {t[0]: v for t, v in zip(kwargs_items, inputs_list_applied[len(args):])}
             outputs = forward_orig(*args, **kwargs)
             if isinstance(outputs, tuple):
                 outputs = WrapOutputsFunction.apply(backward_msg, *outputs)
@@ -67,16 +89,18 @@ def annotate_forward_backward(forward_msg, backward_msg):
 
 
 @contextlib.contextmanager
-def annotate_range(msg):
+def annotate_range(msg, color=DEFAULT_COLOR):
+    nvtx.push_range(msg, color=color)
     record_event((msg, "forward", "begin"))
     try:
         yield
     finally:
         record_event((msg, "forward", "end"))
+        nvtx.pop_range()
 
 
 def annotate_forward_range(msg):
-    return annotate_range(msg)
+    return annotate_range(msg, color=FORWARD_COLOR)
 
 
 class BackwardPushFunction(torch.autograd.Function):
@@ -87,6 +111,8 @@ class BackwardPushFunction(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad):
+        grad.enter_depth = BACKWARD_RANGE_DEPTH
+        nvtx.push_range(ctx.msg, color=BACKWARD_COLOR)
         record_event((ctx.msg, "backward", "begin"))
         return None, grad
 
@@ -100,6 +126,11 @@ class BackwardPopFunction(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad):
         record_event((ctx.msg, "backward", "end"))
+        global BACKWARD_RANGE_DEPTH
+        while BACKWARD_RANGE_DEPTH > grad.enter_depth:
+            nvtx.pop_range()
+            BACKWARD_RANGE_DEPTH -= 1
+        nvtx.pop_range()
         return None, grad
 
 

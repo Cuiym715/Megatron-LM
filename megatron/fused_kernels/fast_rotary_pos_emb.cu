@@ -1,5 +1,3 @@
-// Copyright (c) 2024, Kuaishou Technology. All rights reserved.
-
 #include "fast_rotary_pos_emb.h"
 
 #include <iostream>
@@ -50,7 +48,7 @@ __global__ void fast_rotary_pos_emb_forward_kernel(T const *t, T const *freqs, T
     int i_sq = blockIdx.x;
     int i_b = blockIdx.y;
     for (int i_np = threadIdx.y; i_np < np; i_np += blockDim.y) {
-        int64_t idx_output = ((i_b * sq + i_sq) * np + i_np) * (int64_t)hn + i_hn;
+        int64_t idx_output = ((i_sq * b + i_b) * np + i_np) * (int64_t)hn + i_hn;
         int64_t idx_t = i_sq * (int64_t)stride_sq + (i_b * np + i_np) * (int64_t)stride_np + i_hn;
         int idx_freqs = i_sq * hn + i_hn;
         output[idx_output] = t[idx_t] * get_cos<precompute_sin_cos>(freqs, idx_freqs) + -t[idx_t + hn / 2] * get_sin<precompute_sin_cos>(freqs, idx_freqs);

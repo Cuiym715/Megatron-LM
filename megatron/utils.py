@@ -43,15 +43,22 @@ def calc_params_l2_norm(model):
     params_data = []
     for model_ in model:
         for param in model_.parameters():
-            is_not_shared = param_is_not_shared(param)
             is_not_tp_duplicate = param_is_not_tensor_parallel_duplicate(param)
-            if is_not_shared and is_not_tp_duplicate:
-                if args.bf16:
-                    params_data.append(param.data.float())
-                else:
-                    params_data.append(param.data)
+            if mpu.get_expert_model_parallel_rank() > 0:
+                if not getattr(param, 'allreduce', True) and is_not_tp_duplicate:
+                    assert param_is_not_shared(param)
+                    params_data.append(param.data.float() if args.bf16 else param.data)
+            else:
+                is_not_shared = param_is_not_shared(param)
+                if is_not_shared and is_not_tp_duplicate:
+                    params_data.append(param.data.float() if args.bf16 else param.data)
+
+    # Check the availability of apex
+    assert multi_tensor_applier is not None and amp_C is not None, \
+        "apex is not available, please install it from https://github.com/NVIDIA/apex"
+
     # Calculate norm
-    dummy_overflow_buf = torch.cuda.IntTensor([0])
+    dummy_overflow_buf = torch.tensor([0], dtype=torch.int, device='cuda')
     norm, _ = multi_tensor_applier(
         amp_C.multi_tensor_l2norm,
         dummy_overflow_buf,
@@ -59,10 +66,19 @@ def calc_params_l2_norm(model):
         False # no per-parameter norm
     )
     norm_2 = norm * norm
-    # Sum across all model-parallel GPUs.
-    torch.distributed.all_reduce(norm_2,
-                                 op=torch.distributed.ReduceOp.SUM,
-                                 group=mpu.get_model_parallel_group())
+    if mpu.get_expert_model_parallel_world_size() == 1:
+        # Sum across all model-parallel GPUs(tensor + pipeline).
+        torch.distributed.all_reduce(norm_2,
+                                     op=torch.distributed.ReduceOp.SUM,
+                                     group=mpu.get_model_parallel_group())
+    else:
+        # Sum across tensor, pipeline and expert model-parallel GPUs.
+        torch.distributed.all_reduce(norm_2,
+                                     op=torch.distributed.ReduceOp.SUM,
+                                     group=mpu.get_tensor_and_expert_parallel_group())
+        torch.distributed.all_reduce(norm_2,
+                                     op=torch.distributed.ReduceOp.SUM,
+                                     group=mpu.get_pipeline_model_parallel_group())
     return norm_2.item() ** 0.5
 
 
@@ -76,20 +92,6 @@ def average_losses_across_data_parallel_group(losses):
         torch.distributed.get_world_size(group=mpu.get_data_parallel_group())
 
     return averaged_losses
-
-
-def get_memory_info_for_current_gpu():
-    import cuda.cuda
-    import cuda.cudart
-    import pynvml
-    import uuid
-    err, device_id = cuda.cudart.cudaGetDevice()
-    assert err == cuda.cudart.cudaError_t.cudaSuccess
-    err, device_uuid = cuda.cuda.cuDeviceGetUuid(device_id)
-    assert err == cuda.cuda.CUresult.CUDA_SUCCESS
-    pynvml.nvmlInit()
-    handle = pynvml.nvmlDeviceGetHandleByUUID("GPU-" + str(uuid.UUID(bytes=device_uuid.bytes)))
-    return pynvml.nvmlDeviceGetMemoryInfo(handle)
 
 
 def report_memory(name):
@@ -107,21 +109,6 @@ def report_memory(name):
     if mpu.get_data_parallel_rank() == 0:
         print("[Rank {}] {}".format(torch.distributed.get_rank(), string),
               flush=True)
-    memory_info = get_memory_info_for_current_gpu()
-    data = torch.tensor([torch.cuda.max_memory_allocated(),
-                         torch.cuda.memory_reserved(),
-                         torch.cuda.max_memory_reserved(),
-                         memory_info.used,
-                         memory_info.total],
-                        dtype=torch.long, device="cuda")
-    torch.distributed.all_reduce(data, op=torch.distributed.ReduceOp.MAX)
-    data = data.tolist()
-    if torch.distributed.get_rank() == 0:
-        print("max_memory_allocated", data[0])
-        print("memory_reserved", data[1])
-        print("max_memory_reserved", data[2])
-        print("memory_info.used", data[3])
-        print("memory_info.total", data[4])
 
 
 def print_params_min_max_norm(optimizer, iteration):
@@ -189,9 +176,13 @@ def get_ltor_masks_and_position_ids(data,
         loss_mask[data == eod_token] = 0.0
 
     # Position ids.
-    position_ids = torch.arange(seq_length, dtype=torch.long,
-                                device=data.device)
-    position_ids = position_ids.unsqueeze(0).expand_as(data)
+    if args.use_rotary_position_embeddings:
+        position_ids = 0    # the start pos.
+        assert not (reset_position_ids or reset_attention_mask), 'RoPE has no position ids or attention mask to reset.'
+    else:
+        position_ids = torch.arange(seq_length, dtype=torch.long,
+                                    device=data.device)
+        position_ids = position_ids.unsqueeze(0).expand_as(data)
     # We need to clone as the ids will be modifed based on batch index.
     if reset_position_ids:
         position_ids = position_ids.clone()
@@ -225,6 +216,23 @@ def get_ltor_masks_and_position_ids(data,
         attention_mask = (attention_mask < 0.5)
 
     return attention_mask, loss_mask, position_ids
+
+
+def get_sliced_batch(tokens, position_ids, attention_mask, labels, micro_seq_length=None):
+    if not micro_seq_length:
+        return [(tokens, position_ids, attention_mask, labels)]
+
+    tokens = tokens.split(micro_seq_length, dim=1)
+    if isinstance(position_ids, torch.Tensor):
+        position_ids = position_ids.split(micro_seq_length, dim=-1)
+    else:
+        position_ids = [i * micro_seq_length for i in range(len(tokens))]
+    if isinstance(attention_mask, torch.Tensor):
+        attention_mask = attention_mask.split(micro_seq_length, dim=-1)
+    else:
+        attention_mask = [None] * len(tokens)
+    labels = labels.split(micro_seq_length, dim=1)
+    return list(zip(tokens, position_ids, attention_mask, labels))
 
 
 def print_rank_0(message):

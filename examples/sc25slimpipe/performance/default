@@ -1,0 +1,13 @@
+MICRO_BATCH_SIZE=1
+TP=${TP:-2}
+CP=${CP:-1}
+PP=${PP:-4}
+PP_l=${PP_l:-2}
+RECOMPUTE=partial
+OFFLOAD_ALPHA=.0
+SP=1
+TP_OVERLAP=${TP_OVERLAP:-1}
+SYNC_LEVEL=3
+ALLOC_CONF=1
+
+source "$SCRIPT_DIR/performance/common_postprocess"

@@ -1,5 +1,3 @@
-// Copyright (c) 2024, Kuaishou Technology. All rights reserved.
-
 #include "wrap_gemm_cuda.hpp"
 
 #include <iostream>
@@ -41,6 +39,42 @@ void wrap_gemm_bf16bf16bf16_f32_nn_beta1_cuda(intptr_t A_intptr, intptr_t B_intp
         n,
         CUDA_R_32F,
         CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+
+    if (status != CUBLAS_STATUS_SUCCESS) {
+        std::cerr << "cuBLAS error " << (int)status << ": " << cublasGetStatusString(status) << " " << __FILE__ << ":" << __LINE__ << std::endl;
+        throw std::runtime_error("cuBLAS error " + std::to_string(status) + ": " + cublasGetStatusString(status));
+    }
+}
+
+void wrap_gemm_f32f32f32_f32_nn_beta1_cuda(intptr_t A_intptr, intptr_t B_intptr, intptr_t C_intptr, int m, int n, int k, intptr_t handle_intptr) {
+    float const *A = reinterpret_cast<float const *>(A_intptr);
+    float const *B = reinterpret_cast<float const *>(B_intptr);
+    float *C = reinterpret_cast<float *>(C_intptr);
+    cublasHandle_t handle = reinterpret_cast<cublasHandle_t>(handle_intptr);
+
+    float alpha = 1.;
+    float beta = 1.;
+
+    cublasStatus_t status = cublasGemmEx(
+        handle,
+        CUBLAS_OP_N,
+        CUBLAS_OP_N,
+        n,
+        m,
+        k,
+        &alpha,
+        B,
+        CUDA_R_32F,
+        n,
+        A,
+        CUDA_R_32F,
+        k,
+        &beta,
+        C,
+        CUDA_R_32F,
+        n,
+        CUDA_R_32F,
+        CUBLAS_GEMM_DEFAULT);
 
     if (status != CUBLAS_STATUS_SUCCESS) {
         std::cerr << "cuBLAS error " << (int)status << ": " << cublasGetStatusString(status) << " " << __FILE__ << ":" << __LINE__ << std::endl;

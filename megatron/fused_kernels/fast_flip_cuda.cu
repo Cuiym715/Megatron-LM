@@ -1,5 +1,3 @@
-// Copyright (c) 2024, Kuaishou Technology. All rights reserved.
-
 #include "fast_flip_cuda.hpp"
 
 #include <iostream>

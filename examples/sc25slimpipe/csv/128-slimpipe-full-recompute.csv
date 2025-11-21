@@ -1,0 +1,6 @@
+#GPUs,s,Model,B,b,t,c,p,e,d,n,v,l,recompute,Peak Memory (GiB),Parameter+Gradient Memory (GiB),Optimizer Memory (GiB),Activation Memory (GiB),Output Memory (GiB),Recomputed Memory (GiB),KV Cache Memory (GiB),KV Gradient Memory (GiB),Bubble Ratio
+#128,524288,LLaMA-150B-GQA,8,1,2,4,16,1,1,16,6,1,full,61.60,26.01,13.00,11.81,1.96,1.22,1.97,5.62,1.92%
+#128,524288,LLaMA-150B-GQA,8,1,4,2,16,1,1,16,6,1,full,48.59,13.00,13.00,11.81,1.96,1.22,1.97,5.62,1.92%
+#128,524288,LLaMA-150B-GQA,8,1,8,1,8,1,2,8,12,1,full,61.67,13.00,13.00,20.62,3.91,2.44,3.44,5.25,1.79%
+#128,262144,LLaMA-150B-GQA,16,1,8,1,8,1,2,16,12,1,full,50.90,13.00,13.00,9.66,1.96,0.61,1.61,11.06,0.45%
+#128,524288,LLaMA-150B-GQA,8,1,8,1,16,1,1,16,6,1,full,42.09,6.50,13.00,11.81,1.96,1.22,1.97,5.62,1.92%

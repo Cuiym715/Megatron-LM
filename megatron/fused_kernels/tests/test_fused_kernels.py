@@ -403,21 +403,6 @@ def test_fast_rotary_pos_emb_inner(dtype: torch.dtype, slice_input: bool, sq_axi
     assert ((d_input - d_input_ref).abs() < 1e-4).all(), "backward error is too large"
 
 
-def test_fast_rotary_pos_emb():
-    test_fast_rotary_pos_emb_inner(torch.bfloat16, False, 0)
-    test_fast_rotary_pos_emb_inner(torch.bfloat16, True, 1)
-    test_fast_rotary_pos_emb_inner(torch.bfloat16, True, 2)
-    test_fast_rotary_pos_emb_inner(torch.bfloat16, True, 3)
-    test_fast_rotary_pos_emb_inner(torch.float16, False, 0)
-    test_fast_rotary_pos_emb_inner(torch.float16, True, 1)
-    test_fast_rotary_pos_emb_inner(torch.float16, True, 2)
-    test_fast_rotary_pos_emb_inner(torch.float16, True, 3)
-    test_fast_rotary_pos_emb_inner(torch.float32, False, 0)
-    test_fast_rotary_pos_emb_inner(torch.float32, True, 1)
-    test_fast_rotary_pos_emb_inner(torch.float32, True, 2)
-    test_fast_rotary_pos_emb_inner(torch.float32, True, 3)
-
-
 def test_flip():
     from megatron.core.context_parallel.dattention import flip_cp_, flip_cp, slice_cp
     contiguous_tensor = torch.tensor([
@@ -443,6 +428,21 @@ def test_flip():
     assert (flip_cp(contiguous_tensor, dim=0, world_size=4) == interleaved_tensor).all()
     assert (flip_cp(interleaved_tensor, dim=0, world_size=4) == contiguous_tensor).all()
     assert (slice_cp(contiguous_tensor, dim=0, world_size=4, rank=1) == slice_tensor_rank1).all()
+
+
+def test_fast_rotary_pos_emb():
+    test_fast_rotary_pos_emb_inner(torch.bfloat16, False, 0)
+    test_fast_rotary_pos_emb_inner(torch.bfloat16, True, 1)
+    test_fast_rotary_pos_emb_inner(torch.bfloat16, True, 2)
+    test_fast_rotary_pos_emb_inner(torch.bfloat16, True, 3)
+    test_fast_rotary_pos_emb_inner(torch.float16, False, 0)
+    test_fast_rotary_pos_emb_inner(torch.float16, True, 1)
+    test_fast_rotary_pos_emb_inner(torch.float16, True, 2)
+    test_fast_rotary_pos_emb_inner(torch.float16, True, 3)
+    test_fast_rotary_pos_emb_inner(torch.float32, False, 0)
+    test_fast_rotary_pos_emb_inner(torch.float32, True, 1)
+    test_fast_rotary_pos_emb_inner(torch.float32, True, 2)
+    test_fast_rotary_pos_emb_inner(torch.float32, True, 3)
 
 
 def test_addmm_inplace():
