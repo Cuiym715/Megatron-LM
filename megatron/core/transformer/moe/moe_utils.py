@@ -132,7 +132,7 @@ class MoEAuxLossAutoScaler(torch.autograd.Function):
         """
         (aux_loss,) = ctx.saved_tensors
         aux_loss_backward_scale = MoEAuxLossAutoScaler.main_loss_backward_scale
-        scaled_aux_loss_grad = torch.ones_like(aux_loss) * aux_loss_backward_scale
+        scaled_aux_loss_grad = torch.ones_like(aux_loss) * aux_loss_backward_scale.to(aux_loss.device)
         return grad_output, scaled_aux_loss_grad
 
     @staticmethod

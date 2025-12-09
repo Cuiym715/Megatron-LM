@@ -517,6 +517,15 @@ class MicroBatch:
 
     def compute_loss(self, loss_div):
         """Compute the loss if in the last stage, otherwise do nothing."""
+        # Set the loss scale for the auxiliary loss of the MoE layer.
+        # Since we use a trick to do backward on the auxiliary loss, we need to set the scale explicitly.
+        if get_args().num_experts is not None:
+            # Calculate the loss scale based on the grad_scale_func if available, else default to 1.
+            loss_scale = (
+                self.grad_scaler(torch.ones(())) if self.grad_scaler is not None else torch.ones(())
+            )
+            # Set the loss scale
+            MoEAuxLossAutoScaler.set_loss_scale(loss_scale / loss_div)
         if self.loss_func is None:
             return None
         output_tensor = torch.cat(self.output_tensors, dim=-1)
@@ -527,19 +536,6 @@ class MicroBatch:
             if self.grad_scaler is not None:
                 loss = self.grad_scaler(loss)
             self.output_tensor_grads = list(torch.autograd.grad(loss, self.output_tensors))
-
-            # Set the loss scale for the auxiliary loss of the MoE layer.
-            # Since we use a trick to do backward on the auxiliary loss, we need to set the scale explicitly.
-            if get_args().num_experts is not None:
-                # Calculate the loss scale based on the grad_scale_func if available, else default to 1.
-                loss_scale = (
-                    self.grad_scaler(torch.ones((), device=loss.device))
-                    if self.grad_scaler is not None
-                    else torch.ones((), device=loss.device)
-                )
-                # Set the loss scale
-                MoEAuxLossAutoScaler.set_loss_scale(loss_scale / loss_div)
-
         del self.output_tensors
         return loss_reduced
 
