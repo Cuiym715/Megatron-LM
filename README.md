@@ -5,9 +5,9 @@ This repository provides the open-source implementations of LLM training technol
 
 ## SlimPipe
 
-*SlimPipe* is a fine-grained pipeline parallelism that employs uniform sequence slicing coupled with 1F1B schedule. It is equipped with a sophisticated workload redistribution technique to balance the computation. As a result, SlimPipe reduces the pipeline bubbbles and memory overhead simultaneously.
+*SlimPipe* is a fine-grained pipeline parallelism that employs uniform sequence slicing coupled with 1F1B schedule. It utilizes a sophisticated workload redistribution technique to balance the computation of sliced causal attention. As a result, SlimPipe reduces the pipeline bubbbles and memory overhead simultaneously, making it substantially efficient when training long-context LLMs.
 
-### Examples:
+### Examples
 [examples/sc25slimpipe/](examples/sc25slimpipe/)
 
 ### Paper
