@@ -4,7 +4,6 @@ from megatron.core import parallel_state
 from megatron.core.context_parallel.dattention import flip_cp, flip_cp_, slice_cp
 from megatron.core.cudnn_attn import cudnn_attn_check_capability, CudnnAttnFunc
 from megatron.core.tensor_parallel.random import get_during_recomputing
-from typing import Tuple
 
 import math
 import torch
@@ -110,11 +109,11 @@ def sum_scale_flip(out: torch.Tensor, lse: torch.Tensor, lse_all: torch.Tensor, 
 # There are two methods to merge the `lse`:
 #   1. Merge via `all_reduce`. It must scales the exponentials down to a relatively small range.
 #   2. Merge via `all_gather`. It sums the gathered `lse`, which is numerically stabilized.
-def merge_out_lse(out: torch.Tensor, lse: torch.Tensor, scale, cp_group) -> Tuple[torch.Tensor, torch.Tensor]:
+def merge_out_lse(out: torch.Tensor, lse: torch.Tensor, scale, cp_group):
     """
     Merge out and lse in the CP group.
     If scale is not None, it will be applied to the `lse` and `all_reduce` is used to merge `lse`.
-    Otherwise, `all_gather` is used to merge `lse`.
+    Otherwise, `all_gather` and local `logsumexp` are used to merge `lse`.
     """
     CP = dist.get_world_size(cp_group)
     rank = dist.get_rank(cp_group)
@@ -229,10 +228,9 @@ def attn_forward_pair(ctx_pair, q, cp_group=None):
         if cp_group:
             flip_cp_(q_other, 0, CP)
         out_other, lse_other = attn_forward(q_other, k_other, v_other, False)
-        scale = k_other.shape[0]
         del q_other, k_other, v_other
         if cp_group:
-            out_other, lse_other, req = merge_out_lse(out_other, lse_other, scale, cp_group)
+            out_other, lse_other, req = merge_out_lse(out_other, lse_other, None, cp_group)
             req.wait()
         send_out = dist.P2POp(dist.isend, out_other, peer, group)
         send_lse = dist.P2POp(dist.isend, lse_other, peer, group)
@@ -374,9 +372,9 @@ class ChunkedAttnFunc(torch.autograd.Function):
             last_kv = i == 0
             stream = (torch.cuda.current_stream(), chunk_stream)[i % 2]
             with torch.cuda.stream(stream):
-                if i < n:
+                if i < n:   # calculate the local attn.
                     out_, lse_ = attn_forward(q, k_tensors[i], v_tensors[i], causal and last_kv)
-                else:
+                else:   # calculate or receive the remote attn.
                     out_, lse_ = next(pair_gen)
                     if out_ is None:
                         break
@@ -539,8 +537,7 @@ class CPQOAttnFunc(torch.autograd.Function):
                 next(pair_gen)
         event.wait()
         del k_chunks, v_chunks
-        scale = k.shape[0]
-        oi, lsei, req = merge_out_lse(out, lse, scale, cp_group)
+        oi, lsei, req = merge_out_lse(out, lse, None, cp_group)
         oi_, lsei_ = next(pair_gen)
         req.wait()
         if oi_ is not None:
