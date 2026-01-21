@@ -4,6 +4,7 @@ from megatron.core import parallel_state
 from megatron.core.context_parallel.dattention import flip_cp, flip_cp_, slice_cp
 from megatron.core.cudnn_attn import cudnn_attn_check_capability, CudnnAttnFunc
 from megatron.core.tensor_parallel.random import get_during_recomputing
+from typing import Tuple
 
 import math
 import torch
@@ -93,14 +94,14 @@ def update_out_lse(out: torch.Tensor, out_: torch.Tensor, lse: torch.Tensor, lse
 
 
 @torch.compile(fullgraph=True)
-def log_scale_flip(out: torch.Tensor, lse: torch.Tensor, se_all: torch.Tensor, CP: int) -> torch.Tensor:
+def log_scale_flip(out: torch.Tensor, lse: torch.Tensor, se_all: torch.Tensor, CP: int) -> Tuple[torch.Tensor, torch.Tensor]:
     lse_all = se_all.log()
     out = (out * torch.exp(lse - lse_all)).to(out.dtype)
     return flip_cp(out, 0, CP), lse_all
 
 
 @torch.compile(fullgraph=True)
-def sum_scale_flip(out: torch.Tensor, lse: torch.Tensor, lse_all: torch.Tensor, CP: int) -> torch.Tensor:
+def sum_scale_flip(out: torch.Tensor, lse: torch.Tensor, lse_all: torch.Tensor, CP: int) -> Tuple[torch.Tensor, torch.Tensor]:
     lse_all = torch.logsumexp(lse_all, dim=0)
     out = (out * torch.exp(lse - lse_all)).to(out.dtype)
     return flip_cp(out, 0, CP), lse_all
@@ -152,24 +153,19 @@ def attn_forward_pair(ctx_pair, q, cp_group=None):
         2. Calculate the attention forward on the peer.
         3. Send the output and softmax_lse back.
     """
-    n = (ctx_pair.nbwd if get_during_recomputing() else ctx_pair.nfwd) if ctx_pair else 0
-    if not n:
-        yield 0
-        yield
-        yield
-        yield None, None
-        return
-
-    p = ctx_pair.peer
-    group = parallel_state.get_pipeline_model_parallel_group()
-    # group = torch.distributed.group.WORLD
-    peer = parallel_state.get_pipeline_model_parallel_global_rank(p)
     CP = dist.get_world_size(cp_group) if cp_group else 1
 
+    n = (ctx_pair.nbwd if get_during_recomputing() else ctx_pair.nfwd) if ctx_pair else 0
     pair_print_debug('forward pair+', ctx_pair)
-    # assert all(req.wait() for req in ctx_pair.reqs.pop())
-    reqs = ctx_pair.reqs.pop()
-    k_other, v_other = ctx_pair.other_kv.pop()
+    if n:
+        p = ctx_pair.peer
+        group = parallel_state.get_pipeline_model_parallel_group()
+        # group = torch.distributed.group.WORLD
+        peer = parallel_state.get_pipeline_model_parallel_global_rank(p)
+        # assert all(req.wait() for req in ctx_pair.reqs.pop())
+        reqs = ctx_pair.reqs.pop()
+        k_other, v_other = ctx_pair.other_kv.pop()
+
     # pre-attn pair
     if n < 0:
         assert k_other == n and v_other == n
@@ -182,15 +178,26 @@ def attn_forward_pair(ctx_pair, q, cp_group=None):
         pair_print_debug('q recv+', q.shape)
         reqs += dist.batch_isend_irecv(recvs); del recvs
 
-    # local attn
+    # yield to local attn
     pair_print_debug('attn+')
     # need shapes of out and lse, because they may be incontiguous.
     out, lse = yield n
     pair_print_debug('attn-')
 
     # post-attn pair
+    if n > 0:
+        if cp_group:
+            assert all(req.wait() for req in reqs)
+            pair_print_debug('q recv-')
+            qi = q_other
+            q_other = qi.new_empty(CP * qi.shape[0], *qi.shape[1:])
+            pair_print_debug('q ag+', q_other.shape)
+            reqs = [dist.all_gather_into_tensor(q_other, qi, group=cp_group, async_op=True)]
+            del qi
+
+    yield
+
     if n < 0:
-        yield
         assert all(req.wait() for req in reqs)
         pair_print_debug('q send-')
         if cp_group:
@@ -204,24 +211,20 @@ def attn_forward_pair(ctx_pair, q, cp_group=None):
         recv_lse = dist.P2POp(dist.irecv, lse_recv, peer, group)
         pair_print_debug('out recv+', out_recv.shape)
         reqs = dist.batch_isend_irecv([recv_out, recv_lse])
-    elif n > 0:
-        if cp_group:
-            assert all(req.wait() for req in reqs)
-            pair_print_debug('q recv-')
-            qi = q_other
-            q_other = qi.new_empty(CP * qi.shape[0], *qi.shape[1:])
-            pair_print_debug('q ag+', q_other.shape)
-            reqs = [dist.all_gather_into_tensor(q_other, qi, group=cp_group, async_op=True)]
-            del qi
-        out_recv = lse_recv = None
-        yield
 
     yield
+
+    # merge local out in CP
+    if cp_group:
+        out, lse, cp_req = merge_out_lse(out, lse, None, cp_group)
 
     # post-attn calc
     if n < 0:
         assert all(req.wait() for req in reqs)
         pair_print_debug('out recv-')
+        if cp_group:
+            cp_req.wait()
+        update_out_lse(out, out_recv, lse, lse_recv)
     elif n > 0:
         assert all(req.wait() for req in reqs)
         pair_print_debug('q ag-' if cp_group else 'q recv-')
@@ -230,8 +233,10 @@ def attn_forward_pair(ctx_pair, q, cp_group=None):
         out_other, lse_other = attn_forward(q_other, k_other, v_other, False)
         del q_other, k_other, v_other
         if cp_group:
-            out_other, lse_other, req = merge_out_lse(out_other, lse_other, None, cp_group)
-            req.wait()
+            cp_req.wait()
+            # merge remote out in CP
+            out_other, lse_other, cp_req = merge_out_lse(out_other, lse_other, None, cp_group)
+            cp_req.wait()
         send_out = dist.P2POp(dist.isend, out_other, peer, group)
         send_lse = dist.P2POp(dist.isend, lse_other, peer, group)
         pair_print_debug('out send+', out_other.shape)
@@ -239,8 +244,10 @@ def attn_forward_pair(ctx_pair, q, cp_group=None):
         assert all(req.wait() for req in reqs)
         pair_print_debug('out send-')
 
+    if cp_group:
+        cp_req.wait()
     pair_print_debug('forward pair-', ctx_pair)
-    yield out_recv, lse_recv
+    yield out, lse
 
 
 def attn_backward_pair(ctx_pair, dout, cp_group=None):
@@ -251,24 +258,19 @@ def attn_backward_pair(ctx_pair, dout, cp_group=None):
         2. Calculate the attention backward on the peer.
         3. Send the gradients of query and key-value back.
     """
-    if ctx_pair is None or not ctx_pair.nbwd:
-        yield 0
-        yield
-        yield
-        yield None
-        return
-
-    p, n = ctx_pair.peer, ctx_pair.nbwd
-    group = parallel_state.get_pipeline_model_parallel_group()
-    # group = torch.distributed.group.WORLD
-    peer = parallel_state.get_pipeline_model_parallel_global_rank(p)
     CP = dist.get_world_size(cp_group) if cp_group else 1
 
+    p, n = (ctx_pair.peer, ctx_pair.nbwd) if ctx_pair else (None, 0)
     pair_print_debug('backward pair+', ctx_pair)
-    # assert all(req.wait() for req in ctx_pair.reqs.pop())
-    reqs = ctx_pair.reqs.pop()
-    k_other, v_other = ctx_pair.other_kv.pop()
-    q_other, out_other, lse_other = ctx_pair.other_qo.pop()
+    if n:
+        group = parallel_state.get_pipeline_model_parallel_group()
+        # group = torch.distributed.group.WORLD
+        peer = parallel_state.get_pipeline_model_parallel_global_rank(p)
+        # assert all(req.wait() for req in ctx_pair.reqs.pop())
+        reqs = ctx_pair.reqs.pop()
+        k_other, v_other = ctx_pair.other_kv.pop()
+        q_other, out_other, lse_other = ctx_pair.other_qo.pop()
+
     # pre-attn pair
     if n < 0:
         assert k_other == n and v_other == n
@@ -280,23 +282,14 @@ def attn_backward_pair(ctx_pair, dout, cp_group=None):
         recvs = [dist.P2POp(dist.irecv, dout_other, peer, group)]
         pair_print_debug('dout recv+', dout.shape)
         reqs += dist.batch_isend_irecv(recvs); del recvs
-    # local attn
+
+    # yield to local attn
     pair_print_debug('attn+')
-    dk, dv = yield n
+    dq, dk, dv = yield n
     pair_print_debug('attn-')
 
     # post-attn pair
-    if n < 0:
-        yield
-        assert all(req.wait() for req in reqs)
-        pair_print_debug('dout send-')
-        dq_recv = torch.empty_like(dout)
-        recv_dq = dist.P2POp(dist.irecv, dq_recv, peer, group)
-        recv_dk = dist.P2POp(dist.irecv, dk, peer, group)
-        recv_dv = dist.P2POp(dist.irecv, dv, peer, group)
-        pair_print_debug('dqkv recv+', dq_recv.shape, dk.shape, dv.shape)
-        reqs = dist.batch_isend_irecv([recv_dq, recv_dk, recv_dv])
-    elif n > 0:
+    if n > 0:
         if cp_group:
             assert all(req.wait() for req in reqs)
             pair_print_debug('dout recv-')
@@ -315,15 +308,35 @@ def attn_backward_pair(ctx_pair, dout, cp_group=None):
                 dist.all_gather_into_tensor(dout_other, doi, group=cp_group, async_op=True)
             reqs = cm.works
             del qi, oi, lsei, doi
-        yield
-        dq_recv = None
 
     yield
+
+    if n < 0:
+        assert all(req.wait() for req in reqs)
+        pair_print_debug('dout send-')
+        dq_recv = torch.empty_like(dout)
+        recv_dq = dist.P2POp(dist.irecv, dq_recv, peer, group)
+        recv_dk = dist.P2POp(dist.irecv, dk, peer, group)
+        recv_dv = dist.P2POp(dist.irecv, dv, peer, group)
+        pair_print_debug('dqkv recv+', dq_recv.shape, dk.shape, dv.shape)
+        reqs = dist.batch_isend_irecv([recv_dq, recv_dk, recv_dv])
+
+    yield
+
+    # merge local dq in CP
+    if cp_group:
+        flip_cp_(dq, 0, CP)
+        dqi = dout   # reuse dout memory
+        cp_req = dist.reduce_scatter_tensor(dqi, dq, group=cp_group, async_op=True)
+        dq = dqi
 
     # post-attn pair
     if n < 0:
         assert all(req.wait() for req in reqs)
         pair_print_debug('dqkv recv-')
+        if cp_group:
+            cp_req.wait()
+        dq += dq_recv
     elif n > 0:
         assert all(req.wait() for req in reqs)
         pair_print_debug('dout ag-' if cp_group else 'dout recv-')
@@ -338,19 +351,22 @@ def attn_backward_pair(ctx_pair, dout, cp_group=None):
         del dout_other, q_other, k_other, v_other, out_other, lse_other
         if cp_group:
             flip_cp_(dq_other, 0, CP)
+            cp_req.wait()
             dqi = dq_other.new_empty(dq_other.shape[0] // CP, *dq_other.shape[1:])
             dist.reduce_scatter_tensor(dqi, dq_other, group=cp_group)
             dq_other = dqi
         send_dq = dist.P2POp(dist.isend, dq_other, peer, group)
         send_dk = dist.P2POp(dist.isend, dk_other, peer, group)
         send_dv = dist.P2POp(dist.isend, dv_other, peer, group)
-        pair_print_debug('dqkv send+', dk_other.shape, dv_other.shape)
+        pair_print_debug('dqkv send+', dq_other.shape, dk_other.shape, dv_other.shape)
         reqs = dist.batch_isend_irecv([send_dq, send_dk, send_dv])
         assert all(req.wait() for req in reqs)
         pair_print_debug('dqkv send-')
 
+    if cp_group:
+        cp_req.wait()
     pair_print_debug('backward pair-', ctx_pair)
-    yield dq_recv
+    yield dq
 
 
 class ChunkedAttnFunc(torch.autograd.Function):
@@ -368,16 +384,12 @@ class ChunkedAttnFunc(torch.autograd.Function):
         k_tensors = k._tensors[m:][::-1]
         v_tensors = v._tensors[m:][::-1]
         n = len(k_tensors)
-        for i in range(n + 1):
+        # calculate the local attn.
+        for i in range(n):
             last_kv = i == 0
             stream = (torch.cuda.current_stream(), chunk_stream)[i % 2]
             with torch.cuda.stream(stream):
-                if i < n:   # calculate the local attn.
-                    out_, lse_ = attn_forward(q, k_tensors[i], v_tensors[i], causal and last_kv)
-                else:   # calculate or receive the remote attn.
-                    out_, lse_ = next(pair_gen)
-                    if out_ is None:
-                        break
+                out_, lse_ = attn_forward(q, k_tensors[i], v_tensors[i], causal and last_kv)
                 if i == 0:
                     out, lse = out_, lse_
                 else:
@@ -390,6 +402,9 @@ class ChunkedAttnFunc(torch.autograd.Function):
                 if n == 1 or i + 2 == n:
                     next(pair_gen)
         event.wait()
+        # calculate or receive the remote attn.
+        out, lse = next(pair_gen)
+
         ctx.save_for_backward(q, out, lse)
         # if gradient is not required, qo will not be exchanged for backward.
         if ctx_pair and ctx_pair.nbwd and q.requires_grad:
@@ -413,18 +428,13 @@ class ChunkedAttnFunc(torch.autograd.Function):
         k_tensors = k._tensors[m:][::-1]
         v_tensors = v._tensors[m:][::-1]
         n = len(k_tensors)
-        for i in range(n + 1):
+        for i in range(n):
             last_kv = i == 0
             stream = (torch.cuda.current_stream(), chunk_stream)[i % 2]
             with torch.cuda.stream(stream):
-                if i < n:
-                    offset -= seqlen
-                    dk_, dv_ = dk[offset:offset + seqlen], dv[offset:offset + seqlen]
-                    dq_ = attn_backward(dout, q, k_tensors[i], v_tensors[i], out, lse, dk_, dv_, causal and last_kv)
-                else:
-                    dq_ = next(pair_gen)
-                    if dq_ is None:
-                        break
+                offset -= seqlen
+                dk_, dv_ = dk[offset:offset + seqlen], dv[offset:offset + seqlen]
+                dq_ = attn_backward(dout, q, k_tensors[i], v_tensors[i], out, lse, dk_, dv_, causal and last_kv)
                 if i == 0:
                     dq = dq_
                 else:
@@ -433,10 +443,12 @@ class ChunkedAttnFunc(torch.autograd.Function):
                 event = stream.record_event(event)
                 dq_ = None
                 if i == 0:
-                    pair_gen.send((dk[:m * seqlen], dv[:m * seqlen]))
+                    pair_gen.send((dq, dk[:m * seqlen], dv[:m * seqlen]))
                 if n == 1 or i + 2 == n:
                     next(pair_gen)
         event.wait()
+        # calculate or receive the remote dq, dk, dv.
+        dq = next(pair_gen)
         return dq, dk, dv, None, None
 
 
@@ -537,11 +549,9 @@ class CPQOAttnFunc(torch.autograd.Function):
                 next(pair_gen)
         event.wait()
         del k_chunks, v_chunks
-        oi, lsei, req = merge_out_lse(out, lse, None, cp_group)
-        oi_, lsei_ = next(pair_gen)
-        req.wait()
-        if oi_ is not None:
-            update_out_lse(oi, oi_, lsei, lsei_)
+        # calculate or receive the remote attn.
+        oi, lsei = next(pair_gen)
+
         # if gradient is not required, qo will not be exchanged for backward.
         if ctx_pair and ctx_pair.nbwd and qi.requires_grad:
             ctx_pair.local_qo.append([qi, oi, lsei])
@@ -626,18 +636,13 @@ class CPQOAttnFunc(torch.autograd.Function):
                 event = stream.record_event(event)
                 dq_ = None
             if i == 0:
-                pair_gen.send((dk[:mlength], dv[:mlength]))
+                pair_gen.send((dq, dk[:mlength], dv[:mlength]))
             if (n == 2 and i == 0) or i + 3 == n:
                 next(pair_gen)
         event.wait()
         del dout, k_chunks, v_chunks
-        flip_cp_(dq, 0, CP)
-        dqi = doi   # reuse doi's memory
-        req = dist.reduce_scatter_tensor(dqi, dq, group=ctx.cp_group, async_op=True)
-        dqi_ = next(pair_gen)
-        req.wait()
-        if dqi_ is not None:
-            dqi += dqi_
+        # calculate or receive the remote dq, dk, dv.
+        dqi = next(pair_gen)
         return dqi, dk, dv, None, None
 
 
