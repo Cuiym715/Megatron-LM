@@ -16,6 +16,18 @@ NVRX_MIN_VERSION = "0.6.0"
 
 
 def has_nvrx_async_support() -> bool:
+    # TEMP PATCH by cuiym:
+    # Disable NVRX async checkpoint support for tests.
+    # Reason: Megatron imports distributed checkpointing at startup, and the
+    # current container/venv reports nvidia-resiliency-ext metadata as 0.6.0
+    # but fails Megatron's runtime NVRX compatibility check.
+    # This only disables NVRX/resiliency async checkpoint detection; it should
+    # not affect normal single-/multi-GPU training, CP, PP, TP, or Dynamic CP.
+    # Restore by removing this early return or by:
+    #   mv megatron/core/dist_checkpointing/strategies/nvrx.py.bak_before_disable_nvrx \
+    #      megatron/core/dist_checkpointing/strategies/nvrx.py
+    return False
+
     """Checks whether the NVRx async checkpointing symbols Megatron uses are importable."""
     try:
         core = import_module("nvidia_resiliency_ext.checkpointing.async_ckpt.core")
