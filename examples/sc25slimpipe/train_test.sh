@@ -147,9 +147,6 @@ fi
 
 PERFORMANCE_ARGS=(
     --use-flash-attn
-    --use-fast-rope
-    --use-fast-rms-norm
-    --use-memory-efficient-norm
     --no-masked-softmax-fusion
     --no-bias-gelu-fusion
     --no-bias-dropout-fusion
