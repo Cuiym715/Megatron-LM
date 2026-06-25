@@ -65,10 +65,17 @@ _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS = {'tensor_model_parallel': False,
                                       'partition_stride': 1}
 
 
-if _te_version >= packaging.version.Version("1.6.0"):
-    SPLIT_PIPELINED_AG_P2P = tex.UbufOverlapAlgo.SPLIT_PIPELINED_AG_P2P
+_TE_OVERLAP_ALGO = getattr(tex, "UbufOverlapAlgo", getattr(tex, "CommOverlapAlgo", None))
+if _TE_OVERLAP_ALGO is None:
+    SPLIT_PIPELINED_AG_P2P = None
+elif _te_version >= packaging.version.Version("1.6.0"):
+    SPLIT_PIPELINED_AG_P2P = getattr(
+        _TE_OVERLAP_ALGO,
+        "SPLIT_PIPELINED_AG_P2P",
+        getattr(_TE_OVERLAP_ALGO, "SPLIT_PIPELINED_AG", None),
+    )
 else:
-    SPLIT_PIPELINED_AG_P2P = tex.UbufOverlapAlgo.SPLIT_PIPELINED_AG
+    SPLIT_PIPELINED_AG_P2P = getattr(_TE_OVERLAP_ALGO, "SPLIT_PIPELINED_AG", None)
 
 
 def param_is_not_tensor_parallel_duplicate(param):
