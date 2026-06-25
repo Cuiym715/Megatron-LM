@@ -115,6 +115,7 @@ TRAINING_ARGS=(
     --micro-batch-size "$MICRO_BATCH_SIZE"
     --global-batch-size "$GLOBAL_BATCH_SIZE"
     --train-iters "$TRAIN_ITERS"
+    --use-distributed-optimizer
     --optimizer adam
     --adam-beta1 0.9
     --adam-beta2 0.95
