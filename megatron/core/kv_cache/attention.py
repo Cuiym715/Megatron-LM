@@ -1,5 +1,6 @@
 from .cache_utils import ChunkedTensor
-from flash_attn.flash_attn_interface import _flash_attn_forward, _flash_attn_backward
+from flash_attn.flash_attn_interface import _flash_attn_forward as _flash_attn_forward_raw
+from flash_attn.flash_attn_interface import _flash_attn_backward as _flash_attn_backward_raw
 from megatron.core import parallel_state
 from megatron.core.context_parallel.dattention import flip_cp, flip_cp_, slice_cp
 from megatron.core.cudnn_attn import cudnn_attn_check_capability, CudnnAttnFunc
@@ -14,6 +15,32 @@ import torch.distributed as dist
 
 # q, k, v, out: [s, b, a, d]
 # softmax_lse:  [s, b, a, 1]
+def _flash_attn_forward_compat(q, k, v, dropout_p, softmax_scale, causal):
+    try:
+        result = _flash_attn_forward_raw(
+            q, k, v, dropout_p, softmax_scale, causal, -1, -1, 0.0, None, False)
+        if len(result) == 4:
+            out, softmax_lse, _, _ = result
+            return out, q, k, v, out, softmax_lse, None, None
+        return result
+    except (TypeError, RuntimeError):
+        return _flash_attn_forward_raw(
+            q, k, v, dropout_p, softmax_scale, causal, False, 0, 0, 0)
+
+
+def _flash_attn_backward_compat(
+    dout, q, k, v, out, softmax_lse, dq, dk, dv, dropout_p, softmax_scale, causal
+):
+    try:
+        return _flash_attn_backward_raw(
+            dout, q, k, v, out, softmax_lse, dq, dk, dv,
+            dropout_p, softmax_scale, causal, -1, -1, 0.0, None, False, None)
+    except (TypeError, RuntimeError):
+        return _flash_attn_backward_raw(
+            dout, q, k, v, out, softmax_lse, dq, dk, dv,
+            dropout_p, softmax_scale, 0, 0, 0, causal)
+
+
 def attn_forward(q, k, v, causal):
     q, k, v = [x.transpose(0, 1) for x in [q, k, v]]
     if cudnn_attn_check_capability(use_causal_mask_bottom_right=True):
@@ -21,14 +48,13 @@ def attn_forward(q, k, v, causal):
         softmax_lse = CudnnAttnFunc.forward_no_ctx(q, k, v, causal, False, False, None, None, None, None, out)
     else:
         softmax_scale = q.shape[-1] ** (-0.5)
-        out, q_padded, k_padded, v_padded, out_padded, softmax_lse, _, _ = _flash_attn_forward(
+        out, q_padded, k_padded, v_padded, out_padded, softmax_lse, _, _ = _flash_attn_forward_compat(
             q,
             k,
             v,
             0,
             softmax_scale,
-            causal,
-            False, 0, 0, 0
+            causal
         )
         softmax_lse = softmax_lse.unsqueeze(-1)
         assert q.shape == q_padded.shape and \
@@ -49,7 +75,7 @@ def attn_backward(dout, q, k, v, out, softmax_lse, dk, dv, causal):
     else:
         softmax_lse = softmax_lse.squeeze(-1)
         softmax_scale = q.shape[-1] ** (-0.5)
-        _flash_attn_backward(
+        _flash_attn_backward_compat(
             dout,
             q,
             k,
@@ -61,7 +87,6 @@ def attn_backward(dout, q, k, v, out, softmax_lse, dk, dv, causal):
             dv,
             0,
             softmax_scale,
-            0, 0, 0,
             causal,
         )
         dq = dq[..., : dout.shape[-1]]  # We could have padded the head dimension
