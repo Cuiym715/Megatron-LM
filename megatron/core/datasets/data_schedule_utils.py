@@ -565,7 +565,21 @@ def get_batch_and_global_seqlens(data_iterator, num_microbatches, dp_group):
         global_ids_this_rank: The global IDs locally present on this rank.
     """
 
-    batch_list = [next(data_iterator) for _ in range(num_microbatches)]
+    # batch_list = [next(data_iterator) for _ in range(num_microbatches)]
+    first_item = next(data_iterator)
+    if isinstance(first_item, list) and len(first_item) == num_microbatches:
+        # HybridCP/DCP path: dataloader already yielded one logical global batch.
+        batch_list = [first_item]
+    else:
+        # Normal path: dataloader yields one microbatch at a time.
+        batch_list = [first_item] + [next(data_iterator) for _ in range(num_microbatches - 1)]
+    if torch.distributed.get_rank() == 0:
+        print(
+            f"[DCP DEBUG] num_microbatches={num_microbatches}, "
+            f"type(first_item)={type(first_item)}, "
+            f"len(first_item)={len(first_item) if isinstance(first_item, list) else 'NA'}",
+            flush=True,
+        )
 
     batch = []
     for item in batch_list:
