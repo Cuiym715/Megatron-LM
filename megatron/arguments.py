@@ -174,6 +174,15 @@ def validate_args(args, defaults={}):
     else:
         args.virtual_pipeline_model_parallel_size = None
 
+    if args.variable_seq_slicing:
+        assert args.micro_seq_length > 0, \
+            'variable-seq-slicing requires --micro-seq-length > 0'
+        assert args.variable_seq_debug_num_batches >= 0, \
+            'variable-seq-debug-num-batches must be >= 0'
+        assert args.virtual_pipeline_model_parallel_size is None, \
+            'variable-seq-slicing currently supports non-interleaved PP only; ' \
+            'unset --num-layers-per-virtual-pipeline-stage'
+
     # Parameters dtype.
     args.params_dtype = torch.float
     if args.fp16:
@@ -300,9 +309,13 @@ def validate_args(args, defaults={}):
         assert args.max_position_embeddings >= args.seq_length
     if args.decoder_seq_length is not None:
         assert args.max_position_embeddings >= args.decoder_seq_length
-    # TODO(lizhouyang): support uneven length of micro sequences.
     if args.micro_seq_length:
-        assert args.seq_length % args.micro_seq_length == 0
+        if args.variable_seq_slicing:
+            assert args.seq_length >= args.micro_seq_length, \
+                'variable sequence slicing requires --seq-length >= --micro-seq-length'
+        else:
+            # TODO(lizhouyang): support uneven length of micro sequences.
+            assert args.seq_length % args.micro_seq_length == 0
         if args.num_layers_per_virtual_pipeline_stage is not None:
             num_slices_per_seq = args.seq_length // args.micro_seq_length
             assert num_slices_per_seq >= args.pipeline_model_parallel_size, \
@@ -1260,6 +1273,18 @@ def _add_distributed_args(parser):
                        choices=['key-value', 'query-out'], help='Context parallel implementation.')
     group.add_argument('--micro-seq-length', type=int, default=0,
                        help='Sequence length per model instance forward, for token level pipeline parallel.')
+    group.add_argument('--variable-seq-slicing', action='store_true',
+                       help='Use variable-length sequence slicing with fixed-size chunks. '
+                       'This keeps the original SlimPipe schedule unchanged.')
+    group.add_argument('--variable-seq-pad-token-id', type=int, default=-1,
+                       help='Pad token id used to infer real sequence lengths for variable sequence slicing. '
+                       'If negative, all tokens are treated as valid.')
+    group.add_argument('--variable-seq-pad-to-pipeline-size', action='store_true',
+                       help='Pad the number of chunks to a multiple of pipeline parallel size '
+                       'for variable sequence slicing.')
+    group.add_argument('--variable-seq-debug-num-batches', type=int, default=0,
+                       help='Print variable sequence slicing and pipeline scheduling summaries '
+                       'for the first N microbatches. 0 disables debug logging.')
     group.add_argument('--kaimm-kv-cache-impl', type=str, default='chunked',
                        choices=['chunked', 'extended'],
                        help='KV cache implementation for token level pipeline parallel.')

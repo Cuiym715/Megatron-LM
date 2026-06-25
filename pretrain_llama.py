@@ -14,7 +14,11 @@ from megatron.core.enums import ModelType
 from megatron.data.gpt_dataset import build_train_valid_test_datasets
 from megatron.model import LlamaModel
 from megatron.training import pretrain
-from megatron.utils import get_ltor_masks_and_position_ids, get_sliced_batch
+from megatron.utils import (
+    get_ltor_masks_and_position_ids,
+    get_sliced_batch,
+    get_variable_sliced_batch,
+)
 from megatron.utils import average_losses_across_data_parallel_group
 
 def model_provider(pre_process=True, post_process=True):
@@ -60,6 +64,23 @@ def get_batch(data_iterator):
         args.reset_position_ids,
         args.reset_attention_mask,
         args.eod_mask_loss)
+
+    if args.variable_seq_slicing:
+        pad_to_multiple = (
+            args.pipeline_model_parallel_size
+            if args.variable_seq_pad_to_pipeline_size else 1
+        )
+        slices, loss_mask = get_variable_sliced_batch(
+            tokens,
+            position_ids,
+            attention_mask,
+            labels,
+            loss_mask,
+            args.micro_seq_length,
+            args.variable_seq_pad_token_id,
+            pad_to_multiple,
+        )
+        return (lambda _: slices), partial(loss_func, loss_mask)
 
     return partial(get_sliced_batch, tokens, position_ids, attention_mask, labels), partial(loss_func, loss_mask)
 

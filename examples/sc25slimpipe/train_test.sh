@@ -16,6 +16,7 @@ set -euo pipefail
 # Optional overrides:
 #   CUDA_VISIBLE_DEVICES=0,1 PP_SIZE=2 CP_SIZE=1 TRAIN_ITERS=20 \
 #     bash examples/sc25slimpipe/train_test.sh
+#   VARLEN=1 bash examples/sc25slimpipe/train_test.sh
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 MEGATRON_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
@@ -33,6 +34,14 @@ GPUS_PER_NODE=${GPUS_PER_NODE:-2}
 TP_SIZE=${TP_SIZE:-1}
 PP_SIZE=${PP_SIZE:-2}
 CP_SIZE=${CP_SIZE:-1}
+VARLEN=${VARLEN:-0}
+if [[ "$VARLEN" == "1" ]]; then
+    PP_ATTN_BALANCE=${PP_ATTN_BALANCE:-0}
+    VARLEN_DEBUG=${VARLEN_DEBUG:-2}
+else
+    PP_ATTN_BALANCE=${PP_ATTN_BALANCE:-100}
+    VARLEN_DEBUG=${VARLEN_DEBUG:-0}
+fi
 
 MODEL_PARALLEL_SIZE=$((TP_SIZE * PP_SIZE * CP_SIZE))
 WORLD_SIZE=$((GPUS_PER_NODE * NUM_NODES))
@@ -53,9 +62,13 @@ FFN_HIDDEN_SIZE=${FFN_HIDDEN_SIZE:-2048}
 NUM_ATTENTION_HEADS=${NUM_ATTENTION_HEADS:-8}
 
 SEQ_LENGTH=${SEQ_LENGTH:-2048}
-MICRO_SEQ_LENGTH=${MICRO_SEQ_LENGTH:-1024}
+MICRO_SEQ_LENGTH=${MICRO_SEQ_LENGTH:-512}
 MAX_POSITION_EMBEDDINGS=${MAX_POSITION_EMBEDDINGS:-$SEQ_LENGTH}
-VIRTUAL_PP_LAYERS=${VIRTUAL_PP_LAYERS:-1}
+if [[ "$VARLEN" == "1" ]]; then
+    VIRTUAL_PP_LAYERS=${VIRTUAL_PP_LAYERS:-}
+else
+    VIRTUAL_PP_LAYERS=${VIRTUAL_PP_LAYERS:-1}
+fi
 
 MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-1}
 GLOBAL_BATCH_SIZE=${GLOBAL_BATCH_SIZE:-4}
@@ -76,9 +89,16 @@ if (( NUM_SLICES < PP_SIZE )); then
     exit 1
 fi
 
-if (( NUM_LAYERS % (PP_SIZE * VIRTUAL_PP_LAYERS) != 0 )); then
-    echo "NUM_LAYERS=$NUM_LAYERS must be divisible by PP_SIZE*VIRTUAL_PP_LAYERS=$((PP_SIZE * VIRTUAL_PP_LAYERS))."
-    exit 1
+if [[ -n "$VIRTUAL_PP_LAYERS" ]]; then
+    if (( NUM_LAYERS % (PP_SIZE * VIRTUAL_PP_LAYERS) != 0 )); then
+        echo "NUM_LAYERS=$NUM_LAYERS must be divisible by PP_SIZE*VIRTUAL_PP_LAYERS=$((PP_SIZE * VIRTUAL_PP_LAYERS))."
+        exit 1
+    fi
+else
+    if (( NUM_LAYERS % PP_SIZE != 0 )); then
+        echo "NUM_LAYERS=$NUM_LAYERS must be divisible by PP_SIZE=$PP_SIZE."
+        exit 1
+    fi
 fi
 
 DISTRIBUTED_ARGS=(
@@ -133,13 +153,25 @@ PARALLEL_ARGS=(
     --tensor-model-parallel-size "$TP_SIZE"
     --pipeline-model-parallel-size "$PP_SIZE"
     --context-parallel-size "$CP_SIZE"
-    --num-layers-per-virtual-pipeline-stage "$VIRTUAL_PP_LAYERS"
     --micro-seq-length "$MICRO_SEQ_LENGTH"
     --kaimm-kv-cache-impl chunked
     --kaimm-context-parallel-impl query-out
-    --kaimm-pipeline-attn-balance 100
+    --kaimm-pipeline-attn-balance "$PP_ATTN_BALANCE"
     --overlap-p2p-communication
 )
+
+if [[ -n "$VIRTUAL_PP_LAYERS" ]]; then
+    PARALLEL_ARGS+=(--num-layers-per-virtual-pipeline-stage "$VIRTUAL_PP_LAYERS")
+fi
+
+if [[ "$VARLEN" == "1" ]]; then
+    PARALLEL_ARGS+=(
+        --variable-seq-slicing
+        --variable-seq-pad-token-id "${PAD_TOKEN_ID:--1}"
+        --variable-seq-pad-to-pipeline-size
+        --variable-seq-debug-num-batches "$VARLEN_DEBUG"
+    )
+fi
 
 if (( TP_SIZE > 1 )); then
     PARALLEL_ARGS+=(--sequence-parallel)
@@ -177,6 +209,9 @@ echo "MEGATRON_ROOT=$MEGATRON_ROOT"
 echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 echo "GPUS_PER_NODE=$GPUS_PER_NODE"
 echo "TP_SIZE=$TP_SIZE PP_SIZE=$PP_SIZE CP_SIZE=$CP_SIZE"
+echo "VARLEN=$VARLEN VIRTUAL_PP_LAYERS=${VIRTUAL_PP_LAYERS:-none}"
+echo "VARLEN_DEBUG=$VARLEN_DEBUG"
+echo "PP_ATTN_BALANCE=$PP_ATTN_BALANCE"
 echo "SEQ_LENGTH=$SEQ_LENGTH MICRO_SEQ_LENGTH=$MICRO_SEQ_LENGTH NUM_SLICES=$NUM_SLICES"
 echo "DATA_PATH=$DATA_PATH"
 echo "TOKENIZER_MODEL=$TOKENIZER_MODEL"

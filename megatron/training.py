@@ -650,7 +650,9 @@ def train_step(forward_step_func, get_batch_func, data_iterator,
     # Forward pass.
     timers('forward-backward', log_level=1).start(
         barrier=args.barrier_with_L1_time)
-    forward_backward_func = get_forward_backward_func(args.micro_seq_length)
+    forward_backward_func = get_forward_backward_func(
+        args.micro_seq_length,
+        variable_slicing=args.variable_seq_slicing)
     fwd_bwd_timers = timers if args.timing_log_level > 1 else None
     losses_reduced = forward_backward_func(
         forward_step_func=forward_step_func,
@@ -1133,7 +1135,9 @@ def evaluate(forward_step_func,
                 print_rank_0('Evaluating iter {}/{}'.format(iteration,
                                                             args.eval_iters))
 
-            forward_backward_func = get_forward_backward_func(args.micro_seq_length)
+            forward_backward_func = get_forward_backward_func(
+                args.micro_seq_length,
+                variable_slicing=args.variable_seq_slicing)
             loss_dicts = forward_backward_func(
                 forward_step_func=forward_step_func,
                 data_iterator=data_iterator,

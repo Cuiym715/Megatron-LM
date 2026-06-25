@@ -235,6 +235,87 @@ def get_sliced_batch(tokens, position_ids, attention_mask, labels, micro_seq_len
     return list(zip(tokens, position_ids, attention_mask, labels))
 
 
+def get_variable_sliced_batch(tokens, position_ids, attention_mask, labels,
+                              loss_mask, micro_seq_length, pad_token_id=-1,
+                              pad_chunks_to_multiple=1):
+    """Slice a right-padded batch into fixed-size chunks.
+
+    The original SlimPipe splitter assumes every microbatch has
+    ``seq_length / micro_seq_length`` chunks. This variant trims a batch to the
+    smallest chunk-aligned length that covers its non-padding tokens, then
+    returns only those chunks.
+    """
+    assert micro_seq_length, "variable sequence slicing requires micro_seq_length > 0"
+    args = get_args()
+    seq_length = tokens.size(1)
+    lengths = None
+    if pad_token_id >= 0:
+        valid_tokens = tokens.ne(pad_token_id)
+        lengths = valid_tokens.long().sum(dim=1)
+        # Labels are shifted left by one token; keep one position if the sample
+        # is all padding so downstream tensor shapes remain valid.
+        max_len = int(lengths.max().item()) if lengths.numel() else seq_length
+        max_len = max(max_len, 1)
+        loss_mask = loss_mask.masked_fill(labels.eq(pad_token_id), 0.0)
+    else:
+        max_len = seq_length
+
+    num_chunks = (max_len + micro_seq_length - 1) // micro_seq_length
+    unpadded_num_chunks = num_chunks
+    if pad_chunks_to_multiple > 1:
+        num_chunks = ((num_chunks + pad_chunks_to_multiple - 1) //
+                      pad_chunks_to_multiple) * pad_chunks_to_multiple
+    padded_len = num_chunks * micro_seq_length
+
+    debug_limit = getattr(args, 'variable_seq_debug_num_batches', 0)
+    debug_count = getattr(get_variable_sliced_batch, '_debug_count', 0)
+    if debug_limit > debug_count:
+        if lengths is not None:
+            lengths_cpu = lengths.detach().cpu().tolist()
+            length_summary = (
+                f"valid_lengths={lengths_cpu}, min={min(lengths_cpu)}, "
+                f"max={max(lengths_cpu)}"
+            )
+        else:
+            length_summary = "valid_lengths=all tokens treated as valid"
+        print_rank_0(
+            "[variable-seq][split] "
+            f"microbatch={debug_count}, batch={tokens.size(0)}, "
+            f"input_seq_len={seq_length}, {length_summary}, "
+            f"chunk_size={micro_seq_length}, chunks={unpadded_num_chunks}, "
+            f"padded_chunks={num_chunks}, padded_seq_len={padded_len}, "
+            f"pad_chunks_to_multiple={pad_chunks_to_multiple}"
+        )
+        get_variable_sliced_batch._debug_count = debug_count + 1
+
+    def pad_or_trim_2d(x, pad_value):
+        if x.size(1) >= padded_len:
+            return x[:, :padded_len].contiguous()
+        pad_width = padded_len - x.size(1)
+        return torch.nn.functional.pad(x, (0, pad_width), value=pad_value).contiguous()
+
+    pad_value = pad_token_id if pad_token_id >= 0 else 0
+    tokens = pad_or_trim_2d(tokens, pad_value)
+    labels = pad_or_trim_2d(labels, pad_value)
+    loss_mask = pad_or_trim_2d(loss_mask, 0.0)
+    if isinstance(position_ids, torch.Tensor):
+        if position_ids.size(1) >= padded_len:
+            position_ids = position_ids[:, :padded_len].contiguous()
+        else:
+            extra = torch.arange(position_ids.size(1), padded_len,
+                                 dtype=position_ids.dtype,
+                                 device=position_ids.device)
+            extra = extra.unsqueeze(0).expand(position_ids.size(0), -1)
+            position_ids = torch.cat((position_ids, extra), dim=1).contiguous()
+    if isinstance(attention_mask, torch.Tensor):
+        attention_mask = attention_mask[..., :padded_len].contiguous()
+
+    slices = get_sliced_batch(tokens, position_ids, attention_mask, labels,
+                              micro_seq_length)
+    assert len(slices) == num_chunks
+    return slices, loss_mask
+
+
 def print_rank_0(message):
     """If distributed is initialized, print only on rank 0."""
     if torch.distributed.is_initialized():

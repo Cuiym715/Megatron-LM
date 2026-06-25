@@ -11,6 +11,22 @@ from megatron import get_args
 from megatron.core import mpu
 
 
+def variable_seq_collate(batch):
+    """Right-pad variable-length ``text`` samples for variable slicing."""
+    args = get_args()
+    pad_id = args.variable_seq_pad_token_id
+    if pad_id < 0:
+        pad_id = 0
+    max_input_len = args.seq_length + 1
+    lengths = [min(len(sample['text']), max_input_len) for sample in batch]
+    padded_len = max(lengths)
+    text = torch.full((len(batch), padded_len), pad_id, dtype=torch.long)
+    for idx, sample in enumerate(batch):
+        values = torch.as_tensor(sample['text'][:lengths[idx]], dtype=torch.long)
+        text[idx, :lengths[idx]] = values
+    return {'text': text}
+
+
 def build_pretraining_data_loader(dataset, consumed_samples):
     """Buld dataloader given an input dataset."""
 
@@ -41,11 +57,13 @@ def build_pretraining_data_loader(dataset, consumed_samples):
 
     # Torch dataloader.
     # Notice: here will use default collate_fn, see: torch/utils/data/_utils/collate.py
+    collate_fn = variable_seq_collate if args.variable_seq_slicing else None
     return torch.utils.data.DataLoader(dataset,
                                        batch_sampler=batch_sampler,
                                        num_workers=args.num_workers,
                                        pin_memory=True,
-                                       prefetch_factor=args.prefetch_factor)
+                                       prefetch_factor=args.prefetch_factor,
+                                       collate_fn=collate_fn)
 
 class MegatronPretrainingSampler:
 

@@ -25,7 +25,7 @@ from megatron.profile_utils import annotate_forward_range, annotate_backward_ran
 # Types
 Shape = Union[List[int], torch.Size]
 
-def get_forward_backward_func(slicing=False):
+def get_forward_backward_func(slicing=False, variable_slicing=False):
     """Retrieves the appropriate forward_backward function given the
     configuration of parallel_state.
 
@@ -148,12 +148,20 @@ def get_forward_backward_func(slicing=False):
     pipeline_model_parallel_size = parallel_state.get_pipeline_model_parallel_world_size()
     if pipeline_model_parallel_size > 1:
         if parallel_state.get_virtual_pipeline_model_parallel_world_size() is not None:
+            if variable_slicing:
+                raise NotImplementedError(
+                    "variable sequence slicing is implemented for non-interleaved "
+                    "pipeline parallelism first; unset "
+                    "--num-layers-per-virtual-pipeline-stage to use it."
+                )
             if slicing:
                 forward_backward_func = pipelining_with_interleaved_slicing
             else:
                 forward_backward_func = forward_backward_pipelining_with_interleaving
         else:
-            if slicing:
+            if variable_slicing:
+                forward_backward_func = pipelining_with_variable_slicing
+            elif slicing:
                 forward_backward_func = pipelining_with_slicing
             else:
                 forward_backward_func = forward_backward_pipelining_without_interleaving
@@ -877,6 +885,7 @@ def pipelining_with_slicing(*,
                             post_p2p_async_func: Optional[Callable] = None, # unused
                             offload_ratio: float = 0,
                             offload_delay_to_next_stage: bool = False, # unused
+                            _variable_slicing: bool = False,
                             ):
     """Run 1F1B schedule, with batch and token level pipeline parallelism.
 
@@ -904,6 +913,8 @@ def pipelining_with_slicing(*,
     pipeline_parallel_rank = parallel_state.get_pipeline_model_parallel_rank()
     first_stage = parallel_state.is_pipeline_first_stage()
     last_stage = parallel_state.is_pipeline_last_stage()
+    args = get_args()
+    variable_seq_debug_limit = getattr(args, 'variable_seq_debug_num_batches', 0)
 
     num_slices = tensor_shape[0] // micro_seq_length
     # shape of input_ids.
@@ -919,7 +930,7 @@ def pipelining_with_slicing(*,
     loss_div = num_microbatches
     forward_data_store = []
     # minimun number of slices to fullfill the pipeline.
-    num_slices_preset = num_slices
+    num_slices_preset = 1 if _variable_slicing else num_slices
     # warm up to prefill the pipeline.
     num_slices_warmup = 2 * (pipeline_parallel_size - pipeline_parallel_rank - 1)
     # in-flight slices need to gain.
@@ -935,6 +946,7 @@ def pipelining_with_slicing(*,
     cnt_onload = 0
 
     def make_microbatch(cnt_microbatches):
+        nonlocal num_slices_target
         assert cnt_microbatches < num_microbatches, "No more microbatches."
         if timers is not None:
             timers('batch-generator', log_level=2).start()
@@ -944,8 +956,27 @@ def pipelining_with_slicing(*,
         if not last_stage:
             loss_func = None
         slices = sliced_batch(micro_seq_length)
+        if _variable_slicing:
+            assert len(slices) >= 1, "variable sequence slicing produced no slices."
+            assert len(slices) >= pipeline_parallel_size, \
+                "variable sequence slicing currently requires at least one chunk per pipeline stage."
+            assert len(slices) % pipeline_parallel_size == 0, \
+                "variable sequence slicing currently requires chunk count to be divisible by pipeline size."
+            num_slices_target = max(num_slices_flight + 1, len(slices) + num_slices_warmup)
+            if cnt_microbatches < variable_seq_debug_limit:
+                print(
+                    "[variable-seq][schedule] "
+                    f"rank={pipeline_parallel_rank}/{pipeline_parallel_size}, "
+                    f"microbatch={cnt_microbatches}, slices={len(slices)}, "
+                    f"warmup_slices={num_slices_warmup}, "
+                    f"target_inflight_slices={num_slices_target}, "
+                    f"current_inflight_slices={num_slices_flight}, "
+                    f"forward_only={forward_only}",
+                    flush=True,
+                )
         num_slices_total = num_slices_flight + (num_microbatches - cnt_microbatches) * len(slices)
-        assert num_slices_total >= num_slices_target, "number of total slices is not enough."
+        if not _variable_slicing:
+            assert num_slices_total >= num_slices_target, "number of total slices is not enough."
         kv_cache = kv_cache_class()
         mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func, backward_func, loss_func, grad_scaler)
         # mb._bwd = []
@@ -1201,6 +1232,16 @@ def pipelining_with_slicing(*,
     if not forward_only:
         assert all(req.wait() for req in bwd_reqs); bwd_reqs = None
     return forward_data_store
+
+
+def pipelining_with_variable_slicing(**kwargs):
+    """Run non-interleaved pipeline parallelism with variable chunk counts.
+
+    This is a separate entry point from the original SlimPipe schedules so the
+    baseline remains directly comparable. It reuses the non-interleaved slicing
+    implementation with dynamic target sizing enabled.
+    """
+    return pipelining_with_slicing(_variable_slicing=True, **kwargs)
 
 
 def pipelining_with_interleaved_slicing(*,
