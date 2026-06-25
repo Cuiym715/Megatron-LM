@@ -3,6 +3,8 @@
 # Parts of the code here are adapted from PyTorch
 # repo: https://github.com/pytorch/pytorch
 
+from __future__ import annotations
+
 import math
 import os
 from pkg_resources import packaging
