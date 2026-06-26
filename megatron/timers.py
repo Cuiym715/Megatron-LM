@@ -71,9 +71,11 @@ class Timer(TimerBase):
         self._started = False
         self._record_events = False
         self._record_iteration = None
+        self._record_context = {}
         self._start_time_queue = []
         self._end_time_queue = []
         self._iteration_queue = []
+        self._context_queue = []
         # Note that None will default to the global process group
         self._barrier_group = None
         self._start_time = time.time()
@@ -86,6 +88,9 @@ class Timer(TimerBase):
         self._record_events = record_events
         self._record_iteration = iteration
 
+    def set_record_context(self, context):
+        self._record_context = context or {}
+
     def start(self, barrier=False):
         """Start the timer."""
         assert not self._started, 'timer has already been started'
@@ -97,6 +102,7 @@ class Timer(TimerBase):
         if self._record_events:
             self._start_time_queue.append(self._start_time)
             self._iteration_queue.append(self._record_iteration)
+            self._context_queue.append(dict(self._record_context))
 
 
     def stop(self, barrier=False):
@@ -141,25 +147,35 @@ class Timer(TimerBase):
             return
         if record_path is not None:
             with open(record_path, 'a') as f:
-                for iteration, start_time, end_time in zip(
+                for iteration, context, start_time, end_time in zip(
                         self._iteration_queue[:num_events],
+                        self._context_queue[:num_events],
                         self._start_time_queue[:num_events],
                         self._end_time_queue[:num_events]):
-                    json.dump({
+                    event = {
                         'iter': iteration,
                         'name': self.name,
                         'start': start_time,
                         'end': end_time,
-                    }, f, sort_keys=True)
+                    }
+                    event.update(context)
+                    json.dump(event, f, sort_keys=True)
                     f.write('\n')
         self._start_time_queue = self._start_time_queue[num_events:]
         self._end_time_queue = self._end_time_queue[num_events:]
         self._iteration_queue = self._iteration_queue[num_events:]
+        self._context_queue = self._context_queue[num_events:]
 
 
 
 class Timers:
     """Group of timers."""
+
+    _RECORDED_TIMER_NAMES = {
+        'forward-compute',
+        'backward-compute',
+        'batch-generator',
+    }
 
     def __init__(self, log_level, log_option, record_dir=None,
                  record_start_iter=0, record_end_iter=-1):
@@ -169,6 +185,7 @@ class Timers:
         self._record_start_iter = record_start_iter
         self._record_end_iter = record_end_iter
         self._record_iteration = None
+        self._record_context = {}
         self._timers = {}
         self._log_levels = {}
         self._dummy_timer = DummyTimer()
@@ -183,11 +200,29 @@ class Timers:
             return False
         return True
 
+    def _should_record_name(self, name):
+        if not self._should_record():
+            return False
+        return name in self._RECORDED_TIMER_NAMES
+
+    def is_recording_active(self):
+        return self._should_record()
+
     def set_recording_iteration(self, iteration):
         self._record_iteration = iteration
-        record_events = self._should_record()
+        for name, timer in self._timers.items():
+            timer.set_recording(self._should_record_name(name), iteration)
+
+    def set_record_context(self, **context):
+        self._record_context = {
+            key: value for key, value in context.items()
+            if value is not None
+        }
         for timer in self._timers.values():
-            timer.set_recording(record_events, iteration)
+            timer.set_record_context(self._record_context)
+
+    def clear_record_context(self):
+        self.set_record_context()
 
     def record(self):
         if self._record_dir is None:
@@ -224,7 +259,9 @@ class Timers:
             return self._dummy_timer
         # Otherwise, initalize the timer and set the level.
         self._timers[name] = Timer(name)
-        self._timers[name].set_recording(self._should_record(), self._record_iteration)
+        self._timers[name].set_recording(self._should_record_name(name),
+                                         self._record_iteration)
+        self._timers[name].set_record_context(self._record_context)
         self._log_levels[name] = log_level
         return self._timers[name]
 

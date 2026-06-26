@@ -439,9 +439,13 @@ class MicroBatch:
                  forward_func: Callable,
                  backward_func: Optional[Callable],
                  loss_func: Optional[Callable],
-                 grad_scaler: Optional[Callable]):
+                 grad_scaler: Optional[Callable],
+                 batch_idx: Optional[int] = None,
+                 timers: Optional[Callable] = None):
         self.slices = deque(slices)
         self.num_slices = len(slices)
+        self.batch_idx = batch_idx
+        self.timers = timers
         self.kv_cache = kv_cache
         self.offload_ratio = offload_ratio
         self.forward_func = forward_func
@@ -483,6 +487,7 @@ class MicroBatch:
 
     def forward(self, input_tensor):
         """Run forward on one slice of micro-batch."""
+        slice_idx = self.num_slices - len(self.slices)
         slice = self.slices.popleft()
         if self.backward_func is not None:
             dummy_input = input_tensor
@@ -491,8 +496,16 @@ class MicroBatch:
             input_kv = self.kv_cache.detach().dump()
             self.input_stack.append([dummy_input] + input_kv)
         om = offload.OffloadManager(self.offload_ratio)
+        timers = self.timers
+        record_context = timers is not None and timers.is_recording_active()
+        if record_context:
+            timers.set_record_context(mb=self.batch_idx,
+                                      chunk=slice_idx,
+                                      num_chunks=self.num_slices)
         with offload.offload_manager(om):
             output_tensor = self.forward_func(slice, input_tensor, self.kv_cache)
+        if record_context:
+            timers.clear_record_context()
         self.om_stack.append(om)
         if self.backward_func is not None:
             dummy_output = offload.forward_empty_backward_identity(output_tensor)
@@ -550,6 +563,7 @@ class MicroBatch:
     def backward(self, output_tensor_grad):
         """Run backward on one slice of micro-batch (in reversed order of forward)."""
         assert self.backward_func is not None
+        slice_idx = len(self.om_stack) - 1
         om = self.om_stack.pop()
         assert om.is_complete()
         if output_tensor_grad is None:
@@ -559,7 +573,15 @@ class MicroBatch:
         if not self.kv_grad:    # kv of the last slice has no grad
             outputs = outputs[:1]
         output_tensor_grad = [output_tensor_grad] + self.kv_grad
+        timers = self.timers
+        record_context = timers is not None and timers.is_recording_active()
+        if record_context:
+            timers.set_record_context(mb=self.batch_idx,
+                                      chunk=slice_idx,
+                                      num_chunks=self.num_slices)
         input_tensor_grad, *self.kv_grad = self.backward_func(inputs, outputs, output_tensor_grad)
+        if record_context:
+            timers.clear_record_context()
         om.check_ref()
         return input_tensor_grad
 
@@ -804,16 +826,27 @@ def forward_backward_no_pipelining(*,
                             timers=timers, deallocate_pipeline_outputs=deallocate_pipeline_outputs)
 
     cnt_onload = 0
+    make_microbatch_idx = 0
     def make_microbatch():
+        nonlocal make_microbatch_idx
         if timers is not None:
+            record_context = timers.is_recording_active()
+            if record_context:
+                timers.set_record_context(mb=make_microbatch_idx)
             timers('batch-generator', log_level=2).start()
         sliced_batch, loss_func = get_batch_func(data_iterator)
         if timers is not None:
             timers('batch-generator').stop()
+            if record_context:
+                timers.clear_record_context()
         slices = sliced_batch(micro_seq_length)
         kv_cache = kv_cache_class()
-        return MicroBatch(slices, kv_cache, offload_ratio, forward_func,
-                          backward_func, loss_func, grad_scaler)
+        mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func,
+                        backward_func, loss_func, grad_scaler,
+                        batch_idx=make_microbatch_idx,
+                        timers=timers)
+        make_microbatch_idx += 1
+        return mb
 
     forward_data_store = []
     for _ in range(num_microbatches):
@@ -951,10 +984,15 @@ def pipelining_with_slicing(*,
         nonlocal num_slices_target
         assert cnt_microbatches < num_microbatches, "No more microbatches."
         if timers is not None:
+            record_context = timers.is_recording_active()
+            if record_context:
+                timers.set_record_context(mb=cnt_microbatches)
             timers('batch-generator', log_level=2).start()
         sliced_batch, loss_func = get_batch_func(data_iterator)
         if timers is not None:
             timers('batch-generator').stop()
+            if record_context:
+                timers.clear_record_context()
         if not last_stage:
             loss_func = None
         slices = sliced_batch(micro_seq_length)
@@ -982,7 +1020,9 @@ def pipelining_with_slicing(*,
             assert num_slices_total >= num_slices_target, "number of total slices is not enough."
         kv_cache = kv_cache_class()
         mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func,
-                        backward_func, loss_func, grad_scaler)
+                        backward_func, loss_func, grad_scaler,
+                        batch_idx=cnt_microbatches,
+                        timers=timers)
         # mb._bwd = []
         return cnt_microbatches + 1, mb
 
@@ -1355,24 +1395,31 @@ def pipelining_with_interleaved_slicing(*,
     # attention balance
     attn_balancer = AttnBalancer(num_microbatches, pipeline_parallel_rank, pipeline_parallel_size, attn_balance)
 
-    def make_microbatch(model, data_iterator):
+    def make_microbatch(model, data_iterator, batch_idx=None):
         forward_func = partial(forward_step, forward_step_func=forward_step_func, model=model,
                                timers=timers, enable_autocast=enable_autocast)
         backward_func = partial(backward_step, model_type=model_type,
                                 timers=timers, deallocate_pipeline_outputs=deallocate_pipeline_outputs) \
                         if not forward_only else None
         if timers is not None:
+            record_context = timers.is_recording_active()
+            if record_context:
+                timers.set_record_context(mb=batch_idx)
             timers('batch-generator', log_level=2).start()
         sliced_batch, loss_func = get_batch_func(data_iterator)
         if timers is not None:
             timers('batch-generator').stop()
+            if record_context:
+                timers.clear_record_context()
         if not parallel_state.is_pipeline_last_stage():
             loss_func = None
         slices = sliced_batch(micro_seq_length)
         assert len(slices) >= group_size, "number of slices per microbatch is not enough."
         kv_cache = kv_cache_class()
         mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func,
-                        backward_func, loss_func, grad_scaler)
+                        backward_func, loss_func, grad_scaler,
+                        batch_idx=batch_idx,
+                        timers=timers)
         return mb
 
     def make_cycled_batch(cnt_microbatches):
@@ -1380,7 +1427,8 @@ def pipelining_with_interleaved_slicing(*,
         mbatches = []
         for i in range(num_stages):
             parallel_state.set_virtual_pipeline_model_parallel_rank(i)
-            mbatches.append(make_microbatch(model[i], data_iterator[i]))
+            mbatches.append(make_microbatch(model[i], data_iterator[i],
+                                            cnt_microbatches))
         cbatch = CycledBatch(cnt_microbatches, mbatches, group_size)
         num_slices_total = num_slices_flight + (num_microbatches - cnt_microbatches) * cbatch.num_slices_to_forward
         assert num_slices_total >= num_slices_target, "number of total slices is not enough."
@@ -1769,33 +1817,42 @@ def forward_backward_pipelining_with_interleaving(*,
     onload_req = None
     cnt_onload = 0
 
-    def make_microbatch(model, data_iterator):
+    def make_microbatch(model, data_iterator, batch_idx=None):
         forward_func = partial(forward_step, forward_step_func=forward_step_func, model=model,
                                timers=timers, enable_autocast=enable_autocast)
         backward_func = partial(backward_step, model_type=model_type,
                                 timers=timers, deallocate_pipeline_outputs=deallocate_pipeline_outputs) \
                         if not forward_only else None
         if timers is not None:
+            record_context = timers.is_recording_active()
+            if record_context:
+                timers.set_record_context(mb=batch_idx)
             timers('batch-generator', log_level=2).start()
         sliced_batch, loss_func = get_batch_func(data_iterator)
         if timers is not None:
             timers('batch-generator').stop()
+            if record_context:
+                timers.clear_record_context()
         if not parallel_state.is_pipeline_last_stage():
             loss_func = None
         slices = sliced_batch(micro_seq_length)
         assert len(slices) <= 1, "this function only supports one slice per microbatch."
         kv_cache = kv_cache_class()
         mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func,
-                        backward_func, loss_func, grad_scaler)
+                        backward_func, loss_func, grad_scaler,
+                        batch_idx=batch_idx,
+                        timers=timers)
         return mb
 
+    total_num_microbatches = num_microbatches
     def make_grouped_batch(num_microbatches):
         assert num_microbatches, "No more microbatches."
         mbatches = []
         for i in range(num_stages):
             for j in range(pipeline_parallel_size):
                 parallel_state.set_virtual_pipeline_model_parallel_rank(i)
-                mbatches.append(make_microbatch(model[i], data_iterator[i]))
+                mbatches.append(make_microbatch(model[i], data_iterator[i],
+                                                total_num_microbatches - num_microbatches + j))
         cbatch = GroupedBatch(mbatches, num_stages, pipeline_parallel_size)
         return num_microbatches - pipeline_parallel_size, cbatch
 
@@ -2083,10 +2140,15 @@ def forward_backward_pipelining_without_interleaving(*,
     def make_microbatch(num_mb):
         assert num_mb
         if timers is not None:
+            record_context = timers.is_recording_active()
+            if record_context:
+                timers.set_record_context(mb=num_microbatches - num_mb)
             timers('batch-generator', log_level=2).start()
         sliced_batch, loss_func = get_batch_func(data_iterator)
         if timers is not None:
             timers('batch-generator').stop()
+            if record_context:
+                timers.clear_record_context()
         if not last_stage:
             loss_func = None
         slices = sliced_batch(micro_seq_length)
@@ -2094,7 +2156,9 @@ def forward_backward_pipelining_without_interleaving(*,
         assert  num_total_batches >= num_batches_target, "number of total slices is not enough."
         kv_cache = kv_cache_class()
         mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func,
-                        backward_func, loss_func, grad_scaler)
+                        backward_func, loss_func, grad_scaler,
+                        batch_idx=num_microbatches - num_mb,
+                        timers=timers)
         return num_mb - 1, mb
 
     # print messages for debug.
