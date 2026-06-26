@@ -1012,6 +1012,7 @@ def train(forward_step_func, get_batch_func, model, optimizer, opt_param_schedul
     while iteration < args.train_iters:
         update_num_microbatches(args.consumed_train_samples)
         args.curr_iteration = iteration
+        timers.set_recording_iteration(iteration)
         if args.kaimm_gc_interval > 0:
             if iteration % args.kaimm_gc_interval == 0:
                 gc.collect(0)
@@ -1041,6 +1042,7 @@ def train(forward_step_func, get_batch_func, model, optimizer, opt_param_schedul
                                           iteration, loss_scale,
                                           report_memory_flag, skipped_iter,
                                           grad_norm, params_norm, num_zeros_in_grad)
+        timers.record()
 
         if args.kaimm_profile_analysis:
             perf_model_summary()

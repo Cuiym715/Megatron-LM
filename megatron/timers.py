@@ -4,6 +4,8 @@
 
 from abc import ABC
 from abc import abstractmethod
+import json
+import os
 import time
 
 import torch
@@ -67,6 +69,11 @@ class Timer(TimerBase):
         super().__init__(name)
         self._elapsed = 0.0
         self._started = False
+        self._record_events = False
+        self._record_iteration = None
+        self._start_time_queue = []
+        self._end_time_queue = []
+        self._iteration_queue = []
         # Note that None will default to the global process group
         self._barrier_group = None
         self._start_time = time.time()
@@ -75,6 +82,9 @@ class Timer(TimerBase):
     def set_barrier_group(self, barrier_group):
         self._barrier_group = barrier_group
 
+    def set_recording(self, record_events, iteration=None):
+        self._record_events = record_events
+        self._record_iteration = iteration
 
     def start(self, barrier=False):
         """Start the timer."""
@@ -84,6 +94,9 @@ class Timer(TimerBase):
         torch.cuda.synchronize()
         self._start_time = time.time()
         self._started = True
+        if self._record_events:
+            self._start_time_queue.append(self._start_time)
+            self._iteration_queue.append(self._record_iteration)
 
 
     def stop(self, barrier=False):
@@ -92,8 +105,11 @@ class Timer(TimerBase):
         if barrier:
             torch.distributed.barrier(group=self._barrier_group)
         torch.cuda.synchronize()
-        self._elapsed += (time.time() - self._start_time)
+        end_time = time.time()
+        self._elapsed += (end_time - self._start_time)
         self._started = False
+        if self._record_events:
+            self._end_time_queue.append(end_time)
 
 
     def reset(self):
@@ -118,19 +134,72 @@ class Timer(TimerBase):
             self.start(barrier=barrier)
         return _elapsed
 
+    def record(self, record_path):
+        """Append recorded start/end timestamp events to ``record_path``."""
+        num_events = min(len(self._start_time_queue), len(self._end_time_queue))
+        if num_events == 0:
+            return
+        if record_path is not None:
+            with open(record_path, 'a') as f:
+                for iteration, start_time, end_time in zip(
+                        self._iteration_queue[:num_events],
+                        self._start_time_queue[:num_events],
+                        self._end_time_queue[:num_events]):
+                    json.dump({
+                        'iter': iteration,
+                        'name': self.name,
+                        'start': start_time,
+                        'end': end_time,
+                    }, f, sort_keys=True)
+                    f.write('\n')
+        self._start_time_queue = self._start_time_queue[num_events:]
+        self._end_time_queue = self._end_time_queue[num_events:]
+        self._iteration_queue = self._iteration_queue[num_events:]
+
 
 
 class Timers:
     """Group of timers."""
 
-    def __init__(self, log_level, log_option):
+    def __init__(self, log_level, log_option, record_dir=None,
+                 record_start_iter=0, record_end_iter=-1):
         self._log_level = log_level
         self._log_option = log_option
+        self._record_dir = record_dir
+        self._record_start_iter = record_start_iter
+        self._record_end_iter = record_end_iter
+        self._record_iteration = None
         self._timers = {}
         self._log_levels = {}
         self._dummy_timer = DummyTimer()
         self._max_log_level = 2
 
+    def _should_record(self):
+        if self._record_dir is None or self._record_iteration is None:
+            return False
+        if self._record_iteration < self._record_start_iter:
+            return False
+        if self._record_end_iter >= 0 and self._record_iteration >= self._record_end_iter:
+            return False
+        return True
+
+    def set_recording_iteration(self, iteration):
+        self._record_iteration = iteration
+        record_events = self._should_record()
+        for timer in self._timers.values():
+            timer.set_recording(record_events, iteration)
+
+    def record(self):
+        if self._record_dir is None:
+            return
+        os.makedirs(self._record_dir, exist_ok=True)
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            rank = torch.distributed.get_rank()
+        else:
+            rank = 0
+        record_path = os.path.join(self._record_dir, 'timer_events_rank{}.jsonl'.format(rank))
+        for timer in self._timers.values():
+            timer.record(record_path)
 
     def __call__(self, name, log_level=None):
         # If the timer has already been set, then check if the log-level
@@ -155,6 +224,7 @@ class Timers:
             return self._dummy_timer
         # Otherwise, initalize the timer and set the level.
         self._timers[name] = Timer(name)
+        self._timers[name].set_recording(self._should_record(), self._record_iteration)
         self._log_levels[name] = log_level
         return self._timers[name]
 

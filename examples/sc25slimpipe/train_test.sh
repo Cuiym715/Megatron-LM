@@ -20,6 +20,9 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 MEGATRON_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
+RECORD_TIMER_EVENTS=1
+TIMER_RECORD_START_ITER=5
+TIMER_RECORD_END_ITER=15
 
 export CUDA_DEVICE_MAX_CONNECTIONS=${CUDA_DEVICE_MAX_CONNECTIONS:-1}
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1}
@@ -34,12 +37,14 @@ GPUS_PER_NODE=${GPUS_PER_NODE:-2}
 TP_SIZE=${TP_SIZE:-1}
 PP_SIZE=${PP_SIZE:-2}
 CP_SIZE=${CP_SIZE:-1}
-VARLEN=${VARLEN:-0}
+VARLEN=${VARLEN:-1}
 if [[ "$VARLEN" == "1" ]]; then
     PP_ATTN_BALANCE=${PP_ATTN_BALANCE:-0}
+    # DEBUG for variable length training.
     VARLEN_DEBUG=${VARLEN_DEBUG:-2}
 else
     PP_ATTN_BALANCE=${PP_ATTN_BALANCE:-100}
+    # DEBUG for variable length training.
     VARLEN_DEBUG=${VARLEN_DEBUG:-0}
 fi
 
@@ -75,14 +80,31 @@ GLOBAL_BATCH_SIZE=${GLOBAL_BATCH_SIZE:-4}
 TRAIN_ITERS=${TRAIN_ITERS:-20}
 
 LOG_DIR=${LOG_DIR:-$SCRIPT_DIR/logs/train_test}
+RECORD_TIMER_EVENTS=${RECORD_TIMER_EVENTS:-0}
+if [[ "$RECORD_TIMER_EVENTS" == "1" ]]; then
+    TIMING_LOG_LEVEL=${TIMING_LOG_LEVEL:-2}
+else
+    TIMING_LOG_LEVEL=${TIMING_LOG_LEVEL:-0}
+fi
+TIMER_RECORD_START_ITER=${TIMER_RECORD_START_ITER:-0}
+TIMER_RECORD_END_ITER=${TIMER_RECORD_END_ITER:--1}
+RUN_TAG=${RUN_TAG:-pp${PP_SIZE}_cp${CP_SIZE}_varlen${VARLEN}_seq${SEQ_LENGTH}_mseq${MICRO_SEQ_LENGTH}_gbs${GLOBAL_BATCH_SIZE}_$(date +%Y%m%d_%H%M%S)}
+TIMER_RECORD_DIR=${TIMER_RECORD_DIR:-/workspace/log/${RUN_TAG}/timers}
 mkdir -p "$LOG_DIR" "$DATA_CACHE_PATH"
+if [[ "$RECORD_TIMER_EVENTS" == "1" ]]; then
+    mkdir -p "$TIMER_RECORD_DIR"
+fi
 
-if (( SEQ_LENGTH % MICRO_SEQ_LENGTH != 0 )); then
+if [[ "$VARLEN" != "1" ]] && (( SEQ_LENGTH % MICRO_SEQ_LENGTH != 0 )); then
     echo "SEQ_LENGTH=$SEQ_LENGTH must be divisible by MICRO_SEQ_LENGTH=$MICRO_SEQ_LENGTH."
     exit 1
 fi
 
-NUM_SLICES=$((SEQ_LENGTH / MICRO_SEQ_LENGTH))
+if [[ "$VARLEN" == "1" ]]; then
+    NUM_SLICES=$(((SEQ_LENGTH + MICRO_SEQ_LENGTH - 1) / MICRO_SEQ_LENGTH))
+else
+    NUM_SLICES=$((SEQ_LENGTH / MICRO_SEQ_LENGTH))
+fi
 if (( NUM_SLICES < PP_SIZE )); then
     echo "SlimPipe interleaved slicing expects NUM_SLICES >= PP_SIZE; got NUM_SLICES=$NUM_SLICES PP_SIZE=$PP_SIZE."
     echo "Lower MICRO_SEQ_LENGTH or increase SEQ_LENGTH."
@@ -167,8 +189,9 @@ fi
 if [[ "$VARLEN" == "1" ]]; then
     PARALLEL_ARGS+=(
         --variable-seq-slicing
-        --variable-seq-pad-token-id "${PAD_TOKEN_ID:--1}"
+        --variable-seq-pad-token-id "${PAD_TOKEN_ID:-0}"
         --variable-seq-pad-to-pipeline-size
+        # DEBUG for variable length training.
         --variable-seq-debug-num-batches "$VARLEN_DEBUG"
     )
 fi
@@ -198,6 +221,7 @@ DATA_ARGS=(
 
 LOGGING_ARGS=(
     --log-interval 1
+    --timing-log-level "$TIMING_LOG_LEVEL"
     --eval-iters 0
     --eval-interval 1000
     --save-interval 100000
@@ -205,18 +229,37 @@ LOGGING_ARGS=(
     --master-addr "${MASTER_ADDR}:${MASTER_PORT}"
 )
 
+if [[ "$RECORD_TIMER_EVENTS" == "1" ]]; then
+    LOGGING_ARGS+=(
+        --timer-record-dir "$TIMER_RECORD_DIR"
+        --timer-record-start-iter "$TIMER_RECORD_START_ITER"
+        --timer-record-end-iter "$TIMER_RECORD_END_ITER"
+    )
+fi
+
 echo "MEGATRON_ROOT=$MEGATRON_ROOT"
 echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 echo "GPUS_PER_NODE=$GPUS_PER_NODE"
 echo "TP_SIZE=$TP_SIZE PP_SIZE=$PP_SIZE CP_SIZE=$CP_SIZE"
 echo "VARLEN=$VARLEN VIRTUAL_PP_LAYERS=${VIRTUAL_PP_LAYERS:-none}"
+# DEBUG for variable length training.
 echo "VARLEN_DEBUG=$VARLEN_DEBUG"
+if [[ "$VARLEN" == "1" ]]; then
+    # DEBUG for variable length training.
+    echo "VARIABLE_SEQ_ARGS=--variable-seq-slicing --variable-seq-pad-token-id ${PAD_TOKEN_ID:-0} --variable-seq-pad-to-pipeline-size --variable-seq-debug-num-batches $VARLEN_DEBUG"
+fi
 echo "PP_ATTN_BALANCE=$PP_ATTN_BALANCE"
 echo "SEQ_LENGTH=$SEQ_LENGTH MICRO_SEQ_LENGTH=$MICRO_SEQ_LENGTH NUM_SLICES=$NUM_SLICES"
 echo "DATA_PATH=$DATA_PATH"
 echo "TOKENIZER_MODEL=$TOKENIZER_MODEL"
 echo "LOG_DIR=$LOG_DIR"
+echo "TIMING_LOG_LEVEL=$TIMING_LOG_LEVEL"
+if [[ "$RECORD_TIMER_EVENTS" == "1" ]]; then
+    echo "TIMER_RECORD_DIR=$TIMER_RECORD_DIR"
+    echo "TIMER_RECORD_START_ITER=$TIMER_RECORD_START_ITER TIMER_RECORD_END_ITER=$TIMER_RECORD_END_ITER"
+fi
 
+sleep 10
 cd "$MEGATRON_ROOT"
 
 python -m torch.distributed.run "${DISTRIBUTED_ARGS[@]}" \

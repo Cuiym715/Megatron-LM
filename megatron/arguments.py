@@ -177,11 +177,18 @@ def validate_args(args, defaults={}):
     if args.variable_seq_slicing:
         assert args.micro_seq_length > 0, \
             'variable-seq-slicing requires --micro-seq-length > 0'
+        # DEBUG for variable length training.
         assert args.variable_seq_debug_num_batches >= 0, \
             'variable-seq-debug-num-batches must be >= 0'
         assert args.virtual_pipeline_model_parallel_size is None, \
             'variable-seq-slicing currently supports non-interleaved PP only; ' \
             'unset --num-layers-per-virtual-pipeline-stage'
+    if args.timer_record_dir is not None:
+        assert args.timer_record_start_iter >= 0, \
+            'timer-record-start-iter must be >= 0'
+        assert args.timer_record_end_iter < 0 or \
+            args.timer_record_end_iter > args.timer_record_start_iter, \
+            'timer-record-end-iter must be negative or greater than start iter'
 
     # Parameters dtype.
     args.params_dtype = torch.float
@@ -832,6 +839,15 @@ def _add_logging_args(parser):
                        'flush to disk.')
     group.add_argument('--log-timers-to-tensorboard', action='store_true',
                        help='If set, write timers to tensorboard.')
+    group.add_argument('--timer-record-dir', type=str, default=None,
+                       help='If set, write enabled timer start/end timestamp '
+                       'events as per-rank JSONL files under this directory.')
+    group.add_argument('--timer-record-start-iter', type=int, default=0,
+                       help='First zero-based training iteration to record timer '
+                       'events.')
+    group.add_argument('--timer-record-end-iter', type=int, default=-1,
+                       help='Exclusive zero-based training iteration end for '
+                       'timer event recording. Negative means no end.')
     group.add_argument('--log-batch-size-to-tensorboard', action='store_true',
                        help='If set, write batch-size to tensorboard.')
     group.add_argument('--no-log-learnig-rate-to-tensorboard',
@@ -1282,6 +1298,7 @@ def _add_distributed_args(parser):
     group.add_argument('--variable-seq-pad-to-pipeline-size', action='store_true',
                        help='Pad the number of chunks to a multiple of pipeline parallel size '
                        'for variable sequence slicing.')
+    # DEBUG for variable length training.
     group.add_argument('--variable-seq-debug-num-batches', type=int, default=0,
                        help='Print variable sequence slicing and pipeline scheduling summaries '
                        'for the first N microbatches. 0 disables debug logging.')

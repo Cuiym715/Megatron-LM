@@ -174,7 +174,10 @@ def _set_timers(args):
     """Initialize timers."""
     global _GLOBAL_TIMERS
     _ensure_var_is_not_initialized(_GLOBAL_TIMERS, 'timers')
-    _GLOBAL_TIMERS = Timers(args.timing_log_level, args.timing_log_option)
+    _GLOBAL_TIMERS = Timers(args.timing_log_level, args.timing_log_option,
+                            args.timer_record_dir,
+                            args.timer_record_start_iter,
+                            args.timer_record_end_iter)
 
 
 def _ensure_var_is_initialized(var, name):
@@ -185,6 +188,5 @@ def _ensure_var_is_initialized(var, name):
 def _ensure_var_is_not_initialized(var, name):
     """Make sure the input variable is not None."""
     assert var is None, '{} is already initialized.'.format(name)
-
 
 

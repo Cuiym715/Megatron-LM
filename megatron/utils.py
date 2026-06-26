@@ -267,6 +267,7 @@ def get_variable_sliced_batch(tokens, position_ids, attention_mask, labels,
                       pad_chunks_to_multiple) * pad_chunks_to_multiple
     padded_len = num_chunks * micro_seq_length
 
+    # DEBUG for variable length training.
     debug_limit = getattr(args, 'variable_seq_debug_num_batches', 0)
     debug_count = getattr(get_variable_sliced_batch, '_debug_count', 0)
     if debug_limit > debug_count:

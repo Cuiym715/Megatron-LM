@@ -812,7 +812,8 @@ def forward_backward_no_pipelining(*,
             timers('batch-generator').stop()
         slices = sliced_batch(micro_seq_length)
         kv_cache = kv_cache_class()
-        return MicroBatch(slices, kv_cache, offload_ratio, forward_func, backward_func, loss_func, grad_scaler)
+        return MicroBatch(slices, kv_cache, offload_ratio, forward_func,
+                          backward_func, loss_func, grad_scaler)
 
     forward_data_store = []
     for _ in range(num_microbatches):
@@ -914,6 +915,7 @@ def pipelining_with_slicing(*,
     first_stage = parallel_state.is_pipeline_first_stage()
     last_stage = parallel_state.is_pipeline_last_stage()
     args = get_args()
+    # DEBUG for variable length training.
     variable_seq_debug_limit = getattr(args, 'variable_seq_debug_num_batches', 0)
 
     num_slices = tensor_shape[0] // micro_seq_length
@@ -963,6 +965,7 @@ def pipelining_with_slicing(*,
             assert len(slices) % pipeline_parallel_size == 0, \
                 "variable sequence slicing currently requires chunk count to be divisible by pipeline size."
             num_slices_target = max(num_slices_flight + 1, len(slices) + num_slices_warmup)
+            # DEBUG for variable length training.
             if cnt_microbatches < variable_seq_debug_limit:
                 print(
                     "[variable-seq][schedule] "
@@ -978,7 +981,8 @@ def pipelining_with_slicing(*,
         if not _variable_slicing:
             assert num_slices_total >= num_slices_target, "number of total slices is not enough."
         kv_cache = kv_cache_class()
-        mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func, backward_func, loss_func, grad_scaler)
+        mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func,
+                        backward_func, loss_func, grad_scaler)
         # mb._bwd = []
         return cnt_microbatches + 1, mb
 
@@ -1367,7 +1371,8 @@ def pipelining_with_interleaved_slicing(*,
         slices = sliced_batch(micro_seq_length)
         assert len(slices) >= group_size, "number of slices per microbatch is not enough."
         kv_cache = kv_cache_class()
-        mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func, backward_func, loss_func, grad_scaler)
+        mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func,
+                        backward_func, loss_func, grad_scaler)
         return mb
 
     def make_cycled_batch(cnt_microbatches):
@@ -1780,7 +1785,8 @@ def forward_backward_pipelining_with_interleaving(*,
         slices = sliced_batch(micro_seq_length)
         assert len(slices) <= 1, "this function only supports one slice per microbatch."
         kv_cache = kv_cache_class()
-        mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func, backward_func, loss_func, grad_scaler)
+        mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func,
+                        backward_func, loss_func, grad_scaler)
         return mb
 
     def make_grouped_batch(num_microbatches):
@@ -2087,7 +2093,8 @@ def forward_backward_pipelining_without_interleaving(*,
         num_total_batches = num_batches_flight + num_mb * len(slices) + 1
         assert  num_total_batches >= num_batches_target, "number of total slices is not enough."
         kv_cache = kv_cache_class()
-        mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func, backward_func, loss_func, grad_scaler)
+        mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func,
+                        backward_func, loss_func, grad_scaler)
         return num_mb - 1, mb
 
     # print messages for debug.
