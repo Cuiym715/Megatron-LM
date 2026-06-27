@@ -144,8 +144,10 @@ class ChunkedTensor(torch.Tensor):
     def concat(self) -> torch.Tensor:
         if len(self._tensors) == 1:
             return self._tensors[0]
-        # return torch.cat(self._tensors, self._dim)
-        import fast_cat_cuda
+        try:
+            import fast_cat_cuda
+        except ModuleNotFoundError:
+            return torch.cat(self._tensors, self._dim)
         concat = torch.empty_like(self)
         t = self._tensors[0]
         inner = t.stride(self._dim) * t.size(self._dim)
