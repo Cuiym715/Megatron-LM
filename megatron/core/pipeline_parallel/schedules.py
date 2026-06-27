@@ -583,9 +583,14 @@ class MicroBatch:
             output_tensor_grad = output_tensor_grad[0]
         inputs = self.input_stack.pop()
         outputs = self.output_stack.pop()
-        if not self.kv_grad:    # kv of the last slice has no grad
-            outputs = outputs[:1]
-        output_tensor_grad = [output_tensor_grad] + self.kv_grad
+        output_tensor_grads = [output_tensor_grad] + self.kv_grad
+        outputs_and_grads = [
+            (output, grad)
+            for output, grad in zip(outputs, output_tensor_grads, strict=False)
+            if grad is not None
+        ]
+        assert outputs_and_grads, "No tensor gradients available for this backward slice."
+        outputs, output_tensor_grad = map(list, zip(*outputs_and_grads))
         timers = self.timers
         record_context = timers is not None and timers.is_recording_active()
         if record_context:
