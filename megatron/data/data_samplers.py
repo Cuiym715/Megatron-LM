@@ -7,7 +7,7 @@ import random
 import torch
 import numpy as np
 from torch.utils.data import Dataset
-from megatron import get_args
+from megatron import get_args, print_rank_0
 from megatron.core import mpu
 
 
@@ -18,12 +18,26 @@ def variable_seq_collate(batch):
     if pad_id < 0:
         pad_id = 0
     max_input_len = args.seq_length + 1
-    lengths = [min(len(sample['text']), max_input_len) for sample in batch]
+    raw_lengths = [len(sample['text']) for sample in batch]
+    lengths = [min(length, max_input_len) for length in raw_lengths]
     padded_len = max(lengths)
     text = torch.full((len(batch), padded_len), pad_id, dtype=torch.long)
     for idx, sample in enumerate(batch):
         values = torch.as_tensor(sample['text'][:lengths[idx]], dtype=torch.long)
         text[idx, :lengths[idx]] = values
+
+    # DEBUG for variable length training.
+    debug_limit = getattr(args, 'variable_seq_debug_num_batches', 0)
+    debug_count = getattr(variable_seq_collate, '_debug_count', 0)
+    if debug_limit > debug_count:
+        print_rank_0(
+            "[variable-seq][collate] "
+            f"microbatch={debug_count}, raw_lengths={raw_lengths}, "
+            f"truncated_lengths={lengths}, max_input_len={max_input_len}, "
+            f"padded_batch_len={padded_len}, pad_token_id={pad_id}"
+        )
+        variable_seq_collate._debug_count = debug_count + 1
+
     return {'text': text}
 
 

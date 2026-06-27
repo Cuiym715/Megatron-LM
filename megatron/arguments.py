@@ -177,6 +177,12 @@ def validate_args(args, defaults={}):
     if args.variable_seq_slicing:
         assert args.micro_seq_length > 0, \
             'variable-seq-slicing requires --micro-seq-length > 0'
+        assert not args.use_flash_attn, \
+            'variable-seq-slicing currently requires explicit block attention masks; unset --use-flash-attn'
+        assert args.context_parallel_size == 1, \
+            'variable-seq-slicing packed attention currently requires --context-parallel-size 1'
+        assert not args.use_fast_rope, \
+            'variable-seq-slicing with packed per-token RoPE positions currently requires unset --use-fast-rope'
         # DEBUG for variable length training.
         assert args.variable_seq_debug_num_batches >= 0, \
             'variable-seq-debug-num-batches must be >= 0'
@@ -238,7 +244,7 @@ def validate_args(args, defaults={}):
     # across batches/microbatches. Due to additional communication overhead
     # during pipeline parallelism, it should not be set if sequence length
     # is constant during training.
-    args.variable_seq_lengths = False
+    args.variable_seq_lengths = bool(args.variable_seq_slicing)
 
     # Iteration-based training.
     if args.train_iters:

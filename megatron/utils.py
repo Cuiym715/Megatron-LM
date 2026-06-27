@@ -317,6 +317,184 @@ def get_variable_sliced_batch(tokens, position_ids, attention_mask, labels,
     return slices, loss_mask
 
 
+def get_packed_variable_sliced_batch(tokens_with_labels, micro_seq_length,
+                                     seq_length, pad_token_id=-1,
+                                     pad_chunks_to_multiple=1):
+    """Pack document-level variable-length samples into chunk-sized slices.
+
+    ``tokens_with_labels`` is a padded CPU/GPU tensor shaped ``[batch, length]``.
+    Each row is treated as one independent sequence and truncated to
+    ``seq_length + 1`` tokens. The function packs sequence fragments into
+    fixed-size chunks of ``micro_seq_length`` model tokens. Attention is causal
+    within each original sequence and masked across different packed sequences.
+    """
+    assert micro_seq_length > 0, "variable sequence packing requires micro_seq_length > 0"
+    args = get_args()
+    device = tokens_with_labels.device
+    max_input_len = seq_length + 1
+    pad_value = pad_token_id if pad_token_id >= 0 else 0
+
+    chunks = []
+    loss_masks = []
+    history_seq_ids = []
+    history_positions = []
+    cur_tokens = []
+    cur_labels = []
+    cur_loss_mask = []
+    cur_position_ids = []
+    cur_seq_ids = []
+    cur_positions = []
+    seq_lengths = []
+    chunk_segments = []
+    next_seq_id = 0
+
+    def flush_chunk():
+        nonlocal cur_tokens, cur_labels, cur_loss_mask, cur_position_ids
+        nonlocal cur_seq_ids, cur_positions
+        if not cur_tokens:
+            return
+        real_len = len(cur_tokens)
+        pad_len = micro_seq_length - real_len
+        token_values = cur_tokens + [pad_value] * pad_len
+        label_values = cur_labels + [pad_value] * pad_len
+        loss_values = cur_loss_mask + [0.0] * pad_len
+        position_values = cur_position_ids + [0] * pad_len
+        seq_id_values = cur_seq_ids + [-1] * pad_len
+        position_key_values = cur_positions + [-1] * pad_len
+
+        key_seq_ids = history_seq_ids + seq_id_values
+        key_positions = history_positions + position_key_values
+        mask = torch.ones((micro_seq_length, len(key_seq_ids)),
+                          dtype=torch.bool, device=device)
+        for q_idx, (seq_id, pos) in enumerate(zip(seq_id_values, position_key_values)):
+            if seq_id < 0:
+                continue
+            for k_idx, (key_seq_id, key_pos) in enumerate(zip(key_seq_ids, key_positions)):
+                if key_seq_id == seq_id and 0 <= key_pos <= pos:
+                    mask[q_idx, k_idx] = False
+
+        token_tensor = torch.tensor(token_values, dtype=torch.long,
+                                   device=device).unsqueeze(0)
+        label_tensor = torch.tensor(label_values, dtype=torch.long,
+                                   device=device).unsqueeze(0)
+        position_tensor = torch.tensor(position_values, dtype=torch.long,
+                                      device=device).unsqueeze(0)
+        loss_tensor = torch.tensor(loss_values, dtype=torch.float,
+                                  device=device).unsqueeze(0)
+        attention_mask = mask.view(1, 1, micro_seq_length, len(key_seq_ids))
+        chunks.append((token_tensor, position_tensor, attention_mask, label_tensor))
+        loss_masks.append(loss_tensor)
+
+        history_seq_ids.extend(seq_id_values)
+        history_positions.extend(position_key_values)
+        chunk_segments.append([
+            (seq_id, start, length)
+            for seq_id, start, length in _summarize_packed_segments(seq_id_values, position_key_values)
+        ])
+        cur_tokens = []
+        cur_labels = []
+        cur_loss_mask = []
+        cur_position_ids = []
+        cur_seq_ids = []
+        cur_positions = []
+
+    for row in tokens_with_labels:
+        row = row[:max_input_len]
+        if pad_token_id >= 0:
+            valid_positions = row.ne(pad_token_id).nonzero(as_tuple=False)
+            valid_len = int(valid_positions[-1].item() + 1) if valid_positions.numel() else 0
+        else:
+            valid_len = row.numel()
+        valid_len = min(valid_len, max_input_len)
+        if valid_len < 2:
+            continue
+        seq = row[:valid_len].detach().tolist()
+        seq_lengths.append(valid_len)
+        seq_id = next_seq_id
+        next_seq_id += 1
+        token_values = seq[:-1]
+        label_values = seq[1:]
+        offset = 0
+        while offset < len(token_values):
+            if len(cur_tokens) == micro_seq_length:
+                flush_chunk()
+            take = min(micro_seq_length - len(cur_tokens),
+                       len(token_values) - offset)
+            for i in range(take):
+                pos = offset + i
+                cur_tokens.append(token_values[pos])
+                cur_labels.append(label_values[pos])
+                cur_loss_mask.append(1.0)
+                cur_position_ids.append(pos)
+                cur_seq_ids.append(seq_id)
+                cur_positions.append(pos)
+            offset += take
+
+    flush_chunk()
+
+    if not chunks:
+        chunks.append(_empty_packed_slice(micro_seq_length, pad_value, device))
+        loss_masks.append(torch.zeros((1, micro_seq_length),
+                                      dtype=torch.float, device=device))
+
+    if pad_chunks_to_multiple > 1:
+        while len(chunks) < pad_chunks_to_multiple or len(chunks) % pad_chunks_to_multiple:
+            chunks.append(_empty_packed_slice(micro_seq_length, pad_value, device,
+                                             past_length=len(history_seq_ids)))
+            loss_masks.append(torch.zeros((1, micro_seq_length),
+                                          dtype=torch.float, device=device))
+            history_seq_ids.extend([-1] * micro_seq_length)
+            history_positions.extend([-1] * micro_seq_length)
+
+    # DEBUG for variable length training.
+    debug_limit = getattr(args, 'variable_seq_debug_num_batches', 0)
+    debug_count = getattr(get_packed_variable_sliced_batch, '_debug_count', 0)
+    if debug_limit > debug_count:
+        print_rank_0(
+            "[variable-seq][pack] "
+            f"microbatch={debug_count}, seq_lengths={seq_lengths}, "
+            f"chunk_size={micro_seq_length}, chunks={len(chunks)}, "
+            f"chunk_segments={chunk_segments}"
+        )
+        get_packed_variable_sliced_batch._debug_count = debug_count + 1
+
+    return chunks, torch.cat(loss_masks, dim=0)
+
+
+def _summarize_packed_segments(seq_ids, positions):
+    segments = []
+    cur_seq_id = None
+    start = None
+    length = 0
+    for seq_id, pos in zip(seq_ids, positions):
+        if seq_id < 0:
+            continue
+        if seq_id != cur_seq_id or (start is not None and pos != start + length):
+            if cur_seq_id is not None:
+                segments.append((cur_seq_id, start, length))
+            cur_seq_id = seq_id
+            start = pos
+            length = 1
+        else:
+            length += 1
+    if cur_seq_id is not None:
+        segments.append((cur_seq_id, start, length))
+    return segments
+
+
+def _empty_packed_slice(micro_seq_length, pad_value, device, past_length=0):
+    tokens = torch.full((1, micro_seq_length), pad_value,
+                        dtype=torch.long, device=device)
+    labels = torch.full((1, micro_seq_length), pad_value,
+                        dtype=torch.long, device=device)
+    position_ids = torch.zeros((1, micro_seq_length),
+                               dtype=torch.long, device=device)
+    attention_mask = torch.ones((1, 1, micro_seq_length,
+                                 past_length + micro_seq_length),
+                                dtype=torch.bool, device=device)
+    return tokens, position_ids, attention_mask, labels
+
+
 def print_rank_0(message):
     """If distributed is initialized, print only on rank 0."""
     if torch.distributed.is_initialized():

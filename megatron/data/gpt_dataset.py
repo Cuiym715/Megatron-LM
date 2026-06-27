@@ -9,7 +9,7 @@ import time
 import numpy as np
 import torch
 
-from megatron import print_rank_0
+from megatron import get_args, print_rank_0
 from megatron.core import mpu
 from megatron.data.blendable_dataset import BlendableDataset
 from megatron.data.dataset_utils import get_datasets_weights_and_num_samples
@@ -26,6 +26,8 @@ def build_train_valid_test_datasets(data_prefix, data_impl, splits_string,
                                     return_doc_ids=False, *,
                                     data_cache_path=None):
     """Build train, valid, and test datasets."""
+    args = get_args()
+    use_document_dataset = getattr(args, 'variable_seq_slicing', False)
 
     if data_prefix:
         print_rank_0("Single data path provided for train, valid & test")
@@ -142,12 +144,13 @@ def _build_train_valid_test_datasets(data_prefix, data_impl, splits_string,
         if splits[index + 1] > splits[index]:
             documents = np.arange(start=splits[index], stop=splits[index + 1],
                                   step=1, dtype=np.int32)
-            dataset = GPTDataset(name, data_prefix,
-                                 documents, indexed_dataset,
-                                 train_valid_test_num_samples[index],
-                                 seq_length, seed,
-                                 return_doc_ids,
-                                 data_cache_path=data_cache_path)
+            dataset_class = DocumentGPTDataset if use_document_dataset else GPTDataset
+            dataset = dataset_class(name, data_prefix,
+                                    documents, indexed_dataset,
+                                    train_valid_test_num_samples[index],
+                                    seq_length, seed,
+                                    return_doc_ids,
+                                    data_cache_path=data_cache_path)
         return dataset
 
     train_dataset = build_dataset(0, 'train')
@@ -213,10 +216,12 @@ def _build_dataset(dataset_name, data_prefix, data_impl,
     documents = np.arange(start=0, stop=total_num_of_documents,
                         step=1, dtype=np.int32)
 
-    dataset = GPTDataset(dataset_name, data_prefix,
-                         documents, indexed_dataset,
-                         num_samples, seq_length, seed,
-                         data_cache_path=data_cache_path)
+    args = get_args()
+    dataset_class = DocumentGPTDataset if getattr(args, 'variable_seq_slicing', False) else GPTDataset
+    dataset = dataset_class(dataset_name, data_prefix,
+                            documents, indexed_dataset,
+                            num_samples, seq_length, seed,
+                            data_cache_path=data_cache_path)
 
     return dataset
 
@@ -301,6 +306,53 @@ class GPTDataset(torch.utils.data.Dataset):
                     'doc_ids': np.array(doc_ids, dtype=np.int64)}
         else:
             return {'text': np.array(sample, dtype=np.int64)}
+
+
+class DocumentGPTDataset(torch.utils.data.Dataset):
+    """Document-level GPT dataset for variable-length sequence packing.
+
+    Unlike ``GPTDataset``, this dataset does not concatenate documents into a
+    fixed-length token stream. Each item is one shuffled document truncated to
+    ``seq_length + 1`` tokens, where the extra token is used as the label shift.
+    """
+
+    def __init__(self, name, data_prefix, documents,
+                 indexed_dataset, num_samples, seq_length, seed,
+                 return_doc_ids=False, *,
+                 data_cache_path=None):
+        del data_prefix, data_cache_path
+        self.name = name
+        self.documents = np.array(documents, dtype=np.int32)
+        self.indexed_dataset = indexed_dataset
+        self.num_samples = max(int(num_samples), len(self.documents))
+        self.seq_length = seq_length
+        self.return_doc_ids = return_doc_ids
+
+        assert np.min(self.documents) >= 0
+        assert np.max(self.documents) < indexed_dataset.sizes.shape[0]
+
+        rng = np.random.RandomState(seed=seed)
+        self.shuffle_idx = np.arange(self.num_samples, dtype=np.int64)
+        rng.shuffle(self.shuffle_idx)
+
+        print_rank_0(
+            f" > using document-level GPT dataset for variable sequence slicing: "
+            f"{self.name}, documents={len(self.documents)}, samples={self.num_samples}, "
+            f"max_sequence_length={self.seq_length}"
+        )
+
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, idx):
+        shuffled_idx = int(self.shuffle_idx[idx % self.num_samples])
+        doc_id = int(self.documents[shuffled_idx % len(self.documents)])
+        sample = self.indexed_dataset.get(doc_id, offset=0,
+                                          length=self.seq_length + 1)
+        sample = np.array(sample, dtype=np.int64)
+        if self.return_doc_ids:
+            return {'text': sample, 'doc_ids': np.array([doc_id], dtype=np.int64)}
+        return {'text': sample}
 
 
 def _build_index_mappings(name, data_prefix, documents, sizes,

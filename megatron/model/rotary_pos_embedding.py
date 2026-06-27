@@ -45,6 +45,26 @@ class RotaryEmbedding(nn.Module):
         return freqs
 
     def forward(self, max_seq_len, offset=0):
+        if torch.is_tensor(max_seq_len):
+            position_ids = max_seq_len
+            if position_ids.dim() == 2:
+                seq = position_ids.transpose(0, 1).to(self.dummy_buffer.device)
+            else:
+                seq = position_ids.to(self.dummy_buffer.device)
+            inv_freq = 1.0 / (self.rope_theta ** (torch.arange(0, self.dim, 2, device=self.dummy_buffer.device).float() / self.dim))
+            freqs = einsum('... , j -> ... j', seq.type_as(inv_freq), inv_freq)
+            emb = torch.cat((freqs, freqs), dim=-1)
+            if emb.dim() == 2:
+                from einops import rearrange
+                freqs = rearrange(emb, 'n d -> n 1 1 d')
+            elif emb.dim() == 3:
+                freqs = emb.unsqueeze(2)
+            else:
+                raise RuntimeError(f"Unsupported rotary position_ids shape: {tuple(position_ids.shape)}")
+            if self.use_fast_rope:
+                freqs = torch.cat([freqs.sin()[..., None], freqs.cos()[..., None]], dim=-1).reshape(*freqs.shape[:-1], -1)
+                return freqs.to(self.dummy_buffer.dtype)
+            return freqs
         freqs = self._cached_forward(max_seq_len, offset, self.dim, self.rope_theta, self.dummy_buffer.dtype, self.dummy_buffer.device,
                                      self.context_parallel_world_size, self.context_parallel_rank, self.use_fast_rope)
         # Note(lizhouyang): Wrap freqs in Parameter to prevent it from being offloaded.

@@ -16,8 +16,8 @@ from megatron.model import LlamaModel
 from megatron.training import pretrain
 from megatron.utils import (
     get_ltor_masks_and_position_ids,
+    get_packed_variable_sliced_batch,
     get_sliced_batch,
-    get_variable_sliced_batch,
 )
 from megatron.utils import average_losses_across_data_parallel_group
 
@@ -52,8 +52,22 @@ def get_batch(data_iterator):
         data = None
     data_b = tensor_parallel.broadcast_data(keys, data, datatype)
 
-    # Unpack.
     tokens_ = data_b['text'].long()
+
+    if args.variable_seq_slicing:
+        pad_to_multiple = (
+            args.pipeline_model_parallel_size
+            if args.variable_seq_pad_to_pipeline_size else 1
+        )
+        slices, loss_mask = get_packed_variable_sliced_batch(
+            tokens_,
+            args.micro_seq_length,
+            args.seq_length,
+            args.variable_seq_pad_token_id,
+            pad_to_multiple,
+        )
+        return (lambda _: slices), partial(loss_func, loss_mask)
+
     labels = tokens_[:, 1:].contiguous()
     tokens = tokens_[:, :-1].contiguous()
 
@@ -64,23 +78,6 @@ def get_batch(data_iterator):
         args.reset_position_ids,
         args.reset_attention_mask,
         args.eod_mask_loss)
-
-    if args.variable_seq_slicing:
-        pad_to_multiple = (
-            args.pipeline_model_parallel_size
-            if args.variable_seq_pad_to_pipeline_size else 1
-        )
-        slices, loss_mask = get_variable_sliced_batch(
-            tokens,
-            position_ids,
-            attention_mask,
-            labels,
-            loss_mask,
-            args.micro_seq_length,
-            args.variable_seq_pad_token_id,
-            pad_to_multiple,
-        )
-        return (lambda _: slices), partial(loss_func, loss_mask)
 
     return partial(get_sliced_batch, tokens, position_ids, attention_mask, labels), partial(loss_func, loss_mask)
 

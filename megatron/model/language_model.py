@@ -567,8 +567,10 @@ class TransformerLanguageModel(MegatronModule):
                 rotary_pos_emb = \
                     self.rotary_pos_emb(inference_params.max_sequence_len)
             else:
-                assert isinstance(enc_position_ids, int)    # the start pos.
-                rotary_pos_emb = self.rotary_pos_emb(self.seq_length, enc_position_ids)
+                if isinstance(enc_position_ids, int):
+                    rotary_pos_emb = self.rotary_pos_emb(self.seq_length, enc_position_ids)
+                else:
+                    rotary_pos_emb = self.rotary_pos_emb(enc_position_ids)
 
         # Run encoder.
         if enc_hidden_states is None:
