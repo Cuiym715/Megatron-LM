@@ -468,6 +468,97 @@ def get_packed_variable_sliced_batch(tokens_with_labels, micro_seq_length,
     return chunks, torch.cat(loss_masks, dim=0)
 
 
+def get_flash_variable_sliced_batch(tokens_with_labels, micro_seq_length,
+                                    seq_length, pad_token_id=-1,
+                                    pad_chunks_to_multiple=1):
+    """Slice document-level variable-length samples for chunked FlashAttention.
+
+    Each batch row is one independent sequence. Chunks keep the fixed
+    ``micro_seq_length`` shape required by the existing KVCache, but tail padding
+    has zero loss. This intentionally does not pack different documents into the
+    same batch row, because the current chunked KV cache has no sequence-id
+    metadata and treats chunks in a row as one continuous context.
+    """
+    assert micro_seq_length > 0, "variable sequence slicing requires micro_seq_length > 0"
+    args = get_args()
+    device = tokens_with_labels.device
+    batch_size = tokens_with_labels.size(0)
+    max_input_len = seq_length + 1
+    pad_value = pad_token_id if pad_token_id >= 0 else 0
+
+    row_tokens = []
+    row_labels = []
+    row_lengths = []
+    for row in tokens_with_labels:
+        row = row[:max_input_len]
+        if pad_token_id >= 0:
+            valid_positions = row.ne(pad_token_id).nonzero(as_tuple=False)
+            valid_len = int(valid_positions[-1].item() + 1) if valid_positions.numel() else 0
+        else:
+            valid_len = row.numel()
+        valid_len = min(valid_len, max_input_len)
+        if valid_len < 2:
+            tokens = torch.empty((0,), dtype=torch.long, device=device)
+            labels = torch.empty((0,), dtype=torch.long, device=device)
+        else:
+            tokens = row[:valid_len - 1].contiguous()
+            labels = row[1:valid_len].contiguous()
+        row_tokens.append(tokens)
+        row_labels.append(labels)
+        row_lengths.append(tokens.numel())
+
+    num_chunks = max((length + micro_seq_length - 1) // micro_seq_length
+                     for length in row_lengths)
+    num_chunks = max(num_chunks, 1)
+    if pad_chunks_to_multiple > 1:
+        num_chunks = ((num_chunks + pad_chunks_to_multiple - 1) //
+                      pad_chunks_to_multiple) * pad_chunks_to_multiple
+
+    slices = []
+    loss_masks = []
+    for chunk_idx in range(num_chunks):
+        chunk_tokens = torch.full((batch_size, micro_seq_length), pad_value,
+                                  dtype=torch.long, device=device)
+        chunk_labels = torch.full((batch_size, micro_seq_length), pad_value,
+                                  dtype=torch.long, device=device)
+        chunk_loss_mask = torch.zeros((batch_size, micro_seq_length),
+                                      dtype=torch.float, device=device)
+        start = chunk_idx * micro_seq_length
+        end = start + micro_seq_length
+        chunk_position_ids = torch.arange(start, end, dtype=torch.long,
+                                          device=device).unsqueeze(0).expand(batch_size, -1)
+        for batch_idx, (tokens, labels) in enumerate(zip(row_tokens, row_labels, strict=True)):
+            if start >= tokens.numel():
+                continue
+            take = min(end, tokens.numel()) - start
+            chunk_tokens[batch_idx, :take] = tokens[start:start + take]
+            chunk_labels[batch_idx, :take] = labels[start:start + take]
+            chunk_loss_mask[batch_idx, :take] = 1.0
+        slices.append((chunk_tokens, chunk_position_ids, None, chunk_labels))
+        loss_masks.append(chunk_loss_mask)
+
+    # DEBUG for variable length training.
+    debug_limit = getattr(args, 'variable_seq_debug_num_batches', 0)
+    debug_count = getattr(get_flash_variable_sliced_batch, '_debug_count', 0)
+    if debug_limit > debug_count:
+        chunk_real_lengths = []
+        for chunk_idx in range(num_chunks):
+            start = chunk_idx * micro_seq_length
+            chunk_real_lengths.append([
+                max(0, min(length - start, micro_seq_length))
+                for length in row_lengths
+            ])
+        print_rank_0(
+            "[variable-seq][flash-pack] "
+            f"microbatch={debug_count}, seq_lengths={row_lengths}, "
+            f"chunk_size={micro_seq_length}, chunks={num_chunks}, "
+            f"chunk_real_lengths={chunk_real_lengths}"
+        )
+        get_flash_variable_sliced_batch._debug_count = debug_count + 1
+
+    return slices, torch.cat(loss_masks, dim=1)
+
+
 def _summarize_packed_segments(seq_ids, positions):
     segments = []
     cur_seq_id = None

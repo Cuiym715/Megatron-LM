@@ -15,8 +15,8 @@ from megatron.data.gpt_dataset import build_train_valid_test_datasets
 from megatron.model import LlamaModel
 from megatron.training import pretrain
 from megatron.utils import (
+    get_flash_variable_sliced_batch,
     get_ltor_masks_and_position_ids,
-    get_packed_variable_sliced_batch,
     get_sliced_batch,
 )
 from megatron.utils import average_losses_across_data_parallel_group
@@ -59,7 +59,7 @@ def get_batch(data_iterator):
             args.pipeline_model_parallel_size
             if args.variable_seq_pad_to_pipeline_size else 1
         )
-        slices, loss_mask = get_packed_variable_sliced_batch(
+        slices, loss_mask = get_flash_variable_sliced_batch(
             tokens_,
             args.micro_seq_length,
             args.seq_length,

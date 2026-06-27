@@ -177,12 +177,12 @@ def validate_args(args, defaults={}):
     if args.variable_seq_slicing:
         assert args.micro_seq_length > 0, \
             'variable-seq-slicing requires --micro-seq-length > 0'
-        assert not args.use_flash_attn, \
-            'variable-seq-slicing currently requires explicit block attention masks; unset --use-flash-attn'
+        assert args.use_flash_attn, \
+            'variable-seq-slicing uses chunked KV-cache FlashAttention; set --use-flash-attn'
         assert args.context_parallel_size == 1, \
             'variable-seq-slicing packed attention currently requires --context-parallel-size 1'
         assert not args.use_fast_rope, \
-            'variable-seq-slicing with packed per-token RoPE positions currently requires unset --use-fast-rope'
+            'variable-seq-slicing currently requires unset --use-fast-rope'
         # DEBUG for variable length training.
         assert args.variable_seq_debug_num_batches >= 0, \
             'variable-seq-debug-num-batches must be >= 0'
