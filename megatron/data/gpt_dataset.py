@@ -347,8 +347,10 @@ class DocumentGPTDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         shuffled_idx = int(self.shuffle_idx[idx % self.num_samples])
         doc_id = int(self.documents[shuffled_idx % len(self.documents)])
+        length = min(int(self.indexed_dataset.sizes[doc_id]),
+                     self.seq_length + 1)
         sample = self.indexed_dataset.get(doc_id, offset=0,
-                                          length=self.seq_length + 1)
+                                          length=length)
         sample = np.array(sample, dtype=np.int64)
         if self.return_doc_ids:
             return {'text': sample, 'doc_ids': np.array([doc_id], dtype=np.int64)}
