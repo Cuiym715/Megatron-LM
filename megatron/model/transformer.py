@@ -34,6 +34,7 @@ from megatron.core.tensor_parallel import (
 )
 from megatron.core.parallel_state import get_tensor_model_parallel_group, get_tensor_and_expert_parallel_group
 from megatron.core.kv_cache import cache_aware_attn_func, cp_qo_attn_func
+from megatron.core.kv_cache.cache_utils import ChunkedTensor
 from megatron.profile_utils import annotate_forward_backward
 
 try:
@@ -940,6 +941,10 @@ class ParallelAttention(MegatronModule):
             assert mpu.get_context_parallel_world_size() == 1, \
                 "core_attention does not support context parallel"
             key_layer, value_layer = kv_cache.update(self.layer_number, [key_layer, value_layer])
+            if isinstance(key_layer, ChunkedTensor):
+                key_layer = key_layer.concat()
+            if isinstance(value_layer, ChunkedTensor):
+                value_layer = value_layer.concat()
             attention_mask = attention_mask.narrow(-1, 0, key_layer.size(0))
             # expand the key_layer and value_layer [sk, b, ng, hn] -> [sk, b, np, hn]
             key_layer = key_layer.repeat_interleave(int(self.num_attention_heads_per_partition / self.num_query_groups_per_partition),
