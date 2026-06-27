@@ -364,14 +364,21 @@ def get_packed_variable_sliced_batch(tokens_with_labels, micro_seq_length,
 
         key_seq_ids = history_seq_ids + seq_id_values
         key_positions = history_positions + position_key_values
-        mask = torch.ones((micro_seq_length, len(key_seq_ids)),
-                          dtype=torch.bool, device=device)
-        for q_idx, (seq_id, pos) in enumerate(zip(seq_id_values, position_key_values)):
-            if seq_id < 0:
-                continue
-            for k_idx, (key_seq_id, key_pos) in enumerate(zip(key_seq_ids, key_positions)):
-                if key_seq_id == seq_id and 0 <= key_pos <= pos:
-                    mask[q_idx, k_idx] = False
+        query_seq_ids = torch.tensor(seq_id_values, dtype=torch.long,
+                                     device=device).unsqueeze(1)
+        query_positions = torch.tensor(position_key_values, dtype=torch.long,
+                                       device=device).unsqueeze(1)
+        key_seq_ids_tensor = torch.tensor(key_seq_ids, dtype=torch.long,
+                                          device=device).unsqueeze(0)
+        key_positions_tensor = torch.tensor(key_positions, dtype=torch.long,
+                                            device=device).unsqueeze(0)
+        allowed = (
+            (query_seq_ids >= 0) &
+            (query_seq_ids == key_seq_ids_tensor) &
+            (key_positions_tensor >= 0) &
+            (key_positions_tensor <= query_positions)
+        )
+        mask = ~allowed
 
         token_tensor = torch.tensor(token_values, dtype=torch.long,
                                    device=device).unsqueeze(0)
