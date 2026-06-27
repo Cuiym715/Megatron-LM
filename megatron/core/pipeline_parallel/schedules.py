@@ -566,8 +566,10 @@ class MicroBatch:
         slice_idx = len(self.om_stack) - 1
         om = self.om_stack.pop()
         assert om.is_complete()
-        if output_tensor_grad is None:
+        if self.loss_func is not None:
             output_tensor_grad = self.output_tensor_grads.pop()
+        elif output_tensor_grad is None:
+            raise RuntimeError("Missing output_tensor_grad for a non-last pipeline stage microbatch.")
         inputs = self.input_stack.pop()
         outputs = self.output_stack.pop()
         if not self.kv_grad:    # kv of the last slice has no grad
