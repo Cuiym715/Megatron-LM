@@ -1003,34 +1003,6 @@ def pipelining_with_slicing(*,
     cnt_onload = 0
     variable_microbatch_specs = deque()
 
-    def make_empty_variable_slice(template, chunk_idx):
-        tokens, _, attention_mask, labels = template
-        assert attention_mask is None, "variable FlashAttention padding does not use dense attention masks."
-        batch_size, seq_len = tokens.shape
-        pad_token_id = getattr(args, 'variable_seq_pad_token_id', 0)
-        if pad_token_id < 0:
-            pad_token_id = 0
-        empty_tokens = torch.full((batch_size, seq_len), pad_token_id,
-                                  dtype=tokens.dtype, device=tokens.device)
-        empty_labels = torch.full((batch_size, seq_len), pad_token_id,
-                                  dtype=labels.dtype, device=labels.device)
-        position_ids = torch.arange(chunk_idx * seq_len, (chunk_idx + 1) * seq_len,
-                                    dtype=torch.long, device=tokens.device)
-        position_ids = position_ids.unsqueeze(0).expand(batch_size, -1)
-        return empty_tokens, position_ids, None, empty_labels
-
-    def pad_variable_loss_func(loss_func, batch_size, extra_chunks):
-        if loss_func is None or extra_chunks == 0:
-            return loss_func
-        assert isinstance(loss_func, partial) and loss_func.args, \
-            "variable sequence padding expects loss_func to be partial(loss_func, loss_mask)."
-        loss_mask = loss_func.args[0]
-        pad = torch.zeros((batch_size, extra_chunks * micro_seq_length),
-                          dtype=loss_mask.dtype, device=loss_mask.device)
-        loss_mask = torch.cat((loss_mask, pad), dim=1)
-        return partial(loss_func.func, loss_mask, *loss_func.args[1:],
-                       **(loss_func.keywords or {}))
-
     def read_microbatch_slices(cnt_microbatches):
         if timers is not None:
             record_context = timers.is_recording_active()
@@ -1056,8 +1028,6 @@ def pipelining_with_slicing(*,
             slices, loss_func = read_microbatch_slices(cnt_microbatches)
         if _variable_slicing:
             assert len(slices) >= 1, "variable sequence slicing produced no slices."
-            assert len(slices) >= pipeline_parallel_size, \
-                "variable sequence slicing currently requires at least one chunk per pipeline stage."
             assert len(slices) % pipeline_parallel_size == 0, \
                 "variable sequence slicing currently requires chunk count to be divisible by pipeline size."
             # DEBUG for variable length training.
@@ -1094,22 +1064,16 @@ def pipelining_with_slicing(*,
             "variable sequence slicing currently requires at least one chunk per pipeline stage."
         assert max_num_slices % pipeline_parallel_size == 0, \
             "variable sequence slicing currently requires chunk count to be divisible by pipeline size."
-        for idx, spec in enumerate(variable_microbatch_specs_list):
-            slices, loss_func = spec
-            extra_chunks = max_num_slices - len(slices)
-            if extra_chunks:
-                batch_size = slices[0][0].size(0)
-                for chunk_idx in range(len(slices), max_num_slices):
-                    slices.append(make_empty_variable_slice(slices[0], chunk_idx))
-                loss_func = pad_variable_loss_func(loss_func, batch_size, extra_chunks)
-                spec[1] = loss_func
+        for idx, (slices, _) in enumerate(variable_microbatch_specs_list):
+            assert len(slices) % pipeline_parallel_size == 0, \
+                "variable sequence slicing currently requires chunk count to be divisible by pipeline size."
             # DEBUG for variable length training.
             if idx < variable_seq_debug_limit:
                 print(
                     "[variable-seq][schedule-fixed] "
                     f"rank={pipeline_parallel_rank}/{pipeline_parallel_size}, "
-                    f"microbatch={idx}, original_slices={max_num_slices - extra_chunks}, "
-                    f"padded_slices={max_num_slices}, warmup_slices={num_slices_warmup}, "
+                    f"microbatch={idx}, slices={len(slices)}, max_slices={max_num_slices}, "
+                    f"warmup_slices={num_slices_warmup}, "
                     f"target_inflight_slices={max_num_slices + num_slices_warmup}, "
                     f"forward_only={forward_only}",
                     flush=True,
