@@ -997,6 +997,7 @@ def pipelining_with_slicing(*,
     batch_fwd: Optional[MicroBatch] = None
     batch_bwd: Optional[MicroBatch] = None
     input_tensor_grad = None
+    output_tensor_grad = None
     offload_req = None
     onload_req = None
     cnt_onload = 0
