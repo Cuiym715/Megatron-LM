@@ -26,8 +26,6 @@ def build_train_valid_test_datasets(data_prefix, data_impl, splits_string,
                                     return_doc_ids=False, *,
                                     data_cache_path=None):
     """Build train, valid, and test datasets."""
-    args = get_args()
-    use_document_dataset = getattr(args, 'variable_seq_slicing', False)
 
     if data_prefix:
         print_rank_0("Single data path provided for train, valid & test")
@@ -118,6 +116,8 @@ def _build_train_valid_test_datasets(data_prefix, data_impl, splits_string,
                                      return_doc_ids=False, *,
                                      data_cache_path=None):
     """Build train, valid, and test datasets."""
+    args = get_args()
+    use_document_dataset = getattr(args, 'variable_seq_slicing', False)
 
     # Indexed dataset.
     indexed_dataset = get_indexed_dataset_(data_prefix,
