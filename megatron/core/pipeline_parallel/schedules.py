@@ -322,7 +322,10 @@ def backward_step(input_tensor, output_tensor, output_tensor_grad,
             if deallocate_pipeline_outputs:
                 custom_backward(output_tensor[0], output_tensor_grad[0])
             else:
-                torch.autograd.backward(output_tensor, grad_tensors=output_tensor_grad)
+                args = get_args()
+                retain_graph = args.variable_seq_slicing and not args.use_flash_attn
+                torch.autograd.backward(output_tensor, grad_tensors=output_tensor_grad,
+                                        retain_graph=retain_graph)
 
     # Collect the grad of the input_tensor.
     input_tensor_grad = [None]
