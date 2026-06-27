@@ -1024,7 +1024,8 @@ def pipelining_with_slicing(*,
                 "variable sequence slicing currently requires at least one chunk per pipeline stage."
             assert len(slices) % pipeline_parallel_size == 0, \
                 "variable sequence slicing currently requires chunk count to be divisible by pipeline size."
-            num_slices_target = max(num_slices_flight + 1, len(slices) + num_slices_warmup)
+            num_slices_target = max(num_slices_target, num_slices_flight + 1,
+                                    len(slices) + num_slices_warmup)
             # DEBUG for variable length training.
             if cnt_microbatches < variable_seq_debug_limit:
                 print(
