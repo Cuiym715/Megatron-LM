@@ -1107,6 +1107,7 @@ def pipelining_with_slicing(*,
     print_debug(DEBUG_P2PCOMM, "fwd recv+")
     input_tensor = p2p_communication.recv_forward(tensor_shape, dtype, batch_p2p_comm, timers)
     fwd_reqs = []
+    bwd_reqs = []
     print_debug(DEBUG_P2PCOMM, "fwd recv-")
 
     while num_slices_flight or num_slices_target:
@@ -1204,7 +1205,7 @@ def pipelining_with_slicing(*,
 
         """Backward"""
         if num_slices_flight >= num_slices_target:  # do backward to consume in-flight micro-batches.
-            assert all(req.wait() for req in bwd_reqs); bwd_reqs = None
+            assert all(req.wait() for req in (bwd_reqs or [])); bwd_reqs = None
             print_debug(DEBUG_P2PCOMM, "bwd sendrecv-")
             if onload_req:
                 onload_req.wait(); onload_req = None
@@ -1295,7 +1296,7 @@ def pipelining_with_slicing(*,
             pre_process_backward(dummy_input, None)
             print_debug(DEBUG_P2PCOMM, "bwd pre-" , value=cnt_pp_first)
     if not forward_only:
-        assert all(req.wait() for req in bwd_reqs); bwd_reqs = None
+        assert all(req.wait() for req in (bwd_reqs or [])); bwd_reqs = None
     return forward_data_store
 
 
