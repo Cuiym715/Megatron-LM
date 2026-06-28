@@ -186,9 +186,17 @@ def validate_args(args, defaults={}):
         # DEBUG for variable length training.
         assert args.variable_seq_debug_num_batches >= 0, \
             'variable-seq-debug-num-batches must be >= 0'
-        assert args.virtual_pipeline_model_parallel_size is None, \
-            'variable-seq-slicing currently supports non-interleaved PP only; ' \
-            'unset --num-layers-per-virtual-pipeline-stage'
+        if args.variable_seq_schedule == '1f1b':
+            assert args.virtual_pipeline_model_parallel_size is None, \
+                'variable-seq-slicing 1f1b currently supports non-interleaved PP only; ' \
+                'unset --num-layers-per-virtual-pipeline-stage'
+        else:
+            assert args.virtual_pipeline_model_parallel_size == 2, \
+                'variable-seq-schedule=vzb requires exactly two virtual pipeline chunks'
+            assert args.gradient_accumulation_fusion, \
+                'variable-seq-schedule=vzb requires --gradient-accumulation-fusion'
+            assert not args.overlap_grad_reduce, \
+                'variable-seq-schedule=vzb does not support overlap_grad_reduce yet'
     if args.timer_record_dir is not None:
         assert args.timer_record_start_iter >= 0, \
             'timer-record-start-iter must be >= 0'
@@ -1304,6 +1312,9 @@ def _add_distributed_args(parser):
     group.add_argument('--variable-seq-pad-to-pipeline-size', action='store_true',
                        help='Pad the number of chunks to a multiple of pipeline parallel size '
                        'for variable sequence slicing.')
+    group.add_argument('--variable-seq-schedule', type=str, default='1f1b',
+                       choices=['1f1b', 'vzb'],
+                       help='Pipeline schedule for variable sequence slicing.')
     # DEBUG for variable length training.
     group.add_argument('--variable-seq-debug-num-batches', type=int, default=0,
                        help='Print variable sequence slicing and pipeline scheduling summaries '

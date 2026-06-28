@@ -38,6 +38,7 @@ TP_SIZE=${TP_SIZE:-1}
 PP_SIZE=${PP_SIZE:-2}
 CP_SIZE=${CP_SIZE:-1}
 VARLEN=${VARLEN:-1}
+VARLEN_SCHEDULE=${VARLEN_SCHEDULE:-1f1b}
 if [[ "$VARLEN" == "1" ]]; then
     PP_ATTN_BALANCE=${PP_ATTN_BALANCE:-0}
     # DEBUG for variable length training.
@@ -70,7 +71,11 @@ SEQ_LENGTH=${SEQ_LENGTH:-2048}
 MICRO_SEQ_LENGTH=${MICRO_SEQ_LENGTH:-512}
 MAX_POSITION_EMBEDDINGS=${MAX_POSITION_EMBEDDINGS:-$SEQ_LENGTH}
 if [[ "$VARLEN" == "1" ]]; then
-    VIRTUAL_PP_LAYERS=${VIRTUAL_PP_LAYERS:-}
+    if [[ "$VARLEN_SCHEDULE" == "vzb" ]]; then
+        VIRTUAL_PP_LAYERS=${VIRTUAL_PP_LAYERS:-1}
+    else
+        VIRTUAL_PP_LAYERS=${VIRTUAL_PP_LAYERS:-}
+    fi
 else
     VIRTUAL_PP_LAYERS=${VIRTUAL_PP_LAYERS:-1}
 fi
@@ -189,11 +194,15 @@ fi
 if [[ "$VARLEN" == "1" ]]; then
     PARALLEL_ARGS+=(
         --variable-seq-slicing
+        --variable-seq-schedule "$VARLEN_SCHEDULE"
         --variable-seq-pad-token-id "${PAD_TOKEN_ID:-0}"
         --variable-seq-pad-to-pipeline-size
         # DEBUG for variable length training.
         --variable-seq-debug-num-batches "$VARLEN_DEBUG"
     )
+    if [[ "$VARLEN_SCHEDULE" == "vzb" ]]; then
+        PARALLEL_ARGS+=(--gradient-accumulation-fusion)
+    fi
 fi
 
 if (( TP_SIZE > 1 )); then
@@ -242,11 +251,12 @@ echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 echo "GPUS_PER_NODE=$GPUS_PER_NODE"
 echo "TP_SIZE=$TP_SIZE PP_SIZE=$PP_SIZE CP_SIZE=$CP_SIZE"
 echo "VARLEN=$VARLEN VIRTUAL_PP_LAYERS=${VIRTUAL_PP_LAYERS:-none}"
+echo "VARLEN_SCHEDULE=$VARLEN_SCHEDULE"
 # DEBUG for variable length training.
 echo "VARLEN_DEBUG=$VARLEN_DEBUG"
 if [[ "$VARLEN" == "1" ]]; then
     # DEBUG for variable length training.
-    echo "VARIABLE_SEQ_ARGS=--variable-seq-slicing --variable-seq-pad-token-id ${PAD_TOKEN_ID:-0} --variable-seq-pad-to-pipeline-size --variable-seq-debug-num-batches $VARLEN_DEBUG"
+    echo "VARIABLE_SEQ_ARGS=--variable-seq-slicing --variable-seq-schedule $VARLEN_SCHEDULE --variable-seq-pad-token-id ${PAD_TOKEN_ID:-0} --variable-seq-pad-to-pipeline-size --variable-seq-debug-num-batches $VARLEN_DEBUG"
 fi
 echo "PP_ATTN_BALANCE=$PP_ATTN_BALANCE"
 echo "SEQ_LENGTH=$SEQ_LENGTH MICRO_SEQ_LENGTH=$MICRO_SEQ_LENGTH NUM_SLICES=$NUM_SLICES"

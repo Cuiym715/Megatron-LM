@@ -439,15 +439,26 @@ class LinearWithGradAccumulationAndAsyncCommunication(torch.autograd.Function):
             # reduce scatter is scheduled before the weight gradient computation
 
 
+        from megatron.core.zbpp_utils import WeightGradStore
+        defer_wgrad = WeightGradStore.split_bw()
+
         if not weight.requires_grad:
             grad_weight = None
         elif ctx.gradient_accumulation_fusion:
-            if ctx.main_grad.dtype == torch.float32:
-                fused_weight_gradient_mlp_cuda.wgrad_gemm_accum_fp32(total_input, grad_output, ctx.main_grad)
-            elif ctx.main_grad.dtype in (torch.float16, torch.bfloat16):
-                fused_weight_gradient_mlp_cuda.wgrad_gemm_accum_fp16(total_input, grad_output, ctx.main_grad)
+            main_grad = ctx.main_grad
+            if main_grad.dtype == torch.float32:
+                wgrad_func = fused_weight_gradient_mlp_cuda.wgrad_gemm_accum_fp32
+            elif main_grad.dtype in (torch.float16, torch.bfloat16):
+                wgrad_func = fused_weight_gradient_mlp_cuda.wgrad_gemm_accum_fp16
             else:
                 raise RuntimeError("Unsupported gradient type for gradient accumulation fusion")
+            if defer_wgrad:
+                WeightGradStore.put(
+                    lambda async_op=False: (total_input, grad_output, main_grad),
+                    wgrad_func,
+                )
+            else:
+                wgrad_func(total_input, grad_output, main_grad)
             grad_weight = None
         else:
             grad_weight = grad_output.t().matmul(total_input)
@@ -759,15 +770,26 @@ class LinearQKVWithGradAccumulationAndAsyncCommunication(torch.autograd.Function
             # reduce scatter is scheduled before the weight gradient computation
 
 
+        from megatron.core.zbpp_utils import WeightGradStore
+        defer_wgrad = WeightGradStore.split_bw()
+
         if not weight.requires_grad:
             grad_weight = None
         elif ctx.gradient_accumulation_fusion:
-            if ctx.main_grad.dtype == torch.float32:
-                fused_weight_gradient_mlp_cuda.wgrad_gemm_accum_fp32(total_input, grad_output, ctx.main_grad)
-            elif ctx.main_grad.dtype in (torch.float16, torch.bfloat16):
-                fused_weight_gradient_mlp_cuda.wgrad_gemm_accum_fp16(total_input, grad_output, ctx.main_grad)
+            main_grad = ctx.main_grad
+            if main_grad.dtype == torch.float32:
+                wgrad_func = fused_weight_gradient_mlp_cuda.wgrad_gemm_accum_fp32
+            elif main_grad.dtype in (torch.float16, torch.bfloat16):
+                wgrad_func = fused_weight_gradient_mlp_cuda.wgrad_gemm_accum_fp16
             else:
                 raise RuntimeError("Unsupported gradient type for gradient accumulation fusion")
+            if defer_wgrad:
+                WeightGradStore.put(
+                    lambda async_op=False: (total_input, grad_output, main_grad),
+                    wgrad_func,
+                )
+            else:
+                wgrad_func(total_input, grad_output, main_grad)
             grad_weight = None
         else:
             grad_weight = grad_output.t().matmul(total_input)

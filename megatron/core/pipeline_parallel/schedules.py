@@ -5,7 +5,7 @@ import math
 from collections import deque
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Callable, Deque, Iterator, List, Optional, Union, Type
+from typing import Callable, Deque, Dict, Iterator, List, Optional, Tuple, Union, Type
 
 import torch
 import torch.distributed as dist
@@ -17,6 +17,8 @@ from megatron.core import parallel_state
 from megatron.core.enums import ModelType
 from megatron.core.pipeline_parallel import offload, p2p_communication
 from megatron.core.kv_cache import Cache
+from megatron.core.pipeline_parallel.spp_vzb import build_spp_vzb_schedule
+from megatron.core.zbpp_utils import WeightGradStore
 from megatron.core.transformer.moe.router import MoEAuxLossAutoScaler
 from megatron.core.utils import cuda_sync_and_record, get_attr_wrapped_model, get_model_type
 from megatron.model.utils import slice_lm_inputs_along_cp, pad_to_be_divisible
@@ -149,12 +151,17 @@ def get_forward_backward_func(slicing=False, variable_slicing=False):
     if pipeline_model_parallel_size > 1:
         if parallel_state.get_virtual_pipeline_model_parallel_world_size() is not None:
             if variable_slicing:
-                raise NotImplementedError(
-                    "variable sequence slicing is implemented for non-interleaved "
-                    "pipeline parallelism first; unset "
-                    "--num-layers-per-virtual-pipeline-stage to use it."
-                )
-            if slicing:
+                args = get_args()
+                if getattr(args, 'variable_seq_schedule', '1f1b') == 'vzb':
+                    forward_backward_func = pipelining_with_variable_slicing_vzb
+                else:
+                    raise NotImplementedError(
+                        "variable sequence slicing 1f1b is implemented for "
+                        "non-interleaved pipeline parallelism; unset "
+                        "--num-layers-per-virtual-pipeline-stage or set "
+                        "--variable-seq-schedule vzb."
+                    )
+            elif slicing:
                 forward_backward_func = pipelining_with_interleaved_slicing
             else:
                 forward_backward_func = forward_backward_pipelining_with_interleaving
@@ -605,6 +612,19 @@ class MicroBatch:
             timers.clear_record_context()
         om.check_ref()
         return input_tensor_grad
+
+    def backward_b(self, output_tensor_grad, chunk=0):
+        """Run only activation-gradient work and defer weight gradients."""
+        WeightGradStore.assert_supported()
+        with WeightGradStore.set_split_bw(True):
+            input_tensor_grad = self.backward(output_tensor_grad)
+            WeightGradStore.flush(chunk=chunk)
+        return input_tensor_grad
+
+    def weight_grad(self, pop_num=1, chunk=0):
+        """Run deferred weight-gradient work for this microbatch."""
+        WeightGradStore.assert_supported()
+        return WeightGradStore.pop(chunk=chunk, pop_num=pop_num, timers=self.timers)
 
 
 class GroupedBatch:
@@ -1343,6 +1363,173 @@ def pipelining_with_variable_slicing(**kwargs):
     implementation with dynamic target sizing enabled.
     """
     return pipelining_with_slicing(_variable_slicing=True, **kwargs)
+
+
+def pipelining_with_variable_slicing_vzb(*,
+                                         forward_step_func,
+                                         get_batch_func,
+                                         data_iterator: Union[Iterator, List[Iterator]],
+                                         model: Union[torch.nn.Module, List[torch.nn.Module]],
+                                         num_microbatches: int,
+                                         micro_seq_length: int,
+                                         kv_cache_class: Type[Cache],
+                                         dtype: Optional[torch.dtype] = None,
+                                         tensor_shape: Optional[Shape] = None,
+                                         decoder_seq_length: Optional[int] = None,
+                                         grad_scaler: Callable = None,
+                                         sequence_parallel: bool = False,
+                                         overlap_p2p_comm: bool = False,
+                                         batch_p2p_comm: bool = True,
+                                         attn_balance: int = 0,
+                                         vocab_in_pp: bool = False,
+                                         forward_only: bool = False,
+                                         timers: Callable = None,
+                                         collect_non_loss_data: bool = False,
+                                         enable_autocast: bool = False,
+                                         deallocate_pipeline_outputs: bool = False,
+                                         no_sync_func: Optional[Callable] = None,
+                                         grad_sync_func: Optional[Callable] = None,
+                                         param_sync_func: Optional[Callable] = None,
+                                         pre_p2p_func: Optional[Callable] = None,
+                                         post_p2p_async_func: Optional[Callable] = None,
+                                         offload_ratio: float = 0,
+                                         offload_delay_to_next_stage: bool = False,
+                                         ):
+    """Run variable-length slice-level SPP-VZB with two virtual chunks.
+
+    This is a separate experimental schedule. The existing variable-slicing
+    1F1B schedule remains available through ``--variable-seq-schedule 1f1b``.
+    """
+    assert isinstance(model, list) and len(model) == 2, \
+        "variable-seq VZB requires exactly two virtual pipeline model chunks"
+    if isinstance(data_iterator, list):
+        data_iterator = data_iterator[0]
+    assert get_batch_func is not None
+    assert not forward_only, "variable-seq VZB training path only supports backward training"
+    assert not attn_balance, "variable-seq VZB does not support attention balancing yet"
+    assert not vocab_in_pp, "variable-seq VZB does not support vocab-in-PP yet"
+    assert not no_sync_func and not grad_sync_func and not param_sync_func, \
+        "variable-seq VZB does not support custom sync hooks yet"
+    assert not offload_ratio, "variable-seq VZB does not support activation offload yet"
+
+    WeightGradStore.assert_supported()
+
+    model_type = get_model_type(model[0])
+    assert model_type != ModelType.encoder_and_decoder, \
+        "variable-seq VZB does not support encoder-decoder models"
+
+    pipeline_parallel_size = parallel_state.get_pipeline_model_parallel_world_size()
+    pipeline_parallel_rank = parallel_state.get_pipeline_model_parallel_rank()
+    tensor_shape = get_actual_tensor_shape(tensor_shape, sequence_parallel, micro_seq_length)
+    args = get_args()
+    variable_seq_debug_limit = getattr(args, 'variable_seq_debug_num_batches', 0)
+
+    forward_funcs = [
+        partial(forward_step, forward_step_func=forward_step_func,
+                model=model_chunk, timers=timers,
+                enable_autocast=enable_autocast)
+        for model_chunk in model
+    ]
+    backward_func = partial(backward_step, model_type=model_type,
+                            timers=timers,
+                            deallocate_pipeline_outputs=deallocate_pipeline_outputs)
+
+    microbatches: Dict[Tuple[int, int], MicroBatch] = {}
+    split_counts: List[int] = []
+    forward_data_store = []
+    loss_div = num_microbatches
+
+    for microbatch_idx in range(num_microbatches):
+        if timers is not None:
+            record_context = timers.is_recording_active()
+            if record_context:
+                timers.set_record_context(mb=microbatch_idx)
+            timers('batch-generator', log_level=2).start()
+        sliced_batch, loss_func = get_batch_func(data_iterator)
+        if timers is not None:
+            timers('batch-generator').stop()
+            if record_context:
+                timers.clear_record_context()
+        slices = sliced_batch(micro_seq_length)
+        assert len(slices) >= 1, "variable sequence slicing produced no slices."
+        split_counts.append(len(slices))
+        for chunk in range(2):
+            parallel_state.set_virtual_pipeline_model_parallel_rank(chunk)
+            chunk_loss_func = loss_func if parallel_state.is_pipeline_last_stage() else None
+            microbatches[(microbatch_idx, chunk)] = MicroBatch(
+                slices,
+                kv_cache_class(),
+                offload_ratio,
+                forward_funcs[chunk],
+                backward_func,
+                chunk_loss_func,
+                grad_scaler,
+                batch_idx=microbatch_idx,
+                timers=timers,
+            )
+
+    schedules, plan = build_spp_vzb_schedule(
+        pipeline_parallel_size,
+        num_microbatches,
+        split_counts,
+        delta=(2, 2),
+    )
+    schedule = schedules[pipeline_parallel_rank]
+
+    if variable_seq_debug_limit:
+        # DEBUG for variable length training.
+        print(
+            "[variable-seq][vzb-schedule] "
+            f"rank={pipeline_parallel_rank}/{pipeline_parallel_size}, "
+            f"split_counts={split_counts}, events={len(schedule)}, "
+            f"delta={plan.delta}, transition_stage={plan.transition_stage}, "
+            f"stage_phases={plan.stage_phases}",
+            flush=True,
+        )
+        for node in schedule[:variable_seq_debug_limit * 12]:
+            # DEBUG for variable length training.
+            print(
+                "[variable-seq][vzb-event] "
+                f"rank={pipeline_parallel_rank}, kind={node.kind}{node.chunk}, "
+                f"microbatch={node.microbatch}, split={node.split}, slot={node.slot}",
+                flush=True,
+            )
+
+    def run_forward(node):
+        parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
+        input_tensor = p2p_communication.recv_forward(
+            tensor_shape, dtype, batch_p2p_comm, timers)
+        mb = microbatches[(node.microbatch, node.chunk)]
+        output_tensor = mb.forward(input_tensor)
+        p2p_communication.send_forward(output_tensor, batch_p2p_comm, timers)
+        if node.chunk == 1 and mb.num_slices_to_forward == 0:
+            forward_data_store.append(mb.compute_loss(loss_div))
+
+    def run_backward(node):
+        parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
+        output_tensor_grad = p2p_communication.recv_backward(
+            tensor_shape, dtype, batch_p2p_comm, timers)
+        mb = microbatches[(node.microbatch, node.chunk)]
+        input_tensor_grad = mb.backward_b(output_tensor_grad, chunk=node.chunk)
+        p2p_communication.send_backward(input_tensor_grad, batch_p2p_comm, timers)
+
+    def run_weight(node):
+        parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
+        microbatches[(node.microbatch, node.chunk)].weight_grad(chunk=node.chunk)
+
+    for node in schedule:
+        cuda_sync_and_record(sync_level=1)
+        if node.kind == 'F':
+            run_forward(node)
+        elif node.kind == 'B':
+            run_backward(node)
+        elif node.kind == 'W':
+            run_weight(node)
+        else:
+            raise RuntimeError(f"unknown VZB schedule event: {node}")
+
+    WeightGradStore.assert_empty()
+    return forward_data_store
 
 
 def pipelining_with_interleaved_slicing(*,
