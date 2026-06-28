@@ -1455,7 +1455,9 @@ def pipelining_with_variable_slicing_vzb(*,
         split_counts.append(len(slices))
         for chunk in range(2):
             parallel_state.set_virtual_pipeline_model_parallel_rank(chunk)
-            chunk_loss_func = loss_func if parallel_state.is_pipeline_last_stage() else None
+            chunk_loss_func = loss_func if (
+                chunk == 1 and pipeline_parallel_rank == 0
+            ) else None
             microbatches[(microbatch_idx, chunk)] = MicroBatch(
                 slices,
                 kv_cache_class(),
@@ -1474,7 +1476,68 @@ def pipelining_with_variable_slicing_vzb(*,
         split_counts,
         delta=(2, 2),
     )
+    schedules = [
+        sorted(stage_schedule,
+               key=lambda node: (node.slot, node.kind, node.chunk,
+                                 node.microbatch, node.split))
+        for stage_schedule in schedules
+    ]
     schedule = schedules[pipeline_parallel_rank]
+
+    def comm_key(node):
+        return (node.kind, node.chunk, node.microbatch, node.split)
+
+    def incoming_messages(stage, stage_schedule):
+        messages = []
+        for node in stage_schedule:
+            key = comm_key(node)
+            if node.kind == 'F' and node.chunk == 0 and stage > 0:
+                messages.append(('prev', key))
+            elif node.kind == 'F' and node.chunk == 1 and stage < pipeline_parallel_size - 1:
+                messages.append(('next', key))
+            elif node.kind == 'B' and node.chunk == 1 and stage > 0:
+                messages.append(('prev', key))
+            elif node.kind == 'B' and node.chunk == 0 and stage < pipeline_parallel_size - 1:
+                messages.append(('next', key))
+        return messages
+
+    def outgoing_messages(stage, stage_schedule):
+        messages = []
+        for node in stage_schedule:
+            key = comm_key(node)
+            if node.kind == 'F' and node.chunk == 0 and stage < pipeline_parallel_size - 1:
+                messages.append(('next', key))
+            elif node.kind == 'F' and node.chunk == 1 and stage > 0:
+                messages.append(('prev', key))
+            elif node.kind == 'B' and node.chunk == 1 and stage < pipeline_parallel_size - 1:
+                messages.append(('next', key))
+            elif node.kind == 'B' and node.chunk == 0 and stage > 0:
+                messages.append(('prev', key))
+        return messages
+
+    def validate_p2p_order():
+        for left in range(pipeline_parallel_size - 1):
+            right = left + 1
+            left_out = [key for direction, key in outgoing_messages(left, schedules[left])
+                        if direction == 'next']
+            right_in = [key for direction, key in incoming_messages(right, schedules[right])
+                        if direction == 'prev']
+            if left_out != right_in:
+                raise RuntimeError(
+                    "SPP-VZB schedule has mismatched left-to-right P2P order "
+                    f"between ranks {left}->{right}: send={left_out[:8]}, recv={right_in[:8]}"
+                )
+            right_out = [key for direction, key in outgoing_messages(right, schedules[right])
+                         if direction == 'prev']
+            left_in = [key for direction, key in incoming_messages(left, schedules[left])
+                       if direction == 'next']
+            if right_out != left_in:
+                raise RuntimeError(
+                    "SPP-VZB schedule has mismatched right-to-left P2P order "
+                    f"between ranks {right}->{left}: send={right_out[:8]}, recv={left_in[:8]}"
+                )
+
+    validate_p2p_order()
 
     if variable_seq_debug_limit:
         # DEBUG for variable length training.
@@ -1495,23 +1558,114 @@ def pipelining_with_variable_slicing_vzb(*,
                 flush=True,
             )
 
+    send_reqs = []
+    local_forward_bridge: Dict[Tuple[int, int], torch.Tensor] = {}
+    local_backward_bridge: Dict[Tuple[int, int], torch.Tensor] = {}
+
+    def wait_reqs(reqs):
+        for req in (reqs or []):
+            req.wait()
+
+    def recv_prev():
+        tensor, _, reqs = p2p_communication._communicate(
+            tensor_send_next=None,
+            tensor_send_prev=None,
+            recv_prev=True,
+            recv_next=False,
+            tensor_shape=tensor_shape,
+            batch_p2p_comm=False,
+            wait_on_reqs=False,
+            dtype=dtype)
+        wait_reqs(reqs)
+        return tensor
+
+    def recv_next():
+        _, tensor, reqs = p2p_communication._communicate(
+            tensor_send_next=None,
+            tensor_send_prev=None,
+            recv_prev=False,
+            recv_next=True,
+            tensor_shape=tensor_shape,
+            batch_p2p_comm=False,
+            wait_on_reqs=False,
+            dtype=dtype)
+        wait_reqs(reqs)
+        return tensor
+
+    def send_next(tensor):
+        _, _, reqs = p2p_communication._communicate(
+            tensor_send_next=tensor,
+            tensor_send_prev=None,
+            recv_prev=False,
+            recv_next=False,
+            tensor_shape=None,
+            batch_p2p_comm=False,
+            wait_on_reqs=False,
+            dtype=None)
+        send_reqs.append((reqs, tensor))
+
+    def send_prev(tensor):
+        _, _, reqs = p2p_communication._communicate(
+            tensor_send_next=None,
+            tensor_send_prev=tensor,
+            recv_prev=False,
+            recv_next=False,
+            tensor_shape=None,
+            batch_p2p_comm=False,
+            wait_on_reqs=False,
+            dtype=None)
+        send_reqs.append((reqs, tensor))
+
+    def detach_pipeline_boundary(tensor):
+        if tensor is None:
+            return None
+        detached = tensor.detach()
+        detached.requires_grad_()
+        return detached
+
     def run_forward(node):
         parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
-        input_tensor = p2p_communication.recv_forward(
-            tensor_shape, dtype, batch_p2p_comm, timers)
+        bridge_key = (node.microbatch, node.split)
+        if node.chunk == 0:
+            input_tensor = None if pipeline_parallel_rank == 0 else recv_prev()
+        else:
+            if pipeline_parallel_rank == pipeline_parallel_size - 1:
+                input_tensor = local_forward_bridge.pop(bridge_key)
+            else:
+                input_tensor = recv_next()
         mb = microbatches[(node.microbatch, node.chunk)]
         output_tensor = mb.forward(input_tensor)
-        p2p_communication.send_forward(output_tensor, batch_p2p_comm, timers)
+        if node.chunk == 0:
+            if pipeline_parallel_rank == pipeline_parallel_size - 1:
+                local_forward_bridge[bridge_key] = detach_pipeline_boundary(output_tensor)
+            else:
+                send_next(output_tensor)
+        else:
+            if pipeline_parallel_rank != 0:
+                send_prev(output_tensor)
         if node.chunk == 1 and mb.num_slices_to_forward == 0:
             forward_data_store.append(mb.compute_loss(loss_div))
 
     def run_backward(node):
         parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
-        output_tensor_grad = p2p_communication.recv_backward(
-            tensor_shape, dtype, batch_p2p_comm, timers)
+        bridge_key = (node.microbatch, node.split)
+        if node.chunk == 1:
+            output_tensor_grad = None if pipeline_parallel_rank == 0 else recv_prev()
+        else:
+            if pipeline_parallel_rank == pipeline_parallel_size - 1:
+                output_tensor_grad = local_backward_bridge.pop(bridge_key)
+            else:
+                output_tensor_grad = recv_next()
         mb = microbatches[(node.microbatch, node.chunk)]
         input_tensor_grad = mb.backward_b(output_tensor_grad, chunk=node.chunk)
-        p2p_communication.send_backward(input_tensor_grad, batch_p2p_comm, timers)
+        if node.chunk == 1:
+            if pipeline_parallel_rank == pipeline_parallel_size - 1:
+                local_backward_bridge[bridge_key] = input_tensor_grad
+            else:
+                send_next(input_tensor_grad)
+        else:
+            if pipeline_parallel_rank != 0:
+                send_prev(input_tensor_grad)
 
     def run_weight(node):
         parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
@@ -1528,6 +1682,12 @@ def pipelining_with_variable_slicing_vzb(*,
         else:
             raise RuntimeError(f"unknown VZB schedule event: {node}")
 
+    for reqs, _tensor in send_reqs:
+        wait_reqs(reqs)
+    assert not local_forward_bridge, \
+        f"Unconsumed local forward bridge tensors: {list(local_forward_bridge.keys())[:8]}"
+    assert not local_backward_bridge, \
+        f"Unconsumed local backward bridge tensors: {list(local_backward_bridge.keys())[:8]}"
     WeightGradStore.assert_empty()
     return forward_data_store
 
