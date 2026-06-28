@@ -196,8 +196,10 @@ def validate_args(args, defaults={}):
             assert args.gradient_accumulation_fusion, \
                 'variable-seq-schedule=vzb requires gradient_accumulation_fusion; ' \
                 'do not set --no-gradient-accumulation-fusion'
-            assert not args.overlap_grad_reduce, \
+            assert not getattr(args, 'overlap_grad_reduce', False), \
                 'variable-seq-schedule=vzb does not support overlap_grad_reduce yet'
+            assert not getattr(args, 'kaimm_overlap_optimizer_communication', False), \
+                'variable-seq-schedule=vzb does not support optimizer communication overlap yet'
     if args.timer_record_dir is not None:
         assert args.timer_record_start_iter >= 0, \
             'timer-record-start-iter must be >= 0'
