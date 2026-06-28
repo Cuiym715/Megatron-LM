@@ -1590,66 +1590,56 @@ def pipelining_with_variable_slicing_vzb(*,
         if reqs:
             trace(action + "-end", node=node, peer=peer, key=key)
 
+    p2p_group = parallel_state.get_pipeline_model_parallel_group()
+    prev_pipeline_rank = parallel_state.get_pipeline_model_parallel_prev_rank()
+    next_pipeline_rank = parallel_state.get_pipeline_model_parallel_next_rank()
+
+    def allocate_recv_tensor():
+        if dtype is None:
+            raise RuntimeError("dtype must be provided for SPP-VZB P2P receives")
+        if tensor_shape is None:
+            raise RuntimeError("tensor_shape must be provided for SPP-VZB P2P receives")
+        return torch.empty(tensor_shape,
+                           requires_grad=True,
+                           device=torch.cuda.current_device(),
+                           dtype=dtype)
+
+    def post_irecv(tensor, peer):
+        return torch.distributed.irecv(tensor=tensor, src=peer, group=p2p_group)
+
+    def post_isend(tensor, peer):
+        return torch.distributed.isend(tensor=tensor, dst=peer, group=p2p_group)
+
     def recv_prev(node):
         key = comm_key(node)
         trace("recv-prev-post", node=node, peer=pipeline_parallel_rank - 1, key=key)
-        tensor, _, reqs = p2p_communication._communicate(
-            tensor_send_next=None,
-            tensor_send_prev=None,
-            recv_prev=True,
-            recv_next=False,
-            tensor_shape=tensor_shape,
-            batch_p2p_comm=False,
-            wait_on_reqs=False,
-            dtype=dtype)
-        wait_reqs(reqs, action="recv-prev-wait", node=node,
+        tensor = allocate_recv_tensor()
+        req = post_irecv(tensor, prev_pipeline_rank)
+        wait_reqs([req], action="recv-prev-wait", node=node,
                   peer=pipeline_parallel_rank - 1, key=key)
         return tensor
 
     def recv_next(node):
         key = comm_key(node)
         trace("recv-next-post", node=node, peer=pipeline_parallel_rank + 1, key=key)
-        _, tensor, reqs = p2p_communication._communicate(
-            tensor_send_next=None,
-            tensor_send_prev=None,
-            recv_prev=False,
-            recv_next=True,
-            tensor_shape=tensor_shape,
-            batch_p2p_comm=False,
-            wait_on_reqs=False,
-            dtype=dtype)
-        wait_reqs(reqs, action="recv-next-wait", node=node,
+        tensor = allocate_recv_tensor()
+        req = post_irecv(tensor, next_pipeline_rank)
+        wait_reqs([req], action="recv-next-wait", node=node,
                   peer=pipeline_parallel_rank + 1, key=key)
         return tensor
 
     def send_next(tensor, node):
         key = comm_key(node)
         trace("send-next-post", node=node, peer=pipeline_parallel_rank + 1, key=key)
-        _, _, reqs = p2p_communication._communicate(
-            tensor_send_next=tensor,
-            tensor_send_prev=None,
-            recv_prev=False,
-            recv_next=False,
-            tensor_shape=None,
-            batch_p2p_comm=False,
-            wait_on_reqs=False,
-            dtype=None)
-        send_reqs.append((reqs, tensor, node, pipeline_parallel_rank + 1, key))
+        req = post_isend(tensor, next_pipeline_rank)
+        send_reqs.append(([req], tensor, node, pipeline_parallel_rank + 1, key))
         trace("send-next-posted", node=node, peer=pipeline_parallel_rank + 1, key=key)
 
     def send_prev(tensor, node):
         key = comm_key(node)
         trace("send-prev-post", node=node, peer=pipeline_parallel_rank - 1, key=key)
-        _, _, reqs = p2p_communication._communicate(
-            tensor_send_next=None,
-            tensor_send_prev=tensor,
-            recv_prev=False,
-            recv_next=False,
-            tensor_shape=None,
-            batch_p2p_comm=False,
-            wait_on_reqs=False,
-            dtype=None)
-        send_reqs.append((reqs, tensor, node, pipeline_parallel_rank - 1, key))
+        req = post_isend(tensor, prev_pipeline_rank)
+        send_reqs.append(([req], tensor, node, pipeline_parallel_rank - 1, key))
         trace("send-prev-posted", node=node, peer=pipeline_parallel_rank - 1, key=key)
 
     def detach_pipeline_boundary(tensor):
