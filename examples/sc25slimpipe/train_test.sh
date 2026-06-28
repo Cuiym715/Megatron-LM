@@ -212,9 +212,6 @@ if [[ "$VARLEN" == "1" ]]; then
         # DEBUG for variable length training.
         --variable-seq-debug-num-batches "$VARLEN_DEBUG"
     )
-    if [[ "$VARLEN_SCHEDULE" == "vzb" ]]; then
-        PARALLEL_ARGS+=(--gradient-accumulation-fusion)
-    fi
 fi
 
 if (( TP_SIZE > 1 )); then

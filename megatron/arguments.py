@@ -194,7 +194,8 @@ def validate_args(args, defaults={}):
             assert args.virtual_pipeline_model_parallel_size == 2, \
                 'variable-seq-schedule=vzb requires exactly two virtual pipeline chunks'
             assert args.gradient_accumulation_fusion, \
-                'variable-seq-schedule=vzb requires --gradient-accumulation-fusion'
+                'variable-seq-schedule=vzb requires gradient_accumulation_fusion; ' \
+                'do not set --no-gradient-accumulation-fusion'
             assert not args.overlap_grad_reduce, \
                 'variable-seq-schedule=vzb does not support overlap_grad_reduce yet'
     if args.timer_record_dir is not None:
@@ -921,8 +922,6 @@ def _add_regularization_args(parser):
 
 def _add_training_args(parser):
     group = parser.add_argument_group(title='training')
-
-    mutex_group = parser.add_mutually_exclusive_group()
 
     group.add_argument('--micro-batch-size', type=int, default=None,
                        help='Batch size per model instance (local batch size). '
