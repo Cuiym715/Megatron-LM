@@ -1474,7 +1474,6 @@ def pipelining_with_variable_slicing_slice_v(*,
         pipeline_parallel_size,
         num_microbatches,
         split_counts,
-        delta=(2, 2),
     )
     schedule = schedules[pipeline_parallel_rank]
 
@@ -1539,8 +1538,7 @@ def pipelining_with_variable_slicing_slice_v(*,
             "[variable-seq][slice-v-schedule] "
             f"rank={pipeline_parallel_rank}/{pipeline_parallel_size}, "
             f"split_counts={split_counts}, events={len(schedule)}, "
-            f"delta={plan.delta}, transition_stage={plan.transition_stage}, "
-            f"stage_phases={plan.stage_phases}",
+            f"phase_repeats={plan.phase_repeats[pipeline_parallel_rank]}",
             flush=True,
         )
         for node in schedule[:variable_seq_debug_limit * 12]:
@@ -1548,7 +1546,8 @@ def pipelining_with_variable_slicing_slice_v(*,
             print(
                 "[variable-seq][slice-v-event] "
                 f"rank={pipeline_parallel_rank}, kind={node.kind}{node.chunk}, "
-                f"microbatch={node.microbatch}, split={node.split}, slot={node.slot}",
+                f"microbatch={node.microbatch}, split={node.split}, "
+                f"phase={node.phase}, slot={node.slot}",
                 flush=True,
             )
 
