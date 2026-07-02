@@ -192,14 +192,14 @@ def validate_args(args, defaults={}):
                 'unset --num-layers-per-virtual-pipeline-stage'
         else:
             assert args.virtual_pipeline_model_parallel_size == 2, \
-                'variable-seq-schedule=vzb requires exactly two virtual pipeline chunks'
+                'variable-seq-schedule=slice-v requires exactly two virtual pipeline chunks'
             assert args.gradient_accumulation_fusion, \
-                'variable-seq-schedule=vzb requires gradient_accumulation_fusion; ' \
+                'variable-seq-schedule=slice-v requires gradient_accumulation_fusion; ' \
                 'do not set --no-gradient-accumulation-fusion'
             assert not getattr(args, 'overlap_grad_reduce', False), \
-                'variable-seq-schedule=vzb does not support overlap_grad_reduce yet'
+                'variable-seq-schedule=slice-v does not support overlap_grad_reduce yet'
             assert not getattr(args, 'kaimm_overlap_optimizer_communication', False), \
-                'variable-seq-schedule=vzb does not support optimizer communication overlap yet'
+                'variable-seq-schedule=slice-v does not support optimizer communication overlap yet'
     if args.timer_record_dir is not None:
         assert args.timer_record_start_iter >= 0, \
             'timer-record-start-iter must be >= 0'
@@ -1314,7 +1314,7 @@ def _add_distributed_args(parser):
                        help='Pad the number of chunks to a multiple of pipeline parallel size '
                        'for variable sequence slicing.')
     group.add_argument('--variable-seq-schedule', type=str, default='1f1b',
-                       choices=['1f1b', 'vzb'],
+                       choices=['1f1b', 'slice-v'],
                        help='Pipeline schedule for variable sequence slicing.')
     # DEBUG for variable length training.
     group.add_argument('--variable-seq-debug-num-batches', type=int, default=0,

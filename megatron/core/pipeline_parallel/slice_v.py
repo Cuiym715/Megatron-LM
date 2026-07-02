@@ -12,7 +12,7 @@ TaskKey = Tuple[str, int, int, int]
 
 
 @dataclass(frozen=True)
-class SppVzbPlan:
+class SliceVPlan:
     delta: Tuple[int, int]
     transition_stage: int
     period: int
@@ -21,7 +21,7 @@ class SppVzbPlan:
 
 
 @dataclass(frozen=True)
-class SppVzbNode:
+class SliceVNode:
     kind: str
     stage: int
     microbatch: int
@@ -34,7 +34,7 @@ class SppVzbNode:
 
 @dataclass(frozen=True)
 class _Candidate:
-    plan: SppVzbPlan
+    plan: SliceVPlan
     slots: Dict[TaskKey, int]
     dependencies: Dict[TaskKey, Tuple[Tuple[TaskKey, int], ...]]
     stage_order: Tuple[Tuple[TaskKey, ...], ...]
@@ -85,7 +85,7 @@ def _build_plan(*,
                 num_stages: int,
                 delta: Tuple[int, int],
                 transition_stage: int,
-                stage_zero_phases: Tuple[int, ...]) -> Optional[SppVzbPlan]:
+                stage_zero_phases: Tuple[int, ...]) -> Optional[SliceVPlan]:
     phase_rows: List[Tuple[int, ...]] = [stage_zero_phases]
     offset_rows: List[Tuple[int, ...]] = [stage_zero_phases]
 
@@ -111,7 +111,7 @@ def _build_plan(*,
         phase_rows.append(tuple(phases))
         offset_rows.append(tuple(offsets))
 
-    return SppVzbPlan(
+    return SliceVPlan(
         delta=delta,
         transition_stage=transition_stage,
         period=_PERIOD,
@@ -156,7 +156,7 @@ def _add_dependency(dependencies: DefaultDict[TaskKey, Dict[TaskKey, int]],
 def _build_dependency_graph(*,
                             num_stages: int,
                             split_counts: Sequence[int],
-                            plan: SppVzbPlan
+                            plan: SliceVPlan
                             ) -> Tuple[List[TaskKey], Dict[TaskKey, Tuple[Tuple[TaskKey, int], ...]]]:
     keys: List[TaskKey] = []
     mutable_dependencies: DefaultDict[TaskKey, Dict[TaskKey, int]] = defaultdict(dict)
@@ -243,7 +243,7 @@ def _build_dependency_graph(*,
 
 
 def _assign_absolute_slots(*,
-                           plan: SppVzbPlan,
+                           plan: SliceVPlan,
                            keys: Sequence[TaskKey],
                            dependencies: Dict[TaskKey, Tuple[Tuple[TaskKey, int], ...]]
                            ) -> Optional[Dict[TaskKey, int]]:
@@ -325,7 +325,7 @@ def _candidate_score(*,
 
 
 def _build_candidate(*,
-                     plan: SppVzbPlan,
+                     plan: SliceVPlan,
                      num_stages: int,
                      split_counts: Sequence[int]) -> Optional[_Candidate]:
     keys, dependencies = _build_dependency_graph(
@@ -427,6 +427,40 @@ def _global_completion(completion: Dict[TaskKey, float]) -> float:
     return max(completion.values(), default=0.0)
 
 
+def _communication_order_matches(
+        stage_order: Sequence[Sequence[TaskKey]]) -> bool:
+    """Keep untagged NCCL messages in the same order on both edge endpoints."""
+    for left_stage in range(len(stage_order) - 1):
+        right_stage = left_stage + 1
+
+        left_to_right = [
+            (kind, microbatch, split)
+            for kind, _, microbatch, split in stage_order[left_stage]
+            if kind in {"F0", "B1"}
+        ]
+        received_from_left = [
+            (kind, microbatch, split)
+            for kind, _, microbatch, split in stage_order[right_stage]
+            if kind in {"F0", "B1"}
+        ]
+        if left_to_right != received_from_left:
+            return False
+
+        right_to_left = [
+            (kind, microbatch, split)
+            for kind, _, microbatch, split in stage_order[right_stage]
+            if kind in {"F1", "B0"}
+        ]
+        received_from_right = [
+            (kind, microbatch, split)
+            for kind, _, microbatch, split in stage_order[left_stage]
+            if kind in {"F1", "B0"}
+        ]
+        if right_to_left != received_from_right:
+            return False
+    return True
+
+
 def _fill_boundary_bubbles(*,
                            stage_order: Sequence[Sequence[TaskKey]],
                            dependencies: Dict[TaskKey, Tuple[Tuple[TaskKey, int], ...]],
@@ -447,7 +481,7 @@ def _fill_boundary_bubbles(*,
                 comm_cost=comm_cost,
             )
             if timing is None:
-                raise RuntimeError("SPP-VZB boundary reordering introduced a dependency cycle.")
+                raise RuntimeError("SliceV boundary reordering introduced a dependency cycle.")
             start_times, completion = timing
             current_global_completion = _global_completion(completion)
             row = rows[stage]
@@ -483,6 +517,8 @@ def _fill_boundary_bubbles(*,
 
                     trial_rows = list(rows)
                     trial_rows[stage] = _move_task(row, source_index, gap_index + 1)
+                    if not _communication_order_matches(trial_rows):
+                        continue
                     trial_timing = _schedule_order(
                         stage_order=trial_rows,
                         dependencies=dependencies,
@@ -551,9 +587,12 @@ def _reorder_cooldown_backward_before_weight(*,
                 comm_cost=comm_cost,
             )
             if current_timing is None:
-                raise RuntimeError("SPP-VZB cooldown reordering introduced a dependency cycle.")
+                raise RuntimeError("SliceV cooldown reordering introduced a dependency cycle.")
             trial_rows = list(rows)
             trial_rows[stage] = _move_task(row, source_index, destination_index)
+            if not _communication_order_matches(trial_rows):
+                source_index += 1
+                continue
             trial_timing = _schedule_order(
                 stage_order=trial_rows,
                 dependencies=dependencies,
@@ -610,7 +649,7 @@ def _materialize_schedule(*,
                           num_stages: int,
                           split_counts: Sequence[int],
                           cost: Sequence[float],
-                          comm_cost: float) -> List[List[SppVzbNode]]:
+                          comm_cost: float) -> List[List[SliceVNode]]:
     stage_order = _reorder_boundaries(
         stage_order=candidate.stage_order,
         dependencies=candidate.dependencies,
@@ -626,14 +665,16 @@ def _materialize_schedule(*,
         comm_cost=comm_cost,
     )
     if timing is None:
-        raise RuntimeError("SPP-VZB reordering introduced a dependency cycle.")
+        raise RuntimeError("SliceV reordering introduced a dependency cycle.")
+    if not _communication_order_matches(stage_order):
+        raise RuntimeError("SliceV generated a non-executable P2P message order.")
     start_times, completion = timing
 
-    result: List[List[SppVzbNode]] = [[] for _ in range(num_stages)]
+    result: List[List[SliceVNode]] = [[] for _ in range(num_stages)]
     for stage, row in enumerate(stage_order):
         for key in row:
             kind, _, microbatch, split = key
-            result[stage].append(SppVzbNode(
+            result[stage].append(SliceVNode(
                 kind=kind[0],
                 stage=stage,
                 microbatch=microbatch,
@@ -646,12 +687,12 @@ def _materialize_schedule(*,
     return result
 
 
-def build_spp_vzb_schedule(num_stages: int,
+def build_slice_v_schedule(num_stages: int,
                            num_microbatches: int,
                            split_counts: Sequence[int],
                            delta: DeltaInput = (2, 2),
                            cost: Sequence[float] = (6.0, 6.0, 6.0),
-                           comm_cost: float = 0.0) -> Tuple[List[List[SppVzbNode]], SppVzbPlan]:
+                           comm_cost: float = 0.0) -> Tuple[List[List[SliceVNode]], SliceVPlan]:
     if num_stages <= 0 or num_microbatches <= 0:
         raise ValueError("num_stages and num_microbatches must be positive.")
     if len(split_counts) != num_microbatches:
@@ -685,7 +726,7 @@ def build_spp_vzb_schedule(num_stages: int,
                 candidates.append(candidate)
 
     if not candidates:
-        raise RuntimeError("No collision-free SPP-VZB schedule exists.")
+        raise RuntimeError("No collision-free SliceV schedule exists.")
 
     best = min(candidates, key=lambda candidate: candidate.score)
     result = _materialize_schedule(
