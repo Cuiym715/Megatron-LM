@@ -1,6 +1,7 @@
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import Deque, Dict, List, Sequence, Tuple
+import heapq
+from typing import Deque, Dict, List, Optional, Sequence, Tuple
 
 
 TaskId = Tuple[int, int]
@@ -23,6 +24,15 @@ class SliceVNode:
     slot: int
     start_time: int
     completion_time: int
+
+
+@dataclass(frozen=True)
+class SliceVAction:
+    kind: str
+    node: Optional[SliceVNode] = None
+    sender: Optional[int] = None
+    receiver: Optional[int] = None
+    message: Optional[Tuple[str, int, int, int]] = None
 
 
 def _forward_task_ids(split_counts: Sequence[int]) -> List[TaskId]:
@@ -194,10 +204,10 @@ def _validate_dependencies(schedules: Sequence[Sequence[SliceVNode]],
             for node in right
             if (node.kind, node.chunk) in {('F', 0), ('B', 1)}
         ]
-        if left_to_right != received_from_left:
+        if sorted(left_to_right) != sorted(received_from_left):
             raise RuntimeError(
-                "SliceV left-to-right message order is incompatible with one "
-                f"untagged pipeline group on edge {left_stage}->{left_stage + 1}."
+                "SliceV left-to-right message sets differ on edge "
+                f"{left_stage}->{left_stage + 1}."
             )
 
         right_to_left = [
@@ -210,10 +220,10 @@ def _validate_dependencies(schedules: Sequence[Sequence[SliceVNode]],
             for node in left
             if (node.kind, node.chunk) in {('F', 1), ('B', 0)}
         ]
-        if right_to_left != received_from_right:
+        if sorted(right_to_left) != sorted(received_from_right):
             raise RuntimeError(
-                "SliceV right-to-left message order is incompatible with one "
-                f"untagged pipeline group on edge {left_stage + 1}->{left_stage}."
+                "SliceV right-to-left message sets differ on edge "
+                f"{left_stage + 1}->{left_stage}."
             )
 
 
@@ -238,3 +248,88 @@ def build_slice_v_schedule(num_stages: int,
         split_counts=tuple(split_counts),
         phase_repeats=tuple(phase_repeats),
     )
+
+
+def build_slice_v_execution_plan(
+        schedules: Sequence[Sequence[SliceVNode]]) -> List[SliceVAction]:
+    """Build a deadlock-free global action order without reordering computation."""
+    graph: Dict[Tuple, List[Tuple]] = defaultdict(list)
+    indegree: Dict[Tuple, int] = {}
+    priorities: Dict[Tuple, Tuple] = {}
+    compute_nodes: Dict[Tuple, SliceVNode] = {}
+    message_nodes: Dict[Tuple, Tuple[int, int, Tuple[str, int, int, int]]] = {}
+
+    def add_node(key: Tuple, priority: Tuple) -> None:
+        indegree.setdefault(key, 0)
+        priorities[key] = priority
+
+    def add_edge(source: Tuple, target: Tuple) -> None:
+        graph[source].append(target)
+        indegree[target] += 1
+
+    positions = {}
+    for stage, schedule in enumerate(schedules):
+        previous = None
+        for index, node in enumerate(schedule):
+            key = ('compute', stage, index)
+            add_node(key, (node.slot * 2, stage, index))
+            compute_nodes[key] = node
+            positions[(stage, node.kind, node.chunk,
+                       node.microbatch, node.split)] = key
+            if previous is not None:
+                add_edge(previous, key)
+            previous = key
+
+    def add_message(sender: int, receiver: int, kind: str, chunk: int,
+                    microbatch: int, split: int) -> None:
+        message = (kind, chunk, microbatch, split)
+        producer = positions[(sender, *message)]
+        consumer = positions[(receiver, *message)]
+        key = ('message', sender, receiver, *message)
+        producer_node = compute_nodes[producer]
+        add_node(key, (producer_node.slot * 2 + 1, sender, receiver,
+                       kind, chunk, microbatch, split))
+        message_nodes[key] = (sender, receiver, message)
+        add_edge(producer, key)
+        add_edge(key, consumer)
+
+    num_stages = len(schedules)
+    if not num_stages:
+        return []
+    first_schedule = schedules[0]
+    tasks = [(node.microbatch, node.split) for node in first_schedule
+             if node.kind == 'F' and node.chunk == 0]
+    for left in range(num_stages - 1):
+        right = left + 1
+        for microbatch, split in tasks:
+            add_message(left, right, 'F', 0, microbatch, split)
+            add_message(right, left, 'F', 1, microbatch, split)
+            add_message(left, right, 'B', 1, microbatch, split)
+            add_message(right, left, 'B', 0, microbatch, split)
+
+    ready = [(priorities[key], key) for key, degree in indegree.items()
+             if degree == 0]
+    heapq.heapify(ready)
+    actions = []
+    while ready:
+        _, key = heapq.heappop(ready)
+        if key[0] == 'compute':
+            actions.append(SliceVAction(kind='compute', node=compute_nodes[key]))
+        else:
+            sender, receiver, message = message_nodes[key]
+            actions.append(SliceVAction(
+                kind='communication', sender=sender, receiver=receiver,
+                message=message,
+            ))
+        for target in graph[key]:
+            indegree[target] -= 1
+            if indegree[target] == 0:
+                heapq.heappush(ready, (priorities[target], target))
+
+    if len(actions) != len(indegree):
+        blocked = [key for key, degree in indegree.items() if degree > 0]
+        raise RuntimeError(
+            "SliceV computation and communication dependencies contain a cycle: "
+            f"{blocked[:8]}"
+        )
+    return actions

@@ -17,7 +17,10 @@ from megatron.core import parallel_state
 from megatron.core.enums import ModelType
 from megatron.core.pipeline_parallel import offload, p2p_communication
 from megatron.core.kv_cache import Cache
-from megatron.core.pipeline_parallel.slice_v import build_slice_v_schedule
+from megatron.core.pipeline_parallel.slice_v import (
+    build_slice_v_execution_plan,
+    build_slice_v_schedule,
+)
 from megatron.core.zbpp_utils import WeightGradStore
 from megatron.core.transformer.moe.router import MoEAuxLossAutoScaler
 from megatron.core.utils import cuda_sync_and_record, get_attr_wrapped_model, get_model_type
@@ -1476,6 +1479,7 @@ def pipelining_with_variable_slicing_slice_v(*,
         split_counts,
     )
     schedule = schedules[pipeline_parallel_rank]
+    execution_plan = build_slice_v_execution_plan(schedules)
 
     def comm_key(node):
         return (node.kind, node.chunk, node.microbatch, node.split)
@@ -1508,29 +1512,29 @@ def pipelining_with_variable_slicing_slice_v(*,
                 messages.append(('prev', key))
         return messages
 
-    def validate_p2p_order():
+    def validate_p2p_messages():
         for left in range(pipeline_parallel_size - 1):
             right = left + 1
             left_out = [key for direction, key in outgoing_messages(left, schedules[left])
                         if direction == 'next']
             right_in = [key for direction, key in incoming_messages(right, schedules[right])
                         if direction == 'prev']
-            if left_out != right_in:
+            if sorted(left_out) != sorted(right_in):
                 raise RuntimeError(
-                    "SliceV schedule has mismatched left-to-right P2P order "
+                    "SliceV schedule has mismatched left-to-right P2P messages "
                     f"between ranks {left}->{right}: send={left_out[:8]}, recv={right_in[:8]}"
                 )
             right_out = [key for direction, key in outgoing_messages(right, schedules[right])
                          if direction == 'prev']
             left_in = [key for direction, key in incoming_messages(left, schedules[left])
                        if direction == 'next']
-            if right_out != left_in:
+            if sorted(right_out) != sorted(left_in):
                 raise RuntimeError(
-                    "SliceV schedule has mismatched right-to-left P2P order "
+                    "SliceV schedule has mismatched right-to-left P2P messages "
                     f"between ranks {right}->{left}: send={right_out[:8]}, recv={left_in[:8]}"
                 )
 
-    validate_p2p_order()
+    validate_p2p_messages()
 
     if variable_seq_debug_limit:
         # DEBUG for variable length training.
@@ -1554,8 +1558,8 @@ def pipelining_with_variable_slicing_slice_v(*,
     local_forward_bridge: Dict[Tuple[int, int], torch.Tensor] = {}
     local_backward_bridge: Dict[Tuple[int, int], torch.Tensor] = {}
     trace_slice_v = variable_seq_debug_limit > 0
-    pending_send = None
-    outstanding_sends = []
+    outgoing_tensors = {}
+    incoming_tensors = {}
 
     def node_desc(node):
         return (
@@ -1576,14 +1580,6 @@ def pipelining_with_variable_slicing_slice_v(*,
         # DEBUG for variable length training.
         print("[variable-seq][slice-v-trace] " + ", ".join(details), flush=True)
 
-    def wait_reqs(reqs, action="wait-reqs", node=None, peer=None, key=None):
-        if reqs:
-            trace(action + "-begin", node=node, peer=peer, key=key)
-        for req in (reqs or []):
-            req.wait()
-        if reqs:
-            trace(action + "-end", node=node, peer=peer, key=key)
-
     def allocate_recv_tensor():
         if dtype is None:
             raise RuntimeError("dtype must be provided for SliceV P2P receives")
@@ -1595,98 +1591,44 @@ def pipelining_with_variable_slicing_slice_v(*,
                            dtype=dtype)
 
     pipeline_group = parallel_state.get_pipeline_model_parallel_group()
-    prev_pipeline_rank = parallel_state.get_pipeline_model_parallel_prev_rank()
-    next_pipeline_rank = parallel_state.get_pipeline_model_parallel_next_rank()
 
-    def ordered_p2p_ops(tensor_send_prev, tensor_recv_prev,
-                        tensor_send_next, tensor_recv_next):
-        def send_next():
-            if tensor_send_next is None:
-                return None
-            return dist.isend(tensor_send_next, next_pipeline_rank, group=pipeline_group)
+    def receive(node):
+        key = comm_key(node)
+        try:
+            return incoming_tensors.pop(key)
+        except KeyError as exc:
+            raise RuntimeError(f"missing completed SliceV communication {key}") from exc
 
-        def recv_prev():
-            if tensor_recv_prev is None:
-                return None
-            return dist.irecv(tensor_recv_prev, prev_pipeline_rank, group=pipeline_group)
+    def save_for_send(tensor, node):
+        key = comm_key(node)
+        if key in outgoing_tensors:
+            raise RuntimeError(f"duplicate SliceV outgoing tensor {key}")
+        outgoing_tensors[key] = tensor
 
-        def send_prev():
-            if tensor_send_prev is None:
-                return None
-            return dist.isend(tensor_send_prev, prev_pipeline_rank, group=pipeline_group)
-
-        def recv_next():
-            if tensor_recv_next is None:
-                return None
-            return dist.irecv(tensor_recv_next, next_pipeline_rank, group=pipeline_group)
-
-        if pipeline_parallel_rank % 2 == 0:
-            ordered_ops = (
-                ('send', send_next),
-                ('recv', recv_prev),
-                ('send', send_prev),
-                ('recv', recv_next),
-            )
+    def run_communication(action):
+        key = action.message
+        if pipeline_parallel_rank not in (action.sender, action.receiver):
+            return
+        peer_stage = (action.receiver
+                      if pipeline_parallel_rank == action.sender
+                      else action.sender)
+        peer = parallel_state.get_pipeline_model_parallel_global_rank(peer_stage)
+        if pipeline_parallel_rank == action.sender:
+            try:
+                tensor = outgoing_tensors.pop(key)
+            except KeyError as exc:
+                raise RuntimeError(f"SliceV send tensor {key} is not ready") from exc
+            op = dist.P2POp(dist.isend, tensor, peer, group=pipeline_group)
+            trace("p2p-send", peer=peer, key=key)
         else:
-            ordered_ops = (
-                ('recv', recv_prev),
-                ('send', send_next),
-                ('recv', recv_next),
-                ('send', send_prev),
-            )
-        requests = {'send': [], 'recv': []}
-        for op_type, op in ordered_ops:
-            req = op()
-            if req is not None:
-                requests[op_type].append(req)
-        return requests
-
-    def communicate(recv_direction, node=None):
-        """Flush one pending send and receive the current task input together."""
-        nonlocal pending_send
-        tensor_send_prev = None
-        tensor_send_next = None
-        send_node = None
-        if pending_send is not None:
-            send_direction, send_tensor, send_node = pending_send
-            if send_direction == 'prev':
-                tensor_send_prev = send_tensor
-            else:
-                tensor_send_next = send_tensor
-
-        tensor_recv_prev = allocate_recv_tensor() if recv_direction == 'prev' else None
-        tensor_recv_next = allocate_recv_tensor() if recv_direction == 'next' else None
-        if pending_send is None and recv_direction is None:
-            return None
-
-        trace(
-            "p2p-begin",
-            node=node,
-            key={
-                'send': comm_key(send_node) if send_node is not None else None,
-                'send_direction': pending_send[0] if pending_send is not None else None,
-                'recv': comm_key(node) if recv_direction is not None else None,
-                'recv_direction': recv_direction,
-            },
-        )
-        requests = ordered_p2p_ops(
-            tensor_send_prev,
-            tensor_recv_prev,
-            tensor_send_next,
-            tensor_recv_next,
-        )
-        if requests['send']:
-            outstanding_sends.append((requests['send'], send_tensor, send_node))
-        wait_reqs(requests['recv'], action="p2p-recv-wait", node=node)
-        trace("p2p-end", node=node)
-        pending_send = None
-        return tensor_recv_prev if recv_direction == 'prev' else tensor_recv_next
-
-    def defer_send(direction, tensor, node):
-        nonlocal pending_send
-        assert pending_send is None, "SliceV allows at most one pending send"
-        pending_send = (direction, tensor, node)
-        trace("p2p-defer-send", node=node, key=direction)
+            tensor = allocate_recv_tensor()
+            op = dist.P2POp(dist.irecv, tensor, peer, group=pipeline_group)
+            trace("p2p-recv", peer=peer, key=key)
+        requests = dist.batch_isend_irecv([op])
+        for request in requests:
+            request.wait()
+        if pipeline_parallel_rank == action.receiver:
+            incoming_tensors[key] = tensor
 
     def detach_pipeline_boundary(tensor):
         if tensor is None:
@@ -1700,15 +1642,13 @@ def pipelining_with_variable_slicing_slice_v(*,
         bridge_key = (node.microbatch, node.split)
         trace("forward-begin", node=node)
         if node.chunk == 0:
-            recv_direction = None if pipeline_parallel_rank == 0 else 'prev'
-            input_tensor = communicate(recv_direction, node)
+            input_tensor = None if pipeline_parallel_rank == 0 else receive(node)
         else:
             if pipeline_parallel_rank == pipeline_parallel_size - 1:
-                communicate(None, node)
                 trace("forward-local-bridge-pop", node=node, key=bridge_key)
                 input_tensor = local_forward_bridge.pop(bridge_key)
             else:
-                input_tensor = communicate('next', node)
+                input_tensor = receive(node)
         mb = microbatches[(node.microbatch, node.chunk)]
         trace("forward-compute-begin", node=node)
         output_tensor = mb.forward(input_tensor)
@@ -1718,10 +1658,10 @@ def pipelining_with_variable_slicing_slice_v(*,
                 trace("forward-local-bridge-push", node=node, key=bridge_key)
                 local_forward_bridge[bridge_key] = detach_pipeline_boundary(output_tensor)
             else:
-                defer_send('next', output_tensor, node)
+                save_for_send(output_tensor, node)
         else:
             if pipeline_parallel_rank != 0:
-                defer_send('prev', output_tensor, node)
+                save_for_send(output_tensor, node)
         if node.chunk == 1 and mb.num_slices_to_forward == 0:
             trace("loss-begin", node=node)
             forward_data_store.append(mb.compute_loss(loss_div))
@@ -1733,15 +1673,13 @@ def pipelining_with_variable_slicing_slice_v(*,
         bridge_key = (node.microbatch, node.split)
         trace("backward-begin", node=node)
         if node.chunk == 1:
-            recv_direction = None if pipeline_parallel_rank == 0 else 'prev'
-            output_tensor_grad = communicate(recv_direction, node)
+            output_tensor_grad = None if pipeline_parallel_rank == 0 else receive(node)
         else:
             if pipeline_parallel_rank == pipeline_parallel_size - 1:
-                communicate(None, node)
                 trace("backward-local-bridge-pop", node=node, key=bridge_key)
                 output_tensor_grad = local_backward_bridge.pop(bridge_key)
             else:
-                output_tensor_grad = communicate('next', node)
+                output_tensor_grad = receive(node)
         mb = microbatches[(node.microbatch, node.chunk)]
         trace("backward-compute-begin", node=node)
         input_tensor_grad = mb.backward_b(output_tensor_grad, chunk=node.chunk)
@@ -1751,20 +1689,25 @@ def pipelining_with_variable_slicing_slice_v(*,
                 trace("backward-local-bridge-push", node=node, key=bridge_key)
                 local_backward_bridge[bridge_key] = input_tensor_grad
             else:
-                defer_send('next', input_tensor_grad, node)
+                save_for_send(input_tensor_grad, node)
         else:
             if pipeline_parallel_rank != 0:
-                defer_send('prev', input_tensor_grad, node)
+                save_for_send(input_tensor_grad, node)
         trace("backward-end", node=node)
 
     def run_weight(node):
         parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
-        communicate(None, node)
         trace("weight-begin", node=node)
         microbatches[(node.microbatch, node.chunk)].weight_grad(chunk=node.chunk)
         trace("weight-end", node=node)
 
-    for node in schedule:
+    for action in execution_plan:
+        if action.kind == 'communication':
+            run_communication(action)
+            continue
+        node = action.node
+        if node.stage != pipeline_parallel_rank:
+            continue
         cuda_sync_and_record(sync_level=1)
         if node.kind == 'F':
             run_forward(node)
@@ -1775,9 +1718,10 @@ def pipelining_with_variable_slicing_slice_v(*,
         else:
             raise RuntimeError(f"unknown SliceV schedule event: {node}")
 
-    communicate(None)
-    for send_reqs, _send_tensor, send_node in outstanding_sends:
-        wait_reqs(send_reqs, action="p2p-send-final-wait", node=send_node)
+    assert not outgoing_tensors, \
+        f"Unsent SliceV tensors: {list(outgoing_tensors.keys())[:8]}"
+    assert not incoming_tensors, \
+        f"Unconsumed SliceV tensors: {list(incoming_tensors.keys())[:8]}"
     assert not local_forward_bridge, \
         f"Unconsumed local forward bridge tensors: {list(local_forward_bridge.keys())[:8]}"
     assert not local_backward_bridge, \
