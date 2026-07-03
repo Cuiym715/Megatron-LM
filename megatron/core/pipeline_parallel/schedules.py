@@ -1545,7 +1545,8 @@ def pipelining_with_variable_slicing_slice_v(*,
             f"phase_repeats={plan.phase_repeats[pipeline_parallel_rank]}",
             flush=True,
         )
-        for node in schedule[:variable_seq_debug_limit * 12]:
+        # DEBUG for variable length training.
+        for node in schedule:
             # DEBUG for variable length training.
             print(
                 "[variable-seq][slice-v-event] "
@@ -1640,7 +1641,6 @@ def pipelining_with_variable_slicing_slice_v(*,
     def run_forward(node):
         parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
         bridge_key = (node.microbatch, node.split)
-        trace("forward-begin", node=node)
         if node.chunk == 0:
             input_tensor = None if pipeline_parallel_rank == 0 else receive(node)
         else:
@@ -1666,12 +1666,10 @@ def pipelining_with_variable_slicing_slice_v(*,
             trace("loss-begin", node=node)
             forward_data_store.append(mb.compute_loss(loss_div))
             trace("loss-end", node=node)
-        trace("forward-end", node=node)
 
     def run_backward(node):
         parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
         bridge_key = (node.microbatch, node.split)
-        trace("backward-begin", node=node)
         if node.chunk == 1:
             output_tensor_grad = None if pipeline_parallel_rank == 0 else receive(node)
         else:
@@ -1693,7 +1691,6 @@ def pipelining_with_variable_slicing_slice_v(*,
         else:
             if pipeline_parallel_rank != 0:
                 save_for_send(input_tensor_grad, node)
-        trace("backward-end", node=node)
 
     def run_weight(node):
         parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
