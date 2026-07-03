@@ -1552,7 +1552,8 @@ def pipelining_with_variable_slicing_slice_v(*,
                 "[variable-seq][slice-v-event] "
                 f"rank={pipeline_parallel_rank}, kind={node.kind}{node.chunk}, "
                 f"microbatch={node.microbatch}, split={node.split}, "
-                f"phase={node.phase}, slot={node.slot}",
+                f"phase={node.phase}, local_slot={node.slot}, "
+                f"start_slot={node.start_time}",
                 flush=True,
             )
 
@@ -1565,7 +1566,8 @@ def pipelining_with_variable_slicing_slice_v(*,
     def node_desc(node):
         return (
             f"kind={node.kind}{node.chunk}, mb={node.microbatch}, "
-            f"split={node.split}, slot={node.slot}"
+            f"split={node.split}, local_slot={node.slot}, "
+            f"start_slot={node.start_time}"
         )
 
     def trace(action, node=None, peer=None, key=None):

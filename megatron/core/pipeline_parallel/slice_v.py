@@ -98,8 +98,8 @@ def _build_stage_schedule(stage: int,
             chunk=chunk,
             phase=phase,
             slot=slot,
-            start_time=slot,
-            completion_time=slot + 1,
+            start_time=slot + stage,
+            completion_time=slot + stage + 1,
         ))
 
     def emit_compute(kind: str, chunk: int, phase: int) -> TaskId:
@@ -272,7 +272,7 @@ def build_slice_v_execution_plan(
         previous = None
         for index, node in enumerate(schedule):
             key = ('compute', stage, index)
-            add_node(key, (node.slot * 2, stage, index))
+            add_node(key, (node.start_time * 2, stage, index))
             compute_nodes[key] = node
             positions[(stage, node.kind, node.chunk,
                        node.microbatch, node.split)] = key
@@ -287,7 +287,7 @@ def build_slice_v_execution_plan(
         consumer = positions[(receiver, *message)]
         key = ('message', sender, receiver, *message)
         producer_node = compute_nodes[producer]
-        add_node(key, (producer_node.slot * 2 + 1, sender, receiver,
+        add_node(key, (producer_node.start_time * 2 + 1, sender, receiver,
                        kind, chunk, microbatch, split))
         message_nodes[key] = (sender, receiver, message)
         add_edge(producer, key)
