@@ -1562,6 +1562,7 @@ def pipelining_with_variable_slicing_slice_v(*,
     trace_slice_v = variable_seq_debug_limit > 0
     outgoing_tensors = {}
     incoming_tensors = {}
+    pending_sends = {}
 
     def node_desc(node):
         return (
@@ -1598,9 +1599,13 @@ def pipelining_with_variable_slicing_slice_v(*,
     def receive(node):
         key = comm_key(node)
         try:
-            return incoming_tensors.pop(key)
+            tensor, request, peer = incoming_tensors.pop(key)
         except KeyError as exc:
-            raise RuntimeError(f"missing completed SliceV communication {key}") from exc
+            raise RuntimeError(f"missing submitted SliceV communication {key}") from exc
+        trace("p2p-recv-wait-begin", node=node, peer=peer, key=key)
+        request.wait()
+        trace("p2p-recv-wait-end", node=node, peer=peer, key=key)
+        return tensor
 
     def save_for_send(tensor, node):
         key = comm_key(node)
@@ -1617,6 +1622,12 @@ def pipelining_with_variable_slicing_slice_v(*,
                       else action.sender)
         peer = parallel_state.get_pipeline_model_parallel_global_rank(peer_stage)
         if pipeline_parallel_rank == action.sender:
+            previous_send = pending_sends.pop(peer, None)
+            if previous_send is not None:
+                previous_request, _previous_tensor, previous_key = previous_send
+                trace("p2p-send-wait-begin", peer=peer, key=previous_key)
+                previous_request.wait()
+                trace("p2p-send-wait-end", peer=peer, key=previous_key)
             try:
                 tensor = outgoing_tensors.pop(key)
             except KeyError as exc:
@@ -1628,14 +1639,11 @@ def pipelining_with_variable_slicing_slice_v(*,
             op = dist.P2POp(dist.irecv, tensor, peer, group=pipeline_group)
             trace("p2p-recv", peer=peer, key=key)
         requests = dist.batch_isend_irecv([op])
-        for request in requests:
-            request.wait()
-        # ProcessGroupNCCL Work.wait() only establishes CUDA stream ordering
-        # in the default nonblocking mode. SliceV communication actions are
-        # completion boundaries, so wait for that stream dependency here.
-        torch.cuda.current_stream().synchronize()
-        if pipeline_parallel_rank == action.receiver:
-            incoming_tensors[key] = tensor
+        request = requests[0]
+        if pipeline_parallel_rank == action.sender:
+            pending_sends[peer] = (request, tensor, key)
+        else:
+            incoming_tensors[key] = (tensor, request, peer)
 
     def detach_pipeline_boundary(tensor):
         if tensor is None:
@@ -1721,6 +1729,10 @@ def pipelining_with_variable_slicing_slice_v(*,
         f"Unsent SliceV tensors: {list(outgoing_tensors.keys())[:8]}"
     assert not incoming_tensors, \
         f"Unconsumed SliceV tensors: {list(incoming_tensors.keys())[:8]}"
+    for peer, (request, _tensor, key) in pending_sends.items():
+        trace("p2p-send-final-wait-begin", peer=peer, key=key)
+        request.wait()
+        trace("p2p-send-final-wait-end", peer=peer, key=key)
     assert not local_forward_bridge, \
         f"Unconsumed local forward bridge tensors: {list(local_forward_bridge.keys())[:8]}"
     assert not local_backward_bridge, \
