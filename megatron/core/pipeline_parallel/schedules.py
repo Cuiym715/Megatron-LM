@@ -1628,6 +1628,10 @@ def pipelining_with_variable_slicing_slice_v(*,
         requests = dist.batch_isend_irecv([op])
         for request in requests:
             request.wait()
+        # ProcessGroupNCCL Work.wait() only establishes CUDA stream ordering
+        # in the default nonblocking mode. SliceV communication actions are
+        # completion boundaries, so wait for that stream dependency here.
+        torch.cuda.current_stream().synchronize()
         if pipeline_parallel_rank == action.receiver:
             incoming_tensors[key] = tensor
 
@@ -1645,7 +1649,6 @@ def pipelining_with_variable_slicing_slice_v(*,
             input_tensor = None if pipeline_parallel_rank == 0 else receive(node)
         else:
             if pipeline_parallel_rank == pipeline_parallel_size - 1:
-                trace("forward-local-bridge-pop", node=node, key=bridge_key)
                 input_tensor = local_forward_bridge.pop(bridge_key)
             else:
                 input_tensor = receive(node)
@@ -1655,7 +1658,6 @@ def pipelining_with_variable_slicing_slice_v(*,
         trace("forward-compute-end", node=node)
         if node.chunk == 0:
             if pipeline_parallel_rank == pipeline_parallel_size - 1:
-                trace("forward-local-bridge-push", node=node, key=bridge_key)
                 local_forward_bridge[bridge_key] = detach_pipeline_boundary(output_tensor)
             else:
                 save_for_send(output_tensor, node)
@@ -1674,7 +1676,6 @@ def pipelining_with_variable_slicing_slice_v(*,
             output_tensor_grad = None if pipeline_parallel_rank == 0 else receive(node)
         else:
             if pipeline_parallel_rank == pipeline_parallel_size - 1:
-                trace("backward-local-bridge-pop", node=node, key=bridge_key)
                 output_tensor_grad = local_backward_bridge.pop(bridge_key)
             else:
                 output_tensor_grad = receive(node)
@@ -1684,7 +1685,6 @@ def pipelining_with_variable_slicing_slice_v(*,
         trace("backward-compute-end", node=node)
         if node.chunk == 1:
             if pipeline_parallel_rank == pipeline_parallel_size - 1:
-                trace("backward-local-bridge-push", node=node, key=bridge_key)
                 local_backward_bridge[bridge_key] = input_tensor_grad
             else:
                 save_for_send(input_tensor_grad, node)
