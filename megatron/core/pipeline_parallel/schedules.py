@@ -1656,8 +1656,9 @@ def pipelining_with_variable_slicing_slice_v(*,
             requests.append(request)
             if trace_slice_v:
                 request.wait()
+                trace("p2p-wait-returned", peer=peer, key=key)
                 torch.cuda.current_stream().synchronize()
-                trace("p2p-complete", peer=peer, key=key)
+                trace("p2p-local-complete", peer=peer, key=key)
         for (_operation, transfer, key, tensor), request in zip(transfers, requests):
             if transfer == 'send':
                 pending_sends[peer] = (request, tensor, key)
