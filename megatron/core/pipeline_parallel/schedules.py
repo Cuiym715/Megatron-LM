@@ -1619,7 +1619,6 @@ def pipelining_with_variable_slicing_slice_v(*,
                 previous_request, _previous_tensor, _previous_key = previous_send
                 previous_request.wait()
 
-        ops = []
         transfers = []
         for action in actions:
             key = action.message
@@ -1628,21 +1627,38 @@ def pipelining_with_variable_slicing_slice_v(*,
                     tensor = outgoing_tensors.pop(key)
                 except KeyError as exc:
                     raise RuntimeError(f"SliceV send tensor {key} is not ready") from exc
-                op = dist.P2POp(dist.isend, tensor, peer, group=pipeline_group)
-                trace("p2p-send-begin", peer=peer, key=key)
-                transfers.append(('send', key, tensor))
+                operation = 'send_next' if peer_stage > pipeline_parallel_rank else 'send_prev'
+                transfers.append((operation, 'send', key, tensor))
             else:
                 tensor = allocate_recv_tensor()
-                op = dist.P2POp(dist.irecv, tensor, peer, group=pipeline_group)
-                trace("p2p-recv-begin", peer=peer, key=key)
-                transfers.append(('recv', key, tensor))
-            ops.append(op)
-        requests = dist.batch_isend_irecv(ops)
+                operation = 'recv_prev' if peer_stage < pipeline_parallel_rank else 'recv_next'
+                transfers.append((operation, 'recv', key, tensor))
+
+        if pipeline_parallel_rank % 2 == 0:
+            operation_order = {
+                'send_next': 0, 'recv_prev': 1,
+                'send_prev': 2, 'recv_next': 3,
+            }
+        else:
+            operation_order = {
+                'recv_prev': 0, 'send_next': 1,
+                'recv_next': 2, 'send_prev': 3,
+            }
+        transfers.sort(key=lambda transfer: operation_order[transfer[0]])
+
+        requests = []
+        for _operation, transfer, key, tensor in transfers:
+            trace(f"p2p-{transfer}-begin", peer=peer, key=key)
+            if transfer == 'send':
+                request = dist.isend(tensor, peer, group=pipeline_group)
+            else:
+                request = dist.irecv(tensor, peer, group=pipeline_group)
+            requests.append(request)
         if trace_slice_v:
             for request in requests:
                 request.wait()
             torch.cuda.current_stream().synchronize()
-        for (transfer, key, tensor), request in zip(transfers, requests):
+        for (_operation, transfer, key, tensor), request in zip(transfers, requests):
             if trace_slice_v:
                 trace("p2p-complete", peer=peer, key=key)
             if transfer == 'send':
