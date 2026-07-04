@@ -1545,18 +1545,6 @@ def pipelining_with_variable_slicing_slice_v(*,
             f"phase_repeats={plan.phase_repeats[pipeline_parallel_rank]}",
             flush=True,
         )
-        # DEBUG for variable length training.
-        for node in schedule:
-            # DEBUG for variable length training.
-            print(
-                "[variable-seq][slice-v-event] "
-                f"rank={pipeline_parallel_rank}, kind={node.kind}{node.chunk}, "
-                f"microbatch={node.microbatch}, split={node.split}, "
-                f"phase={node.phase}, local_slot={node.slot}, "
-                f"start_slot={node.start_time}",
-                flush=True,
-            )
-
     local_forward_bridge: Dict[Tuple[int, int], torch.Tensor] = {}
     local_backward_bridge: Dict[Tuple[int, int], torch.Tensor] = {}
     trace_slice_v = variable_seq_debug_limit > 0
@@ -1602,9 +1590,8 @@ def pipelining_with_variable_slicing_slice_v(*,
             tensor, request, peer = incoming_tensors.pop(key)
         except KeyError as exc:
             raise RuntimeError(f"missing submitted SliceV communication {key}") from exc
-        trace("p2p-recv-wait-begin", node=node, peer=peer, key=key)
-        request.wait()
-        trace("p2p-recv-wait-end", node=node, peer=peer, key=key)
+        if not trace_slice_v:
+            request.wait()
         return tensor
 
     def save_for_send(tensor, node):
@@ -1623,21 +1610,19 @@ def pipelining_with_variable_slicing_slice_v(*,
         peer = parallel_state.get_pipeline_model_parallel_global_rank(peer_stage)
         if pipeline_parallel_rank == action.sender:
             previous_send = pending_sends.pop(peer, None)
-            if previous_send is not None:
+            if previous_send is not None and not trace_slice_v:
                 previous_request, _previous_tensor, previous_key = previous_send
-                trace("p2p-send-wait-begin", peer=peer, key=previous_key)
                 previous_request.wait()
-                trace("p2p-send-wait-end", peer=peer, key=previous_key)
             try:
                 tensor = outgoing_tensors.pop(key)
             except KeyError as exc:
                 raise RuntimeError(f"SliceV send tensor {key} is not ready") from exc
             op = dist.P2POp(dist.isend, tensor, peer, group=pipeline_group)
-            trace("p2p-send", peer=peer, key=key)
+            trace("p2p-send-begin", peer=peer, key=key)
         else:
             tensor = allocate_recv_tensor()
             op = dist.P2POp(dist.irecv, tensor, peer, group=pipeline_group)
-            trace("p2p-recv", peer=peer, key=key)
+            trace("p2p-recv-begin", peer=peer, key=key)
         requests = dist.batch_isend_irecv([op])
         request = requests[0]
         if trace_slice_v:
@@ -1734,9 +1719,8 @@ def pipelining_with_variable_slicing_slice_v(*,
     assert not incoming_tensors, \
         f"Unconsumed SliceV tensors: {list(incoming_tensors.keys())[:8]}"
     for peer, (request, _tensor, key) in pending_sends.items():
-        trace("p2p-send-final-wait-begin", peer=peer, key=key)
-        request.wait()
-        trace("p2p-send-final-wait-end", peer=peer, key=key)
+        if not trace_slice_v:
+            request.wait()
     assert not local_forward_bridge, \
         f"Unconsumed local forward bridge tensors: {list(local_forward_bridge.keys())[:8]}"
     assert not local_backward_bridge, \
