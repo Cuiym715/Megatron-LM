@@ -1648,7 +1648,12 @@ def pipelining_with_variable_slicing_slice_v(*,
 
         requests = []
         for _operation, transfer, key, tensor in transfers:
-            trace(f"p2p-{transfer}-begin", peer=peer, key=key)
+            trace(f"p2p-{transfer}-begin", peer=peer, key={
+                'task': key,
+                'shape': tuple(tensor.shape),
+                'dtype': str(tensor.dtype),
+                'contiguous': tensor.is_contiguous(),
+            })
             if transfer == 'send':
                 request = dist.isend(tensor, peer, group=pipeline_group)
             else:
