@@ -758,7 +758,12 @@ def train_step(forward_step_func, get_batch_func, data_iterator,
     if args.empty_unused_memory_level >= 2:
         torch.cuda.empty_cache()
 
-    if mpu.is_pipeline_last_stage(ignore_virtual=True):
+    is_loss_stage = (
+        mpu.get_pipeline_model_parallel_rank() == 0
+        if args.variable_seq_schedule == 'slice-v'
+        else mpu.is_pipeline_last_stage(ignore_virtual=True)
+    )
+    if is_loss_stage:
         # Average loss across microbatches.
         loss_reduced = {}
         for key in losses_reduced[0]:
@@ -1159,7 +1164,12 @@ def evaluate(forward_step_func,
             if args.empty_unused_memory_level >= 1:
                 torch.cuda.empty_cache()
 
-            if mpu.is_pipeline_last_stage(ignore_virtual=True):
+            is_loss_stage = (
+                mpu.get_pipeline_model_parallel_rank() == 0
+                if args.variable_seq_schedule == 'slice-v'
+                else mpu.is_pipeline_last_stage(ignore_virtual=True)
+            )
+            if is_loss_stage:
                 # Reduce across processes.
                 for loss_dict in loss_dicts:
                     for key in loss_dict:
