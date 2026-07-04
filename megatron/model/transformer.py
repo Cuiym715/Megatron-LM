@@ -1843,6 +1843,15 @@ class ParallelTransformer(MegatronModule):
             offset = mpu.get_virtual_pipeline_model_parallel_rank() * (
                 num_layers_including_padding_layers // args.virtual_pipeline_model_parallel_size) + \
                 (transformer_pipeline_model_parallel_rank * self.num_layers)
+            if args.variable_seq_schedule == 'slice-v':
+                assert args.virtual_pipeline_model_parallel_size == 2
+                assert not args.standalone_embedding_stage
+                if mpu.get_virtual_pipeline_model_parallel_rank() == 0:
+                    offset = mpu.get_pipeline_model_parallel_rank() * self.num_layers
+                else:
+                    offset = num_layers_including_padding_layers - (
+                        (mpu.get_pipeline_model_parallel_rank() + 1) * self.num_layers
+                    )
         else:
             # Each stage gets a contiguous set of layers.
             if args.model_type == ModelType.encoder_and_decoder and \

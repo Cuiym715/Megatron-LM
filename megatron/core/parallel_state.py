@@ -355,9 +355,14 @@ def initialize_model_parallel(
         # Setup embedding group (to exchange gradients between
         # first and last stages).
         if len(ranks) > 1:
-            embedding_ranks = [ranks[0], ranks[-1]]
+            from megatron import get_args
+            is_slice_v = getattr(get_args(), 'variable_seq_schedule', '1f1b') == 'slice-v'
+            if is_slice_v:
+                embedding_ranks = [ranks[0]]
+            else:
+                embedding_ranks = [ranks[0], ranks[-1]]
             position_embedding_ranks = [ranks[0]]
-            if pipeline_model_parallel_split_rank is not None:
+            if pipeline_model_parallel_split_rank is not None and not is_slice_v:
                 if ranks[pipeline_model_parallel_split_rank] not in embedding_ranks:
                     embedding_ranks = [ranks[0],
                                        ranks[pipeline_model_parallel_split_rank],
@@ -745,6 +750,12 @@ def is_pipeline_last_stage(ignore_virtual=False):
     if not ignore_virtual:
         virtual_pipeline_model_parallel_world_size = \
             get_virtual_pipeline_model_parallel_world_size()
+        if virtual_pipeline_model_parallel_world_size is not None:
+            from megatron import get_args
+            if getattr(get_args(), 'variable_seq_schedule', '1f1b') == 'slice-v':
+                assert virtual_pipeline_model_parallel_world_size == 2
+                return get_pipeline_model_parallel_rank() == 0 and \
+                    get_virtual_pipeline_model_parallel_rank() == 1
         if virtual_pipeline_model_parallel_world_size is not None and \
             get_virtual_pipeline_model_parallel_rank() != (
                 virtual_pipeline_model_parallel_world_size - 1):
@@ -759,6 +770,12 @@ def is_rank_in_embedding_group(ignore_virtual=False):
     global _EMBEDDING_GLOBAL_RANKS
     if ignore_virtual:
         return rank in _EMBEDDING_GLOBAL_RANKS
+    from megatron import get_args
+    if getattr(get_args(), 'variable_seq_schedule', '1f1b') == 'slice-v':
+        return rank in _EMBEDDING_GLOBAL_RANKS and (
+            is_pipeline_first_stage(ignore_virtual=False)
+            or is_pipeline_last_stage(ignore_virtual=False)
+        )
     if rank in _EMBEDDING_GLOBAL_RANKS:
         if rank == _EMBEDDING_GLOBAL_RANKS[0]:
             return is_pipeline_first_stage(ignore_virtual=False)
