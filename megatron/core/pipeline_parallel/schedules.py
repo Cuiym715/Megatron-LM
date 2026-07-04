@@ -1654,13 +1654,11 @@ def pipelining_with_variable_slicing_slice_v(*,
             else:
                 request = dist.irecv(tensor, peer, group=pipeline_group)
             requests.append(request)
-        if trace_slice_v:
-            for request in requests:
-                request.wait()
-            torch.cuda.current_stream().synchronize()
-        for (_operation, transfer, key, tensor), request in zip(transfers, requests):
             if trace_slice_v:
+                request.wait()
+                torch.cuda.current_stream().synchronize()
                 trace("p2p-complete", peer=peer, key=key)
+        for (_operation, transfer, key, tensor), request in zip(transfers, requests):
             if transfer == 'send':
                 pending_sends[peer] = (request, tensor, key)
             else:
