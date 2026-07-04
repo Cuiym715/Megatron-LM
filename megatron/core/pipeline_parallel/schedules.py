@@ -1600,39 +1600,55 @@ def pipelining_with_variable_slicing_slice_v(*,
             raise RuntimeError(f"duplicate SliceV outgoing tensor {key}")
         outgoing_tensors[key] = tensor
 
-    def run_communication(action):
-        key = action.message
-        if pipeline_parallel_rank not in (action.sender, action.receiver):
+    def run_communication(actions):
+        first_action = actions[0]
+        if pipeline_parallel_rank not in (
+                first_action.sender, first_action.receiver):
             return
-        peer_stage = (action.receiver
-                      if pipeline_parallel_rank == action.sender
-                      else action.sender)
+        peer_stage = (first_action.receiver
+                      if pipeline_parallel_rank == first_action.sender
+                      else first_action.sender)
         peer = parallel_state.get_pipeline_model_parallel_global_rank(peer_stage)
-        if pipeline_parallel_rank == action.sender:
+        if trace_slice_v:
+            # Keep p2p-complete specific to this transfer during synchronous
+            # debugging instead of including unfinished earlier computation.
+            torch.cuda.current_stream().synchronize()
+        if any(pipeline_parallel_rank == action.sender for action in actions):
             previous_send = pending_sends.pop(peer, None)
             if previous_send is not None and not trace_slice_v:
-                previous_request, _previous_tensor, previous_key = previous_send
+                previous_request, _previous_tensor, _previous_key = previous_send
                 previous_request.wait()
-            try:
-                tensor = outgoing_tensors.pop(key)
-            except KeyError as exc:
-                raise RuntimeError(f"SliceV send tensor {key} is not ready") from exc
-            op = dist.P2POp(dist.isend, tensor, peer, group=pipeline_group)
-            trace("p2p-send-begin", peer=peer, key=key)
-        else:
-            tensor = allocate_recv_tensor()
-            op = dist.P2POp(dist.irecv, tensor, peer, group=pipeline_group)
-            trace("p2p-recv-begin", peer=peer, key=key)
-        requests = dist.batch_isend_irecv([op])
-        request = requests[0]
+
+        ops = []
+        transfers = []
+        for action in actions:
+            key = action.message
+            if pipeline_parallel_rank == action.sender:
+                try:
+                    tensor = outgoing_tensors.pop(key)
+                except KeyError as exc:
+                    raise RuntimeError(f"SliceV send tensor {key} is not ready") from exc
+                op = dist.P2POp(dist.isend, tensor, peer, group=pipeline_group)
+                trace("p2p-send-begin", peer=peer, key=key)
+                transfers.append(('send', key, tensor))
+            else:
+                tensor = allocate_recv_tensor()
+                op = dist.P2POp(dist.irecv, tensor, peer, group=pipeline_group)
+                trace("p2p-recv-begin", peer=peer, key=key)
+                transfers.append(('recv', key, tensor))
+            ops.append(op)
+        requests = dist.batch_isend_irecv(ops)
         if trace_slice_v:
-            request.wait()
+            for request in requests:
+                request.wait()
             torch.cuda.current_stream().synchronize()
-            trace("p2p-complete", peer=peer, key=key)
-        if pipeline_parallel_rank == action.sender:
-            pending_sends[peer] = (request, tensor, key)
-        else:
-            incoming_tensors[key] = (tensor, request, peer)
+        for (transfer, key, tensor), request in zip(transfers, requests):
+            if trace_slice_v:
+                trace("p2p-complete", peer=peer, key=key)
+            if transfer == 'send':
+                pending_sends[peer] = (request, tensor, key)
+            else:
+                incoming_tensors[key] = (tensor, request, peer)
 
     def detach_pipeline_boundary(tensor):
         if tensor is None:
@@ -1697,12 +1713,26 @@ def pipelining_with_variable_slicing_slice_v(*,
         microbatches[(node.microbatch, node.chunk)].weight_grad(chunk=node.chunk)
         trace("weight-end", node=node)
 
-    for action in execution_plan:
+    action_index = 0
+    while action_index < len(execution_plan):
+        action = execution_plan[action_index]
         if action.kind == 'communication':
-            run_communication(action)
+            communication_actions = [action]
+            if action_index + 1 < len(execution_plan):
+                next_action = execution_plan[action_index + 1]
+                if (
+                    next_action.kind == 'communication'
+                    and action.sender == next_action.receiver
+                    and action.receiver == next_action.sender
+                ):
+                    communication_actions.append(next_action)
+                    action_index += 1
+            run_communication(communication_actions)
+            action_index += 1
             continue
         node = action.node
         if node.stage != pipeline_parallel_rank:
+            action_index += 1
             continue
         cuda_sync_and_record(sync_level=1)
         if node.kind == 'F':
@@ -1713,6 +1743,7 @@ def pipelining_with_variable_slicing_slice_v(*,
             run_weight(node)
         else:
             raise RuntimeError(f"unknown SliceV schedule event: {node}")
+        action_index += 1
 
     assert not outgoing_tensors, \
         f"Unsent SliceV tensors: {list(outgoing_tensors.keys())[:8]}"
