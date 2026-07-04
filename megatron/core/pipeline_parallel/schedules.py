@@ -1640,6 +1640,10 @@ def pipelining_with_variable_slicing_slice_v(*,
             trace("p2p-recv", peer=peer, key=key)
         requests = dist.batch_isend_irecv([op])
         request = requests[0]
+        if trace_slice_v:
+            request.wait()
+            torch.cuda.current_stream().synchronize()
+            trace("p2p-complete", peer=peer, key=key)
         if pipeline_parallel_rank == action.sender:
             pending_sends[peer] = (request, tensor, key)
         else:
