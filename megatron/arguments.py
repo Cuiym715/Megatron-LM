@@ -162,13 +162,26 @@ def validate_args(args, defaults={}):
             'pipeline-model-parallel size should be greater than or equal to 2 with ' \
             'interleaved schedule'
         num_layers_including_padding_layers = args.kaimm_num_layers_padding_front + args.num_layers + args.kaimm_num_layers_padding_back
-        assert num_layers_including_padding_layers % (args.transformer_pipeline_model_parallel_size * args.num_layers_per_virtual_pipeline_stage) == 0, \
-            f'num_layers_including_padding_layers ({num_layers_including_padding_layers}) is not divisible ' \
-            f'by transformer_pipeline_model_parallel_size ({args.transformer_pipeline_model_parallel_size}) ' \
-            f'times num_layers_per_virtual_pipeline_stage ({args.num_layers_per_virtual_pipeline_stage})'
-        args.virtual_pipeline_model_parallel_size = \
-            (num_layers_including_padding_layers // args.transformer_pipeline_model_parallel_size) // \
-            args.num_layers_per_virtual_pipeline_stage
+        if args.variable_seq_slicing and args.variable_seq_schedule == 'slice-v':
+            assert args.kaimm_num_layers_padding_front == 0 and \
+                args.kaimm_num_layers_padding_back == 0, \
+                'slice-v uneven layer allocation does not support padding layers'
+            logical_stages = 2 * args.transformer_pipeline_model_parallel_size
+            assert (args.num_layers + 1) % logical_stages == 0, \
+                f'slice-v requires num_layers + 1 ({args.num_layers + 1}) to be ' \
+                f'divisible by 2 * pipeline size ({logical_stages})'
+            expected_layers = (args.num_layers + 1) // logical_stages
+            assert args.num_layers_per_virtual_pipeline_stage == expected_layers, \
+                f'slice-v requires num_layers_per_virtual_pipeline_stage={expected_layers}'
+            args.virtual_pipeline_model_parallel_size = 2
+        else:
+            assert num_layers_including_padding_layers % (args.transformer_pipeline_model_parallel_size * args.num_layers_per_virtual_pipeline_stage) == 0, \
+                f'num_layers_including_padding_layers ({num_layers_including_padding_layers}) is not divisible ' \
+                f'by transformer_pipeline_model_parallel_size ({args.transformer_pipeline_model_parallel_size}) ' \
+                f'times num_layers_per_virtual_pipeline_stage ({args.num_layers_per_virtual_pipeline_stage})'
+            args.virtual_pipeline_model_parallel_size = \
+                (num_layers_including_padding_layers // args.transformer_pipeline_model_parallel_size) // \
+                args.num_layers_per_virtual_pipeline_stage
         assert args.virtual_pipeline_model_parallel_size >= 2 or args.micro_seq_length > 0, \
             'vpp should be greater than or equal to 2 with interleaved schedule'
     else:

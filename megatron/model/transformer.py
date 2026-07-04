@@ -1642,6 +1642,11 @@ def _get_num_layers(args, model_type, is_decoder=False):
         else:
             assert args.num_layers == args.encoder_num_layers
             num_layers_including_padding_layers = args.kaimm_num_layers_padding_front + args.num_layers + args.kaimm_num_layers_padding_back
+            if args.variable_seq_schedule == 'slice-v':
+                logical_stages = 2 * args.transformer_pipeline_model_parallel_size
+                assert (args.num_layers + 1) % logical_stages == 0
+                num_layers = 2 * ((args.num_layers + 1) // logical_stages)
+                return num_layers
             assert num_layers_including_padding_layers % (args.transformer_pipeline_model_parallel_size * (args.virtual_pipeline_model_parallel_size or 1)) == 0, \
                 f'num_layers_including_padding_layers ({num_layers_including_padding_layers}) must be ' \
                 f'divisible by transformer_pipeline_model_parallel_size ({args.transformer_pipeline_model_parallel_size}) ' \
@@ -1825,13 +1830,31 @@ class ParallelTransformer(MegatronModule):
         )
         if args.virtual_pipeline_model_parallel_size is not None:
             num_layers_including_padding_layers = args.kaimm_num_layers_padding_front + args.num_layers + args.kaimm_num_layers_padding_back
-            assert num_layers_including_padding_layers % args.virtual_pipeline_model_parallel_size == 0, \
-                'num_layers_per_stage must be divisible by ' \
-                'virtual_pipeline_model_parallel_size'
             assert args.model_type != ModelType.encoder_and_decoder
-            # Number of layers in each model chunk is the number of layers in the stage,
-            # divided by the number of model chunks in a stage.
-            self.num_layers = self.num_layers // args.virtual_pipeline_model_parallel_size
+            if args.variable_seq_schedule == 'slice-v':
+                assert args.virtual_pipeline_model_parallel_size == 2
+                assert not args.standalone_embedding_stage
+                layers_per_logical_stage = (args.num_layers + 1) // (
+                    2 * mpu.get_pipeline_model_parallel_world_size()
+                )
+                self.num_layers = layers_per_logical_stage
+                if mpu.get_virtual_pipeline_model_parallel_rank() == 0:
+                    offset = mpu.get_pipeline_model_parallel_rank() * self.num_layers
+                else:
+                    offset = (
+                        2 * mpu.get_pipeline_model_parallel_world_size()
+                        - mpu.get_pipeline_model_parallel_rank() - 1
+                    ) * self.num_layers
+            else:
+                assert num_layers_including_padding_layers % args.virtual_pipeline_model_parallel_size == 0, \
+                    'num_layers_per_stage must be divisible by ' \
+                    'virtual_pipeline_model_parallel_size'
+                # Number of layers in each model chunk is the number of layers in the stage,
+                # divided by the number of model chunks in a stage.
+                self.num_layers = self.num_layers // args.virtual_pipeline_model_parallel_size
+                offset = mpu.get_virtual_pipeline_model_parallel_rank() * (
+                    num_layers_including_padding_layers // args.virtual_pipeline_model_parallel_size) + \
+                    (transformer_pipeline_model_parallel_rank * self.num_layers)
             # With 8 layers, 2 stages, and 4 model chunks, we want an assignment of
             # layers to stages like (each list is a model chunk):
             # Stage 0: [0]  [2]  [4]  [6]
@@ -1840,18 +1863,6 @@ class ParallelTransformer(MegatronModule):
             # layers to stages like (each list is a model chunk):
             # Stage 0: [0, 1]  [4, 5]
             # Stage 1: [2, 3]  [6, 7]
-            offset = mpu.get_virtual_pipeline_model_parallel_rank() * (
-                num_layers_including_padding_layers // args.virtual_pipeline_model_parallel_size) + \
-                (transformer_pipeline_model_parallel_rank * self.num_layers)
-            if args.variable_seq_schedule == 'slice-v':
-                assert args.virtual_pipeline_model_parallel_size == 2
-                assert not args.standalone_embedding_stage
-                if mpu.get_virtual_pipeline_model_parallel_rank() == 0:
-                    offset = mpu.get_pipeline_model_parallel_rank() * self.num_layers
-                else:
-                    offset = num_layers_including_padding_layers - (
-                        (mpu.get_pipeline_model_parallel_rank() + 1) * self.num_layers
-                    )
         else:
             # Each stage gets a contiguous set of layers.
             if args.model_type == ModelType.encoder_and_decoder and \

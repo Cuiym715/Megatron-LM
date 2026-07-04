@@ -28,7 +28,7 @@ MICRO_SEQ_LENGTH=4096
 GLOBAL_BATCH_SIZE=4
 VARLEN_SCHEDULE=slice-v
 PP_SIZE=3
-NUM_LAYERS=6
+NUM_LAYERS=8
 
 export CUDA_DEVICE_MAX_CONNECTIONS=${CUDA_DEVICE_MAX_CONNECTIONS:-1}
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1,2}
@@ -70,14 +70,15 @@ if (( WORLD_SIZE % MODEL_PARALLEL_SIZE != 0 )); then
     exit 1
 fi
 
-DATA_PATH=${DATA_PATH:-/workspace/src/data/megatron/slimpajama_arxiv_50k_text_document}
-TOKENIZER_MODEL=${TOKENIZER_MODEL:-/workspace/src/tokenizers/Qwen2.5-7B}
-DATA_CACHE_PATH=${DATA_CACHE_PATH:-/workspace/src/data/cache_kwai_slimpipe_test}
+DATA_PATH=${DATA_PATH:-/workspace/src/data/megatron/slimpajama_arxiv_50k_mistral32k_text_document}
+TOKENIZER_MODEL=${TOKENIZER_MODEL:-/workspace/src/tokenizers/Mistral-7B-v0.1}
+DATA_CACHE_PATH=${DATA_CACHE_PATH:-/workspace/src/data/cache_kwai_slimpipe_test_mistral32k}
+PAD_TOKEN_ID=${PAD_TOKEN_ID:-0}
 
-NUM_LAYERS=${NUM_LAYERS:-4}
-HIDDEN_SIZE=${HIDDEN_SIZE:-512}
-FFN_HIDDEN_SIZE=${FFN_HIDDEN_SIZE:-2048}
-NUM_ATTENTION_HEADS=${NUM_ATTENTION_HEADS:-8}
+NUM_LAYERS=${NUM_LAYERS:-17}
+HIDDEN_SIZE=${HIDDEN_SIZE:-1024}
+FFN_HIDDEN_SIZE=${FFN_HIDDEN_SIZE:-2816}
+NUM_ATTENTION_HEADS=${NUM_ATTENTION_HEADS:-16}
 
 SEQ_LENGTH=${SEQ_LENGTH:-8192}
 MICRO_SEQ_LENGTH=${MICRO_SEQ_LENGTH:-4096}
@@ -129,7 +130,16 @@ if (( NUM_SLICES < PP_SIZE )); then
 fi
 
 if [[ -n "$VIRTUAL_PP_LAYERS" ]]; then
-    if (( NUM_LAYERS % (PP_SIZE * VIRTUAL_PP_LAYERS) != 0 )); then
+    if [[ "$VARLEN" == "1" && "$VARLEN_SCHEDULE" == "slice-v" ]]; then
+        if (( (NUM_LAYERS + 1) % (2 * PP_SIZE) != 0 )); then
+            echo "SliceV requires NUM_LAYERS+1=$((NUM_LAYERS + 1)) to be divisible by 2*PP_SIZE=$((2 * PP_SIZE))."
+            exit 1
+        fi
+        if (( VIRTUAL_PP_LAYERS != (NUM_LAYERS + 1) / (2 * PP_SIZE) )); then
+            echo "VIRTUAL_PP_LAYERS=$VIRTUAL_PP_LAYERS must equal $(((NUM_LAYERS + 1) / (2 * PP_SIZE))) for SliceV."
+            exit 1
+        fi
+    elif (( NUM_LAYERS % (PP_SIZE * VIRTUAL_PP_LAYERS) != 0 )); then
         echo "NUM_LAYERS=$NUM_LAYERS must be divisible by PP_SIZE*VIRTUAL_PP_LAYERS=$((PP_SIZE * VIRTUAL_PP_LAYERS))."
         exit 1
     fi
