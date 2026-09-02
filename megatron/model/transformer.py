@@ -33,7 +33,12 @@ from megatron.core.tensor_parallel import (
     get_during_recomputing
 )
 from megatron.core.parallel_state import get_tensor_model_parallel_group, get_tensor_and_expert_parallel_group
-from megatron.core.kv_cache import cache_aware_attn_func, cp_qo_attn_func
+from megatron.core.kv_cache import (
+    DsppSequenceKVState,
+    cache_aware_attn_func,
+    cp_qo_attn_func,
+    dspp_packed_flash_attention,
+)
 from megatron.core.kv_cache.cache_utils import ChunkedTensor
 from megatron.profile_utils import annotate_forward_backward
 
@@ -938,6 +943,8 @@ class ParallelAttention(MegatronModule):
 
         cp_data_to_save = None
         if not self.use_flash_attn:
+            if isinstance(kv_cache, DsppSequenceKVState):
+                raise RuntimeError("DSPP packed sequence state requires FlashAttention")
             assert mpu.get_context_parallel_world_size() == 1, \
                 "core_attention does not support context parallel"
             key_layer, value_layer = kv_cache.update(self.layer_number, [key_layer, value_layer])
@@ -962,7 +969,17 @@ class ParallelAttention(MegatronModule):
             rng_ctx = nullcontext() if self.sequence_parallel else tensor_parallel.get_cuda_rng_tracker().fork()
             if mpu.get_context_parallel_world_size() < 2:
                 with rng_ctx:
-                    if kv_cache:
+                    if isinstance(kv_cache, DsppSequenceKVState):
+                        context_layer = dspp_packed_flash_attention(
+                            query_layer,
+                            key_layer,
+                            value_layer,
+                            state=kv_cache,
+                            meta=kv_cache.current_meta,
+                            layer_idx=self.layer_number,
+                            softmax_scale=self.core_attention_flash.softmax_scale,
+                        )
+                    elif kv_cache:
                         key_layer, value_layer = kv_cache.update(self.layer_number, [key_layer, value_layer])
                         context_layer = cache_aware_attn_func(query_layer, key_layer, value_layer, 0., None, True, kv_cache.ctx_pair)
                     else:
@@ -1603,7 +1620,8 @@ class NoopTransformerLayer(MegatronModule):
                 retriever_output=None,
                 retriever_attn_mask=None,
                 inference_params=None,
-                rotary_pos_emb=None):
+                rotary_pos_emb=None,
+                kv_cache=None):
         return hidden_states.clone()
 
 
@@ -1642,7 +1660,7 @@ def _get_num_layers(args, model_type, is_decoder=False):
         else:
             assert args.num_layers == args.encoder_num_layers
             num_layers_including_padding_layers = args.kaimm_num_layers_padding_front + args.num_layers + args.kaimm_num_layers_padding_back
-            if args.variable_seq_schedule == 'slice-v':
+            if args.variable_seq_schedule == 'slice-v' or getattr(args, 'dspp', False):
                 logical_stages = 2 * args.transformer_pipeline_model_parallel_size
                 assert (args.num_layers + 1) % logical_stages == 0
                 num_layers = 2 * ((args.num_layers + 1) // logical_stages)
@@ -1831,7 +1849,7 @@ class ParallelTransformer(MegatronModule):
         if args.virtual_pipeline_model_parallel_size is not None:
             num_layers_including_padding_layers = args.kaimm_num_layers_padding_front + args.num_layers + args.kaimm_num_layers_padding_back
             assert args.model_type != ModelType.encoder_and_decoder
-            if args.variable_seq_schedule == 'slice-v':
+            if args.variable_seq_schedule == 'slice-v' or getattr(args, 'dspp', False):
                 assert args.virtual_pipeline_model_parallel_size == 2
                 assert not args.standalone_embedding_stage
                 layers_per_logical_stage = (args.num_layers + 1) // (

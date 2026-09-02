@@ -219,6 +219,32 @@ class MegatronOptimizer(ABC):
         pipelined model parallelism (BERT and GPT-2).
         """
 
+        is_v_pipeline = (
+            getattr(args, 'dspp', False)
+            or getattr(args, 'variable_seq_schedule', '1f1b') == 'slice-v'
+        )
+        if is_v_pipeline and mpu.get_pipeline_model_parallel_rank() == 0:
+            first_model = unwrap_model(
+                self.models[0], (torchDDP, LocalDDP, Float16Module)
+            )
+            last_model = unwrap_model(
+                self.models[-1], (torchDDP, LocalDDP, Float16Module)
+            )
+            if first_model.share_word_embeddings and not first_model.vocab_in_pp:
+                first_weight = first_model.word_embeddings_weight()
+                last_weight = last_model.word_embeddings_weight()
+                first_grad = (
+                    first_weight.main_grad
+                    if args.DDP_impl == 'local' else first_weight.grad
+                )
+                last_grad = (
+                    last_weight.main_grad
+                    if args.DDP_impl == 'local' else last_weight.grad
+                )
+                first_grad.add_(last_grad)
+                last_grad.copy_(first_grad)
+            return
+
         if mpu.is_rank_in_embedding_group(ignore_virtual=True) and \
                 mpu.get_pipeline_model_parallel_world_size() > 1:
             if mpu.is_pipeline_first_stage(ignore_virtual=True):

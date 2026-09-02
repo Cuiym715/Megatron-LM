@@ -13,6 +13,10 @@ _TENSOR_MODEL_PARALLEL_GROUP = None
 # Inter-layer model parallel group that the current rank belongs to.
 _PIPELINE_MODEL_PARALLEL_GROUP = None
 _PIPELINE_MODEL_PARALLEL_GROUP_GLOO = None
+# DSPP uses two NCCL communicators per physical edge so traffic in one
+# direction cannot head-of-line block traffic in the other direction.
+_PIPELINE_MODEL_PARALLEL_NEXT_GROUP = None
+_PIPELINE_MODEL_PARALLEL_PREV_GROUP = None
 # Model parallel group (both intra- and pipeline) that the current rank belongs to.
 _MODEL_PARALLEL_GROUP = None
 # Network barrier group that the current rank belongs to. Used in --kaimm-overlap-optimizer-communication.
@@ -330,9 +334,13 @@ def initialize_model_parallel(
     # (first and last rank in each pipeline model-parallel group).
     global _PIPELINE_MODEL_PARALLEL_GROUP
     global _PIPELINE_MODEL_PARALLEL_GROUP_GLOO
+    global _PIPELINE_MODEL_PARALLEL_NEXT_GROUP
+    global _PIPELINE_MODEL_PARALLEL_PREV_GROUP
     global _PIPELINE_GLOBAL_RANKS
     assert _PIPELINE_MODEL_PARALLEL_GROUP is None, \
         'pipeline model parallel group is already initialized'
+    assert _PIPELINE_MODEL_PARALLEL_NEXT_GROUP is None
+    assert _PIPELINE_MODEL_PARALLEL_PREV_GROUP is None
     global _EMBEDDING_GROUP
     global _EMBEDDING_GLOBAL_RANKS
     assert _EMBEDDING_GROUP is None, 'embedding group is already initialized'
@@ -344,9 +352,42 @@ def initialize_model_parallel(
         ranks = range(i, world_size, num_pipeline_model_parallel_groups)
         group = torch.distributed.new_group(ranks)
         group_gloo = torch.distributed.new_group(ranks, backend="gloo")
+        from megatron import get_args
+        if getattr(get_args(), 'dspp', False):
+            edge_groups = []
+            for edge in range(len(ranks) - 1):
+                edge_ranks = [ranks[edge], ranks[edge + 1]]
+                next_group = torch.distributed.new_group(edge_ranks)
+                prev_group = torch.distributed.new_group(edge_ranks)
+                edge_groups.append((edge_ranks, next_group, prev_group))
         if rank in ranks:
             _PIPELINE_MODEL_PARALLEL_GROUP = group
             _PIPELINE_MODEL_PARALLEL_GROUP_GLOO = group_gloo
+            if getattr(get_args(), 'dspp', False):
+                _PIPELINE_MODEL_PARALLEL_NEXT_GROUP = {}
+                _PIPELINE_MODEL_PARALLEL_PREV_GROUP = {}
+                for edge, (edge_ranks, next_group, prev_group) in enumerate(edge_groups):
+                    if rank in edge_ranks:
+                        _PIPELINE_MODEL_PARALLEL_NEXT_GROUP[edge] = next_group
+                        _PIPELINE_MODEL_PARALLEL_PREV_GROUP[edge] = prev_group
+                        lane_warmup = torch.empty((), dtype=torch.float, device='cuda')
+                        low_rank, high_rank = edge_ranks
+                        next_op = torch.distributed.P2POp(
+                            torch.distributed.isend if rank == low_rank else torch.distributed.irecv,
+                            lane_warmup,
+                            high_rank if rank == low_rank else low_rank,
+                            next_group,
+                        )
+                        prev_op = torch.distributed.P2POp(
+                            torch.distributed.isend if rank == high_rank else torch.distributed.irecv,
+                            lane_warmup,
+                            low_rank if rank == high_rank else high_rank,
+                            prev_group,
+                        )
+                        for request in torch.distributed.batch_isend_irecv([next_op]):
+                            request.wait()
+                        for request in torch.distributed.batch_isend_irecv([prev_op]):
+                            request.wait()
             _PIPELINE_GLOBAL_RANKS = ranks
             # warmup collective comm for `batch_isend_irecv`,
             # refer to https://pytorch.org/docs/stable/distributed.html#torch.distributed.batch_isend_irecv
@@ -356,7 +397,10 @@ def initialize_model_parallel(
         # first and last stages).
         if len(ranks) > 1:
             from megatron import get_args
-            is_slice_v = getattr(get_args(), 'variable_seq_schedule', '1f1b') == 'slice-v'
+            is_slice_v = (
+                getattr(get_args(), 'variable_seq_schedule', '1f1b') == 'slice-v'
+                or getattr(get_args(), 'dspp', False)
+            )
             if is_slice_v:
                 embedding_ranks = [ranks[0]]
             else:
@@ -510,6 +554,20 @@ def get_pipeline_model_parallel_group_gloo():
     assert _PIPELINE_MODEL_PARALLEL_GROUP_GLOO is not None, \
         'pipeline_model parallel group is not initialized'
     return _PIPELINE_MODEL_PARALLEL_GROUP_GLOO
+
+
+def get_pipeline_model_parallel_next_group(edge):
+    """Return the DSPP communicator for traffic to the next physical stage."""
+    assert _PIPELINE_MODEL_PARALLEL_NEXT_GROUP is not None, \
+        'pipeline next-direction group is not initialized'
+    return _PIPELINE_MODEL_PARALLEL_NEXT_GROUP[edge]
+
+
+def get_pipeline_model_parallel_prev_group(edge):
+    """Return the DSPP communicator for traffic to the previous physical stage."""
+    assert _PIPELINE_MODEL_PARALLEL_PREV_GROUP is not None, \
+        'pipeline prev-direction group is not initialized'
+    return _PIPELINE_MODEL_PARALLEL_PREV_GROUP[edge]
 
 
 def get_context_parallel_group():
@@ -752,7 +810,11 @@ def is_pipeline_last_stage(ignore_virtual=False):
             get_virtual_pipeline_model_parallel_world_size()
         if virtual_pipeline_model_parallel_world_size is not None:
             from megatron import get_args
-            if getattr(get_args(), 'variable_seq_schedule', '1f1b') == 'slice-v':
+            args = get_args()
+            if (
+                getattr(args, 'variable_seq_schedule', '1f1b') == 'slice-v'
+                or getattr(args, 'dspp', False)
+            ):
                 assert virtual_pipeline_model_parallel_world_size == 2
                 return get_pipeline_model_parallel_rank() == 0 and \
                     get_virtual_pipeline_model_parallel_rank() == 1
@@ -771,7 +833,11 @@ def is_rank_in_embedding_group(ignore_virtual=False):
     if ignore_virtual:
         return rank in _EMBEDDING_GLOBAL_RANKS
     from megatron import get_args
-    if getattr(get_args(), 'variable_seq_schedule', '1f1b') == 'slice-v':
+    args = get_args()
+    if (
+        getattr(args, 'variable_seq_schedule', '1f1b') == 'slice-v'
+        or getattr(args, 'dspp', False)
+    ):
         return rank in _EMBEDDING_GLOBAL_RANKS and (
             is_pipeline_first_stage(ignore_virtual=False)
             or is_pipeline_last_stage(ignore_virtual=False)
@@ -1027,6 +1093,10 @@ def destroy_model_parallel():
     _PIPELINE_MODEL_PARALLEL_GROUP = None
     global _PIPELINE_MODEL_PARALLEL_GROUP_GLOO
     _PIPELINE_MODEL_PARALLEL_GROUP_GLOO = None
+    global _PIPELINE_MODEL_PARALLEL_NEXT_GROUP
+    _PIPELINE_MODEL_PARALLEL_NEXT_GROUP = None
+    global _PIPELINE_MODEL_PARALLEL_PREV_GROUP
+    _PIPELINE_MODEL_PARALLEL_PREV_GROUP = None
     global _CONTEXT_PARALLEL_GROUP
     _CONTEXT_PARALLEL_GROUP = None
     global _CONTEXT_PARALLEL_GROUP_SLOW

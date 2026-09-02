@@ -14,9 +14,10 @@ from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
 
 from megatron import get_args
 from megatron.core import parallel_state
+from megatron.core.datasets.dspp_training import DsppTrainingBatch
 from megatron.core.enums import ModelType
 from megatron.core.pipeline_parallel import offload, p2p_communication
-from megatron.core.kv_cache import Cache
+from megatron.core.kv_cache import Cache, DsppSequenceKVState
 from megatron.core.pipeline_parallel.slice_v import (
     build_slice_v_execution_plan,
     build_slice_v_schedule,
@@ -30,7 +31,7 @@ from megatron.profile_utils import annotate_forward_range, annotate_backward_ran
 # Types
 Shape = Union[List[int], torch.Size]
 
-def get_forward_backward_func(slicing=False, variable_slicing=False):
+def get_forward_backward_func(slicing=False, variable_slicing=False, dspp=False):
     """Retrieves the appropriate forward_backward function given the
     configuration of parallel_state.
 
@@ -151,6 +152,18 @@ def get_forward_backward_func(slicing=False, variable_slicing=False):
 
     """
     pipeline_model_parallel_size = parallel_state.get_pipeline_model_parallel_world_size()
+    if dspp:
+        if pipeline_model_parallel_size == 1:
+            if parallel_state.get_virtual_pipeline_model_parallel_world_size() is not None:
+                raise NotImplementedError(
+                    "single-stage DSPP does not support virtual pipeline chunks"
+                )
+            return forward_backward_dspp_no_pipelining
+        if pipeline_model_parallel_size == 3 and (
+            parallel_state.get_virtual_pipeline_model_parallel_world_size() == 2
+        ):
+            return pipelining_with_dspp_stage_local_v
+        raise NotImplementedError("distributed DSPP requires PP=3 and VPP=2")
     if pipeline_model_parallel_size > 1:
         if parallel_state.get_virtual_pipeline_model_parallel_world_size() is not None:
             if variable_slicing:
@@ -921,6 +934,580 @@ def forward_backward_no_pipelining(*,
             prior_works = [torch.cuda.current_stream().record_event()]
             mb.backward(None)
 
+    return forward_data_store
+
+
+def forward_backward_dspp_no_pipelining(*,
+                                        forward_step_func,
+                                        get_batch_func,
+                                        data_iterator: Union[Iterator, List[Iterator]],
+                                        model: Union[torch.nn.Module, List[torch.nn.Module]],
+                                        num_microbatches: int,
+                                        micro_seq_length: int,
+                                        kv_cache_class: Type[Cache], # unused
+                                        dtype: Optional[torch.dtype] = None, # unused
+                                        tensor_shape: Optional[Shape] = None, # unused
+                                        decoder_seq_length: Optional[int] = None, # unused
+                                        grad_scaler: Callable = None,
+                                        sequence_parallel: bool = False,
+                                        overlap_p2p_comm: bool = False,
+                                        batch_p2p_comm: bool = True, # unused
+                                        attn_balance: int = 0,
+                                        vocab_in_pp: bool = False,
+                                        forward_only: bool = False,
+                                        timers: Callable = None,
+                                        collect_non_loss_data: bool = False,
+                                        enable_autocast: bool = False,
+                                        deallocate_pipeline_outputs: bool = False,
+                                        no_sync_func: Optional[Callable] = None,
+                                        grad_sync_func: Optional[Callable] = None,
+                                        param_sync_func: Optional[Callable] = None,
+                                        pre_p2p_func: Optional[Callable] = None,
+                                        post_p2p_async_func: Optional[Callable] = None,
+                                        offload_ratio: float = 0,
+                                        offload_delay_to_next_stage: bool = False,
+                                        ):
+    """Execute DSPP physical microbatches on one stage.
+
+    One :class:`DsppSequenceKVState` is shared by every physical microbatch
+    derived from a logical dataloader batch.  Forward follows plan order and
+    backward follows exact reverse order, making segment dependencies a
+    structural property of this executor rather than a hot-path graph check.
+
+    ``estimated_flops`` in the batch plan is never read here. CUDA kernels and
+    autograd determine real execution time.
+    """
+
+    del (
+        kv_cache_class,
+        dtype,
+        tensor_shape,
+        decoder_seq_length,
+        batch_p2p_comm,
+        no_sync_func,
+        grad_sync_func,
+        param_sync_func,
+        pre_p2p_func,
+        post_p2p_async_func,
+        offload_delay_to_next_stage,
+    )
+    if isinstance(model, list):
+        if len(model) != 1:
+            raise ValueError("DSPP B1 requires exactly one model chunk")
+        model = model[0]
+    if isinstance(data_iterator, list):
+        if len(data_iterator) != 1:
+            raise ValueError("DSPP B1 requires exactly one data iterator")
+        data_iterator = data_iterator[0]
+    if parallel_state.get_pipeline_model_parallel_world_size() != 1:
+        raise ValueError("DSPP B1 requires pipeline model parallel size 1")
+    if sequence_parallel:
+        raise ValueError("DSPP B1 does not support sequence parallelism")
+    if overlap_p2p_comm:
+        raise ValueError("DSPP B1 has no pipeline P2P communication")
+    if attn_balance:
+        raise ValueError("DSPP B1 does not support attention balancing")
+    if vocab_in_pp:
+        raise ValueError("DSPP B1 does not support vocab-in-pipeline")
+    if offload_ratio:
+        raise ValueError("DSPP B1 does not support activation offload")
+    if deallocate_pipeline_outputs:
+        raise ValueError("DSPP B1 does not pseudo-deallocate physical outputs")
+    if collect_non_loss_data:
+        raise NotImplementedError("DSPP B1 does not collect non-loss data")
+    if micro_seq_length <= 0:
+        raise ValueError("DSPP requires a positive micro_seq_length")
+
+    model_type = get_model_type(model)
+    if model_type == ModelType.encoder_and_decoder:
+        raise ValueError("DSPP B1 supports decoder-only models")
+    forward_func = partial(
+        forward_step,
+        forward_step_func=forward_step_func,
+        model=model,
+        timers=timers,
+        enable_autocast=enable_autocast,
+    )
+    backward_func = None if forward_only else partial(
+        backward_step,
+        model_type=model_type,
+        timers=timers,
+        deallocate_pipeline_outputs=False,
+    )
+
+    # Read the logical accumulation set first so variable-length groups can be
+    # weighted by their actual number of LM targets. The physical model work
+    # still runs one logical group at a time, so only data tensors (not all
+    # activation graphs) are retained across groups.
+    logical_batches = []
+    for logical_microbatch_id in range(num_microbatches):
+        if timers is not None:
+            timers("batch-generator", log_level=2).start()
+        training_batch, loss_func = get_batch_func(data_iterator)
+        if timers is not None:
+            timers("batch-generator").stop()
+        if not isinstance(training_batch, DsppTrainingBatch):
+            raise TypeError(
+                "DSPP get_batch_func must return a DsppTrainingBatch as its first value"
+            )
+        if training_batch.plan.chunk_size != micro_seq_length:
+            raise ValueError(
+                "DSPP training batch chunk size does not match micro_seq_length"
+            )
+        logical_batches.append((training_batch, loss_func))
+
+    total_valid_tokens = sum(
+        training_batch.valid_token_count
+        for training_batch, _ in logical_batches
+    )
+    if total_valid_tokens <= 0:
+        raise RuntimeError("DSPP iteration contains no valid LM targets")
+
+    forward_data_store = []
+    debug_limit = getattr(get_args(), "variable_seq_debug_num_batches", 0)
+    for logical_microbatch_id, (training_batch, loss_func) in enumerate(
+        logical_batches
+    ):
+        debug_count = getattr(
+            forward_backward_dspp_no_pipelining, "_debug_count", 0
+        )
+        debug_runtime = debug_count < debug_limit
+        if debug_limit:
+            forward_backward_dspp_no_pipelining._debug_count = debug_count + 1
+        if debug_runtime:
+            training_batch.validate()
+            physical_layout = [
+                [
+                    (
+                        item.sequence_id,
+                        item.segment_id,
+                        item.token_offset,
+                        item.token_length,
+                    )
+                    for item in physical.meta.items
+                ]
+                for physical in training_batch.physical_microbatches
+            ]
+            print(
+                "[dspp][batch] "
+                f"logical_microbatch={logical_microbatch_id}, "
+                f"sequence_lengths={training_batch.plan.sequence_lengths}, "
+                f"valid_tokens={training_batch.valid_token_count}, "
+                f"physical_microbatches={len(physical_layout)}, "
+                f"layout={physical_layout}",
+                flush=True,
+            )
+
+        state = DsppSequenceKVState(validate_runtime=debug_runtime)
+        outputs = []
+        for physical in training_batch.physical_microbatches:
+            state.set_microbatch(physical.meta)
+            model_batch = (
+                physical.tokens,
+                physical.position_ids,
+                None,
+                physical.labels,
+            )
+            outputs.append(forward_func(model_batch, None, state))
+
+        combined_output = torch.cat(outputs, dim=-1)
+        loss, loss_reduced = loss_func(combined_output)
+        token_weight = training_batch.valid_token_count / total_valid_tokens
+        # The caller averages the returned dictionaries over Megatron logical
+        # microbatches. Compensate for that outer average so logs report the
+        # same token-weighted objective used by backward.
+        forward_data_store.append(
+            {
+                key: value * token_weight * num_microbatches
+                for key, value in loss_reduced.items()
+            }
+        )
+
+        if forward_only:
+            # Forward-only evaluation has no reverse pass that could drain
+            # retained K/V. It is safe to release the iteration-owned state.
+            state.clear()
+            continue
+
+        loss = loss * token_weight
+        if grad_scaler is not None:
+            loss = grad_scaler(loss)
+        output_grads = torch.autograd.grad(loss, outputs)
+        for output, output_grad in reversed(
+            list(zip(outputs, output_grads, strict=True))
+        ):
+            backward_func(None, output, output_grad)
+        state.finish_iteration()
+
+    return forward_data_store
+
+
+class _DsppVTaskBatch:
+    """Per-logical-batch activation state for one V-pipeline model chunk."""
+
+    def __init__(self, training_batch, forward_func, backward_func, loss_func,
+                 grad_scaler, token_weight, log_multiplier, chunk):
+        self.training_batch = training_batch
+        self.forward_func = forward_func
+        self.backward_func = backward_func
+        self.loss_func = loss_func
+        self.grad_scaler = grad_scaler
+        self.token_weight = token_weight
+        self.log_multiplier = log_multiplier
+        self.chunk = chunk
+        self.kv_state = DsppSequenceKVState()
+        self.inputs = {}
+        self.outputs = {}
+        self.output_grads = {}
+        self.loss_reduced = None
+
+    def forward(self, split, input_tensor):
+        physical = self.training_batch.physical_microbatches[split]
+        self.kv_state.set_microbatch(physical.meta)
+        model_batch = (
+            physical.tokens,
+            physical.position_ids,
+            None,
+            physical.labels,
+        )
+        output_tensor = self.forward_func(model_batch, input_tensor, self.kv_state)
+        self.inputs[split] = input_tensor
+        self.outputs[split] = output_tensor
+        if self.loss_func is not None and len(self.outputs) == len(
+            self.training_batch.physical_microbatches
+        ):
+            ordered_outputs = [self.outputs[index] for index in range(len(self.outputs))]
+            combined_output = torch.cat(ordered_outputs, dim=-1)
+            loss, reduced = self.loss_func(combined_output)
+            scaled_loss = loss * self.token_weight
+            if self.grad_scaler is not None:
+                scaled_loss = self.grad_scaler(scaled_loss)
+            if self.backward_func is not None:
+                grads = torch.autograd.grad(scaled_loss, ordered_outputs)
+                self.output_grads = dict(enumerate(grads))
+            self.loss_reduced = {
+                key: value * self.token_weight * self.log_multiplier
+                for key, value in reduced.items()
+            }
+        return None if self.loss_func is not None else output_tensor
+
+    def backward(self, split, output_tensor_grad):
+        if self.loss_func is not None:
+            output_tensor_grad = self.output_grads.pop(split)
+        input_tensor = self.inputs.pop(split)
+        output_tensor = self.outputs.pop(split)
+        with WeightGradStore.set_split_bw(True):
+            input_tensor_grad = self.backward_func(
+                input_tensor, output_tensor, output_tensor_grad
+            )
+            WeightGradStore.flush(chunk=self.chunk)
+        return input_tensor_grad
+
+    def weight(self):
+        WeightGradStore.pop(chunk=self.chunk, pop_num=1)
+
+
+def _pad_dspp_v_split_counts(split_counts, pipeline_size):
+    """Add communication-only slots when a short iteration cannot fill V warmup."""
+
+    counts = list(split_counts)
+    if len(counts) < 2:
+        raise ValueError("distributed DSPP requires at least two logical microbatches")
+    while sum(counts) < max(counts) + 2 * pipeline_size - 2:
+        smallest = min(range(len(counts)), key=counts.__getitem__)
+        counts[smallest] += 1
+    return counts
+
+
+def pipelining_with_dspp_stage_local_v(*,
+                                       forward_step_func,
+                                       get_batch_func,
+                                       data_iterator: Union[Iterator, List[Iterator]],
+                                       model: Union[torch.nn.Module, List[torch.nn.Module]],
+                                       num_microbatches: int,
+                                       micro_seq_length: int,
+                                       kv_cache_class: Type[Cache], # unused
+                                       dtype: Optional[torch.dtype] = None,
+                                       tensor_shape: Optional[Shape] = None,
+                                       decoder_seq_length: Optional[int] = None, # unused
+                                       grad_scaler: Callable = None,
+                                       sequence_parallel: bool = False,
+                                       overlap_p2p_comm: bool = False, # unused
+                                       batch_p2p_comm: bool = True, # unused
+                                       attn_balance: int = 0,
+                                       vocab_in_pp: bool = False,
+                                       forward_only: bool = False,
+                                       timers: Callable = None,
+                                       collect_non_loss_data: bool = False,
+                                       enable_autocast: bool = False,
+                                       deallocate_pipeline_outputs: bool = False,
+                                       no_sync_func: Optional[Callable] = None,
+                                       grad_sync_func: Optional[Callable] = None,
+                                       param_sync_func: Optional[Callable] = None,
+                                       pre_p2p_func: Optional[Callable] = None,
+                                       post_p2p_async_func: Optional[Callable] = None,
+                                       offload_ratio: float = 0,
+                                       offload_delay_to_next_stage: bool = False,
+                                       ):
+    """Run DSPP V-ZB from the current stage's local F/B/W event stream.
+
+    Communication carries only fixed ``[chunk, 1, hidden]`` activations. Two
+    NCCL groups bind traffic to the physical next/previous direction. Task
+    identity is ``(logical_microbatch, physical_microbatch)`` and is used only
+    to retain local activation state and order each directed message stream.
+    """
+
+    del (kv_cache_class, decoder_seq_length, overlap_p2p_comm, batch_p2p_comm,
+         no_sync_func, grad_sync_func, param_sync_func, pre_p2p_func,
+         post_p2p_async_func, offload_delay_to_next_stage)
+    if not isinstance(model, list) or len(model) != 2:
+        raise ValueError("distributed DSPP requires exactly two model chunks")
+    if isinstance(data_iterator, list):
+        data_iterator = data_iterator[0]
+    if sequence_parallel or attn_balance or vocab_in_pp or offload_ratio:
+        raise ValueError("DSPP PP currently excludes SP, attention balance, vocab PP, and offload")
+    if deallocate_pipeline_outputs or collect_non_loss_data:
+        raise ValueError("DSPP PP does not support output deallocation or non-loss collection")
+    if dtype is None or tensor_shape is None:
+        raise ValueError("DSPP PP requires a fixed pipeline dtype and tensor shape")
+
+    pipeline_size = parallel_state.get_pipeline_model_parallel_world_size()
+    stage = parallel_state.get_pipeline_model_parallel_rank()
+    if pipeline_size != 3:
+        raise ValueError("distributed DSPP currently requires PP=3")
+    WeightGradStore.assert_supported()
+
+    logical_batches = []
+    for _ in range(num_microbatches):
+        if timers is not None:
+            timers("batch-generator", log_level=2).start()
+        training_batch, loss_func = get_batch_func(data_iterator)
+        if timers is not None:
+            timers("batch-generator").stop()
+        if not isinstance(training_batch, DsppTrainingBatch):
+            raise TypeError("DSPP get_batch_func must return DsppTrainingBatch")
+        logical_batches.append((training_batch, loss_func))
+
+    total_valid_tokens = sum(batch.valid_token_count for batch, _ in logical_batches)
+    if total_valid_tokens <= 0:
+        raise RuntimeError("DSPP iteration contains no valid LM targets")
+    split_counts = [len(batch.physical_microbatches) for batch, _ in logical_batches]
+    schedule_split_counts = _pad_dspp_v_split_counts(split_counts, pipeline_size)
+    schedules, _ = build_slice_v_schedule(
+        pipeline_size, num_microbatches, schedule_split_counts
+    )
+    schedule = schedules[stage]
+    if forward_only:
+        schedule = [node for node in schedule if node.kind == 'F']
+
+    model_type = get_model_type(model[0])
+    if model_type == ModelType.encoder_and_decoder:
+        raise ValueError("DSPP supports decoder-only models")
+    forward_funcs = [
+        partial(forward_step, forward_step_func=forward_step_func,
+                model=model_chunk, timers=timers,
+                enable_autocast=enable_autocast)
+        for model_chunk in model
+    ]
+    backward_func = None if forward_only else partial(
+        backward_step, model_type=model_type, timers=timers,
+        deallocate_pipeline_outputs=False
+    )
+
+    task_batches = {}
+    for logical_id, (training_batch, loss_func) in enumerate(logical_batches):
+        token_weight = training_batch.valid_token_count / total_valid_tokens
+        for chunk in range(2):
+            task_batches[(logical_id, chunk)] = _DsppVTaskBatch(
+                training_batch=training_batch,
+                forward_func=forward_funcs[chunk],
+                backward_func=backward_func,
+                loss_func=loss_func if chunk == 1 and stage == 0 else None,
+                grad_scaler=grad_scaler,
+                token_weight=token_weight,
+                log_multiplier=num_microbatches,
+                chunk=chunk,
+            )
+
+    def message_key(node):
+        return (node.kind, node.chunk, node.microbatch, node.split)
+
+    def incoming_sender(target_stage, node):
+        if node.kind == 'F' and node.chunk == 0 and target_stage > 0:
+            return target_stage - 1
+        if node.kind == 'F' and node.chunk == 1 and target_stage < pipeline_size - 1:
+            return target_stage + 1
+        if node.kind == 'B' and node.chunk == 1 and target_stage > 0:
+            return target_stage - 1
+        if node.kind == 'B' and node.chunk == 0 and target_stage < pipeline_size - 1:
+            return target_stage + 1
+        return None
+
+    # A sender may compute messages in a different F/B interleave than its
+    # receiver consumes them. Queue ready tensors and submit them in the
+    # receiver's local order; this is lane-local ordering, not global timing.
+    expected_sends = {}
+    for peer in (stage - 1, stage + 1):
+        if 0 <= peer < pipeline_size:
+            peer_schedule = schedules[peer]
+            if forward_only:
+                peer_schedule = [node for node in peer_schedule if node.kind == 'F']
+            expected_sends[peer] = [
+                message_key(node) for node in peer_schedule
+                if incoming_sender(peer, node) == stage
+            ]
+    send_cursor = {peer: 0 for peer in expected_sends}
+    ready_sends = {peer: {} for peer in expected_sends}
+    send_requests = []
+    def group_for(sender, receiver):
+        edge = min(sender, receiver)
+        if receiver > sender:
+            return parallel_state.get_pipeline_model_parallel_next_group(edge)
+        return parallel_state.get_pipeline_model_parallel_prev_group(edge)
+
+    def flush_sends(peer):
+        expected = expected_sends[peer]
+        cursor = send_cursor[peer]
+        ready = ready_sends[peer]
+        while cursor < len(expected) and expected[cursor] in ready:
+            key = expected[cursor]
+            tensor = ready.pop(key).contiguous()
+            operation = dist.P2POp(
+                dist.isend, tensor,
+                parallel_state.get_pipeline_model_parallel_global_rank(peer),
+                group_for(stage, peer),
+            )
+            request = dist.batch_isend_irecv([operation])[0]
+            send_requests.append((request, tensor))
+            cursor += 1
+        send_cursor[peer] = cursor
+
+    def submit_send(peer, node, tensor):
+        ready_sends[peer][message_key(node)] = tensor
+        flush_sends(peer)
+
+    recv_shape = get_actual_tensor_shape(
+        tensor_shape, sequence_parallel=False, micro_seq_length=micro_seq_length
+    )
+    recv_shape = (recv_shape[0], 1, recv_shape[2])
+
+    def receive(sender, node):
+        tensor = torch.empty(
+            recv_shape, dtype=dtype, device=torch.cuda.current_device(),
+            requires_grad=True,
+        )
+        operation = dist.P2POp(
+            dist.irecv, tensor,
+            parallel_state.get_pipeline_model_parallel_global_rank(sender),
+            group_for(sender, stage),
+        )
+        request = dist.batch_isend_irecv([operation])[0]
+        request.wait()
+        return tensor
+
+    def detach_boundary(tensor):
+        tensor = tensor.detach()
+        tensor.requires_grad_()
+        return tensor
+
+    local_forward = {}
+    local_backward = {}
+    forward_data_store = []
+    for node in schedule:
+        parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
+        task_id = (node.microbatch, node.split)
+        is_padding = node.split >= split_counts[node.microbatch]
+        if is_padding:
+            if node.kind == 'F':
+                if node.chunk == 0:
+                    tensor = (
+                        torch.zeros(recv_shape, dtype=dtype, device=torch.cuda.current_device())
+                        if stage == 0 else receive(stage - 1, node)
+                    )
+                    if stage == pipeline_size - 1:
+                        local_forward[task_id] = tensor
+                    else:
+                        submit_send(stage + 1, node, tensor)
+                else:
+                    tensor = (
+                        local_forward.pop(task_id)
+                        if stage == pipeline_size - 1 else receive(stage + 1, node)
+                    )
+                    if stage > 0:
+                        submit_send(stage - 1, node, tensor)
+            elif node.kind == 'B':
+                if node.chunk == 1:
+                    tensor = (
+                        torch.zeros(recv_shape, dtype=dtype, device=torch.cuda.current_device())
+                        if stage == 0 else receive(stage - 1, node)
+                    )
+                    if stage == pipeline_size - 1:
+                        local_backward[task_id] = tensor
+                    else:
+                        submit_send(stage + 1, node, tensor)
+                else:
+                    tensor = (
+                        local_backward.pop(task_id)
+                        if stage == pipeline_size - 1 else receive(stage + 1, node)
+                    )
+                    if stage > 0:
+                        submit_send(stage - 1, node, tensor)
+            continue
+        task_batch = task_batches[(node.microbatch, node.chunk)]
+        if node.kind == 'F':
+            if node.chunk == 0:
+                input_tensor = None if stage == 0 else receive(stage - 1, node)
+            else:
+                input_tensor = (
+                    local_forward.pop(task_id)
+                    if stage == pipeline_size - 1
+                    else receive(stage + 1, node)
+                )
+            output_tensor = task_batch.forward(node.split, input_tensor)
+            if node.chunk == 0:
+                if stage == pipeline_size - 1:
+                    local_forward[task_id] = detach_boundary(output_tensor)
+                else:
+                    submit_send(stage + 1, node, output_tensor)
+            elif stage > 0:
+                submit_send(stage - 1, node, output_tensor)
+            if task_batch.loss_reduced is not None:
+                forward_data_store.append(task_batch.loss_reduced)
+                task_batch.loss_reduced = None
+        elif node.kind == 'B':
+            if node.chunk == 1:
+                output_grad = None if stage == 0 else receive(stage - 1, node)
+            else:
+                output_grad = (
+                    local_backward.pop(task_id)
+                    if stage == pipeline_size - 1
+                    else receive(stage + 1, node)
+                )
+            input_grad = task_batch.backward(node.split, output_grad)
+            if node.chunk == 1:
+                if stage == pipeline_size - 1:
+                    local_backward[task_id] = input_grad
+                else:
+                    submit_send(stage + 1, node, input_grad)
+            elif stage > 0:
+                submit_send(stage - 1, node, input_grad)
+        elif node.kind == 'W':
+            task_batch.weight()
+
+    for peer in expected_sends:
+        flush_sends(peer)
+        if send_cursor[peer] != len(expected_sends[peer]):
+            raise RuntimeError(f"DSPP has unsent messages for peer stage {peer}")
+    for request, _tensor in send_requests:
+        request.wait()
+
+    for task_batch in task_batches.values():
+        if forward_only:
+            task_batch.kv_state.clear()
+        else:
+            task_batch.kv_state.finish_iteration()
+    if not forward_only:
+        WeightGradStore.assert_empty()
     return forward_data_store
 
 

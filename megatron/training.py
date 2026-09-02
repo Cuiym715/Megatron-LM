@@ -172,7 +172,7 @@ def pretrain(train_valid_test_dataset_provider,
 
     if args.do_valid:
         prefix = 'the end of training for val data'
-        evaluate_and_print_results(prefix, forward_step_func,
+        evaluate_and_print_results(prefix, forward_step_func, get_batch_func,
                                    valid_data_iterator, model,
                                    iteration, process_non_loss_data_func,
                                    False)
@@ -183,7 +183,7 @@ def pretrain(train_valid_test_dataset_provider,
     if args.do_test:
         # Run on test data.
         prefix = 'the end of training for test data'
-        evaluate_and_print_results(prefix, forward_step_func,
+        evaluate_and_print_results(prefix, forward_step_func, get_batch_func,
                                    test_data_iterator, model,
                                    0, process_non_loss_data_func,
                                    True)
@@ -271,6 +271,16 @@ def get_model(model_provider_func, model_type=ModelType.encoder_or_decoder, wrap
 
     if not isinstance(model, list):
         model = [model]
+
+    # The two ends of a V-shaped pipeline live in different virtual chunks on
+    # rank 0, so initialize their tied embedding copies locally.
+    is_v_pipeline = getattr(args, 'dspp', False) or \
+        args.variable_seq_schedule == 'slice-v'
+    if is_v_pipeline and len(model) == 2 and \
+            mpu.get_pipeline_model_parallel_rank() == 0:
+        model[-1].word_embeddings_weight().data.copy_(
+            model[0].word_embeddings_weight().data
+        )
 
     # Disallow training and inference with Transformer Engine
     # for non-GPT models
@@ -652,7 +662,8 @@ def train_step(forward_step_func, get_batch_func, data_iterator,
         barrier=args.barrier_with_L1_time)
     forward_backward_func = get_forward_backward_func(
         args.micro_seq_length,
-        variable_slicing=args.variable_seq_slicing)
+        variable_slicing=args.variable_seq_slicing,
+        dspp=args.dspp)
     fwd_bwd_timers = timers if args.timing_log_level > 1 else None
     losses_reduced = forward_backward_func(
         forward_step_func=forward_step_func,
@@ -760,7 +771,7 @@ def train_step(forward_step_func, get_batch_func, data_iterator,
 
     is_loss_stage = (
         mpu.get_pipeline_model_parallel_rank() == 0
-        if args.variable_seq_schedule == 'slice-v'
+        if args.dspp or args.variable_seq_schedule == 'slice-v'
         else mpu.is_pipeline_last_stage(ignore_virtual=True)
     )
     if is_loss_stage:
@@ -956,7 +967,10 @@ def training_log(loss_dict, total_loss_dict, learning_rate, iteration,
         total_loss_dict[advanced_iters_key] = 0
         total_loss_dict[skipped_iters_key] = 0
         total_loss_dict[nan_iters_key] = 0
-        print_rank_last(log_string)
+        if args.dspp:
+            print_rank_0(log_string)
+        else:
+            print_rank_last(log_string)
         if report_memory_flag and learning_rate > 0.:
             # Report memory after optimizer state has been initialized.
             report_memory('(after {} iterations)'.format(iteration))
@@ -1063,7 +1077,7 @@ def train(forward_step_func, get_batch_func, model, optimizer, opt_param_schedul
         if args.eval_interval and iteration % args.eval_interval == 0 and \
            args.do_valid:
             prefix = 'iteration {}'.format(iteration)
-            evaluate_and_print_results(prefix, forward_step_func,
+            evaluate_and_print_results(prefix, forward_step_func, get_batch_func,
                                        valid_data_iterator, model,
                                        iteration, process_non_loss_data_func,
                                        False)
@@ -1118,6 +1132,7 @@ def train(forward_step_func, get_batch_func, model, optimizer, opt_param_schedul
 
 
 def evaluate(forward_step_func,
+             get_batch_func,
              data_iterator,
              model,
              process_non_loss_data_func,
@@ -1144,9 +1159,11 @@ def evaluate(forward_step_func,
 
             forward_backward_func = get_forward_backward_func(
                 args.micro_seq_length,
-                variable_slicing=args.variable_seq_slicing)
+                variable_slicing=args.variable_seq_slicing,
+                dspp=args.dspp)
             loss_dicts = forward_backward_func(
                 forward_step_func=forward_step_func,
+                get_batch_func=get_batch_func,
                 data_iterator=data_iterator,
                 model=model,
                 num_microbatches=get_num_microbatches(),
@@ -1166,7 +1183,7 @@ def evaluate(forward_step_func,
 
             is_loss_stage = (
                 mpu.get_pipeline_model_parallel_rank() == 0
-                if args.variable_seq_schedule == 'slice-v'
+                if args.dspp or args.variable_seq_schedule == 'slice-v'
                 else mpu.is_pipeline_last_stage(ignore_virtual=True)
             )
             if is_loss_stage:
@@ -1194,7 +1211,7 @@ def evaluate(forward_step_func,
 
     return total_loss_dict, collected_non_loss_data
 
-def evaluate_and_print_results(prefix, forward_step_func,
+def evaluate_and_print_results(prefix, forward_step_func, get_batch_func,
                                data_iterator, model,
                                iteration, process_non_loss_data_func,
                                verbose=False):
@@ -1203,7 +1220,7 @@ def evaluate_and_print_results(prefix, forward_step_func,
     writer = get_tensorboard_writer()
 
     total_loss_dict, collected_non_loss_data = evaluate(
-        forward_step_func, data_iterator, model,
+        forward_step_func, get_batch_func, data_iterator, model,
         process_non_loss_data_func, verbose)
     string = ' validation loss at {} | '.format(prefix)
     for key in total_loss_dict:
@@ -1227,9 +1244,10 @@ def evaluate_and_print_results(prefix, forward_step_func,
         process_non_loss_data_func(collected_non_loss_data, iteration, writer)
 
     length = len(string) + 1
-    print_rank_last('-' * length)
-    print_rank_last(string)
-    print_rank_last('-' * length)
+    print_loss_rank = print_rank_0 if args.dspp else print_rank_last
+    print_loss_rank('-' * length)
+    print_loss_rank(string)
+    print_loss_rank('-' * length)
 
 
 def cyclic_iter(iter):

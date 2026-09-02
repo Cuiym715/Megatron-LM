@@ -9,8 +9,10 @@ from megatron import print_rank_0
 from megatron import get_timers
 from megatron import get_tokenizer
 from megatron import reference
+from megatron.core import parallel_state as mpu
 from megatron.core import tensor_parallel
 from megatron.core.enums import ModelType
+from megatron.core.datasets.dspp_training import build_dspp_training_batch
 from megatron.data.gpt_dataset import build_train_valid_test_datasets
 from megatron.model import LlamaModel
 from megatron.training import pretrain
@@ -42,7 +44,7 @@ def get_batch(data_iterator):
     tokenizer = get_tokenizer()
 
     # Items and their type.
-    keys = ['text']
+    keys = ['text', 'lengths'] if args.dspp else ['text']
     datatype = torch.int64
 
     # Broadcast data.
@@ -53,6 +55,25 @@ def get_batch(data_iterator):
     data_b = tensor_parallel.broadcast_data(keys, data, datatype)
 
     tokens_ = data_b['text'].long()
+
+    if args.dspp:
+        lengths = data_b['lengths']
+        if mpu.get_pipeline_model_parallel_world_size() > 1:
+            # Sequence lengths are the compact iteration metadata from which
+            # every stage deterministically derives the same physical tasks.
+            torch.distributed.broadcast(
+                lengths,
+                mpu.get_pipeline_model_parallel_first_rank(),
+                group=mpu.get_pipeline_model_parallel_group(),
+            )
+        training_batch = build_dspp_training_batch(
+            tokens_,
+            lengths,
+            chunk_size=args.micro_seq_length,
+            pad_token_id=max(args.variable_seq_pad_token_id, 0),
+            max_sequence_length=args.seq_length,
+        )
+        return training_batch, partial(loss_func, training_batch.loss_mask)
 
     if args.variable_seq_slicing:
         pad_to_multiple = (

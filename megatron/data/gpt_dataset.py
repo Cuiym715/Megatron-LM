@@ -117,7 +117,10 @@ def _build_train_valid_test_datasets(data_prefix, data_impl, splits_string,
                                      data_cache_path=None):
     """Build train, valid, and test datasets."""
     args = get_args()
-    use_document_dataset = getattr(args, 'variable_seq_slicing', False)
+    use_document_dataset = (
+        getattr(args, 'variable_seq_slicing', False)
+        or getattr(args, 'dspp', False)
+    )
 
     # Indexed dataset.
     indexed_dataset = get_indexed_dataset_(data_prefix,
@@ -217,7 +220,11 @@ def _build_dataset(dataset_name, data_prefix, data_impl,
                         step=1, dtype=np.int32)
 
     args = get_args()
-    dataset_class = DocumentGPTDataset if getattr(args, 'variable_seq_slicing', False) else GPTDataset
+    use_document_dataset = (
+        getattr(args, 'variable_seq_slicing', False)
+        or getattr(args, 'dspp', False)
+    )
+    dataset_class = DocumentGPTDataset if use_document_dataset else GPTDataset
     dataset = dataset_class(dataset_name, data_prefix,
                             documents, indexed_dataset,
                             num_samples, seq_length, seed,

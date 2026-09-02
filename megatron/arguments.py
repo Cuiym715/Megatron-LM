@@ -162,17 +162,19 @@ def validate_args(args, defaults={}):
             'pipeline-model-parallel size should be greater than or equal to 2 with ' \
             'interleaved schedule'
         num_layers_including_padding_layers = args.kaimm_num_layers_padding_front + args.num_layers + args.kaimm_num_layers_padding_back
-        if args.variable_seq_slicing and args.variable_seq_schedule == 'slice-v':
+        if args.dspp or (
+            args.variable_seq_slicing and args.variable_seq_schedule == 'slice-v'
+        ):
             assert args.kaimm_num_layers_padding_front == 0 and \
                 args.kaimm_num_layers_padding_back == 0, \
-                'slice-v uneven layer allocation does not support padding layers'
+                'V-shaped uneven layer allocation does not support padding layers'
             logical_stages = 2 * args.transformer_pipeline_model_parallel_size
             assert (args.num_layers + 1) % logical_stages == 0, \
-                f'slice-v requires num_layers + 1 ({args.num_layers + 1}) to be ' \
+                f'V-shaped scheduling requires num_layers + 1 ({args.num_layers + 1}) to be ' \
                 f'divisible by 2 * pipeline size ({logical_stages})'
             expected_layers = (args.num_layers + 1) // logical_stages
             assert args.num_layers_per_virtual_pipeline_stage == expected_layers, \
-                f'slice-v requires num_layers_per_virtual_pipeline_stage={expected_layers}'
+                f'V-shaped scheduling requires num_layers_per_virtual_pipeline_stage={expected_layers}'
             args.virtual_pipeline_model_parallel_size = 2
         else:
             assert num_layers_including_padding_layers % (args.transformer_pipeline_model_parallel_size * args.num_layers_per_virtual_pipeline_stage) == 0, \
@@ -186,6 +188,42 @@ def validate_args(args, defaults={}):
             'vpp should be greater than or equal to 2 with interleaved schedule'
     else:
         args.virtual_pipeline_model_parallel_size = None
+
+    if args.dspp:
+        assert not args.variable_seq_slicing, \
+            '--dspp and --variable-seq-slicing select different runtimes; enable only --dspp'
+        assert args.micro_seq_length > 0, \
+            'DSPP requires --micro-seq-length > 0'
+        assert args.use_flash_attn, \
+            'DSPP requires --use-flash-attn'
+        assert args.tensor_model_parallel_size == 1 and args.context_parallel_size == 1, \
+            'DSPP B2/B3 currently supports TP=1 and CP=1'
+        assert args.world_size == args.pipeline_model_parallel_size, \
+            'DSPP B2/B3 currently supports one pipeline replica (DP=1)'
+        assert args.pipeline_model_parallel_size in (1, 3), \
+            'DSPP currently supports the B1 single-GPU path or the PP=3 B2/B3 path'
+        if args.pipeline_model_parallel_size == 1:
+            assert args.virtual_pipeline_model_parallel_size is None, \
+                'single-GPU DSPP does not use virtual pipeline chunks'
+        else:
+            assert args.virtual_pipeline_model_parallel_size == 2, \
+                'DSPP PP=3 requires exactly two virtual pipeline chunks'
+            assert args.gradient_accumulation_fusion, \
+                'DSPP V-ZB requires gradient accumulation fusion for B/W splitting'
+            assert not getattr(args, 'overlap_grad_reduce', False), \
+                'DSPP V-ZB does not support overlap_grad_reduce'
+            assert args.transformer_impl == 'local', \
+                'DSPP V-ZB currently supports the local transformer implementation'
+        assert args.attention_dropout == 0.0 and args.hidden_dropout == 0.0, \
+            'DSPP requires zero attention and hidden dropout'
+        assert args.recompute_granularity is None, \
+            'DSPP does not support activation recomputation'
+        assert args.num_experts is None, \
+            'DSPP does not support MoE'
+        assert not args.use_fast_rope, \
+            'DSPP currently requires unset --use-fast-rope'
+        assert args.variable_seq_debug_num_batches >= 0, \
+            'variable-seq-debug-num-batches must be >= 0'
 
     if args.variable_seq_slicing:
         assert args.micro_seq_length > 0, \
@@ -268,7 +306,7 @@ def validate_args(args, defaults={}):
     # across batches/microbatches. Due to additional communication overhead
     # during pipeline parallelism, it should not be set if sequence length
     # is constant during training.
-    args.variable_seq_lengths = bool(args.variable_seq_slicing)
+    args.variable_seq_lengths = bool(args.variable_seq_slicing or args.dspp)
 
     # Iteration-based training.
     if args.train_iters:
@@ -1317,6 +1355,9 @@ def _add_distributed_args(parser):
                        choices=['key-value', 'query-out'], help='Context parallel implementation.')
     group.add_argument('--micro-seq-length', type=int, default=0,
                        help='Sequence length per model instance forward, for token level pipeline parallel.')
+    group.add_argument('--dspp', action='store_true',
+                       help='Enable the DSPP variable-length packed training runtime. '
+                       'Supports the single-GPU B1 path and PP=3/VPP=2 B2/B3 path.')
     group.add_argument('--variable-seq-slicing', action='store_true',
                        help='Use variable-length sequence slicing with fixed-size chunks. '
                        'This keeps the original SlimPipe schedule unchanged.')

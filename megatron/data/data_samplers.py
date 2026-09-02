@@ -38,7 +38,13 @@ def variable_seq_collate(batch):
         )
         variable_seq_collate._debug_count = debug_count + 1
 
-    return {'text': text}
+    result = {'text': text}
+    if getattr(args, 'dspp', False):
+        # DSPP must not infer boundaries from token values: the configured pad
+        # id may occur inside a real document. Raw lengths are the source of
+        # truth for materialization and travel with the padded tensor.
+        result['lengths'] = torch.tensor(lengths, dtype=torch.long)
+    return result
 
 
 def build_pretraining_data_loader(dataset, consumed_samples):
@@ -71,7 +77,9 @@ def build_pretraining_data_loader(dataset, consumed_samples):
 
     # Torch dataloader.
     # Notice: here will use default collate_fn, see: torch/utils/data/_utils/collate.py
-    collate_fn = variable_seq_collate if args.variable_seq_slicing else None
+    collate_fn = variable_seq_collate if (
+        args.variable_seq_slicing or getattr(args, 'dspp', False)
+    ) else None
     return torch.utils.data.DataLoader(dataset,
                                        batch_sampler=batch_sampler,
                                        num_workers=args.num_workers,
