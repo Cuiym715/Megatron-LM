@@ -1662,8 +1662,13 @@ def _get_num_layers(args, model_type, is_decoder=False):
             num_layers_including_padding_layers = args.kaimm_num_layers_padding_front + args.num_layers + args.kaimm_num_layers_padding_back
             if args.variable_seq_schedule == 'slice-v' or getattr(args, 'dspp', False):
                 logical_stages = 2 * args.transformer_pipeline_model_parallel_size
-                assert (args.num_layers + 1) % logical_stages == 0
-                num_layers = 2 * ((args.num_layers + 1) // logical_stages)
+                balanced_dspp = (
+                    getattr(args, 'dspp', False)
+                    and getattr(args, 'dspp_v_layer_layout', 'balanced') == 'balanced'
+                )
+                layer_slots = args.num_layers if balanced_dspp else args.num_layers + 1
+                assert layer_slots % logical_stages == 0
+                num_layers = 2 * (layer_slots // logical_stages)
                 return num_layers
             assert num_layers_including_padding_layers % (args.transformer_pipeline_model_parallel_size * (args.virtual_pipeline_model_parallel_size or 1)) == 0, \
                 f'num_layers_including_padding_layers ({num_layers_including_padding_layers}) must be ' \
@@ -1852,7 +1857,12 @@ class ParallelTransformer(MegatronModule):
             if args.variable_seq_schedule == 'slice-v' or getattr(args, 'dspp', False):
                 assert args.virtual_pipeline_model_parallel_size == 2
                 assert not args.standalone_embedding_stage
-                layers_per_logical_stage = (args.num_layers + 1) // (
+                balanced_dspp = (
+                    getattr(args, 'dspp', False)
+                    and getattr(args, 'dspp_v_layer_layout', 'balanced') == 'balanced'
+                )
+                layer_slots = args.num_layers if balanced_dspp else args.num_layers + 1
+                layers_per_logical_stage = layer_slots // (
                     2 * mpu.get_pipeline_model_parallel_world_size()
                 )
                 self.num_layers = layers_per_logical_stage

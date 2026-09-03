@@ -43,6 +43,11 @@ from megatron.data.data_samplers import build_pretraining_data_loader
 from megatron.utils import calc_params_l2_norm
 from megatron.core.transformer.moe.moe_utils import track_moe_metrics
 from megatron.core.pipeline_parallel import get_forward_backward_func
+from megatron.core.pipeline_parallel.dspp_metrics import (
+    append_dspp_metric,
+    summarize_dspp_metrics,
+    write_dspp_metrics,
+)
 from megatron.core.kv_cache import FakeCache, KVCache, Growth
 from megatron.utils import report_memory
 from megatron.profile_utils import annotate_range, enable_perf_model, perf_model_summary, perf_model_clear
@@ -943,6 +948,21 @@ def training_log(loss_dict, total_loss_dict, learning_rate, iteration,
             elapsed_time_per_iteration * 1000.0)
         log_string += ' samples per second: {:.3f} |'.format(samples_per_second)
         log_string += ' tokens per sec per replica: {:.5f} |'.format(tokens_per_sec_per_replica)
+        if args.dspp and getattr(args, '_dspp_metric_history', None):
+            dspp_window = args._dspp_metric_history[-total_iterations:]
+            dspp_metrics = summarize_dspp_metrics(dspp_window)
+            log_string += ' effective tokens/s: {:.3f} |'.format(
+                dspp_metrics['effective_tokens_per_second'])
+            log_string += ' iteration median/P95 (ms): {:.1f}/{:.1f} |'.format(
+                dspp_metrics['iteration_median_ms'],
+                dspp_metrics['iteration_p95_ms'])
+            log_string += ' packing utilization: {:.4f} |'.format(
+                dspp_metrics['packing_utilization'])
+            log_string += ' schedule padding ratio: {:.4f} |'.format(
+                dspp_metrics['schedule_padding_ratio'])
+            log_string += ' peak memory rank0 alloc/reserved (MiB): {:.1f}/{:.1f} |'.format(
+                dspp_metrics['peak_allocated_bytes_rank0'] / (1024.0 ** 2),
+                dspp_metrics['peak_reserved_bytes_rank0'] / (1024.0 ** 2))
         log_string += ' learning rate: {:.8E} |'.format(learning_rate)
         log_string += ' global batch size: {:5d} |'.format(batch_size)
         for key in total_loss_dict:
@@ -1025,6 +1045,33 @@ def train(forward_step_func, get_batch_func, model, optimizer, opt_param_schedul
     # Iterations.
     iteration = args.iteration
 
+    torch_profiler = None
+    torch_profile_iteration = int(
+        getattr(args, 'dspp_torch_profiler_iteration', 0) or 0
+    )
+    torch_profile_dir = getattr(args, 'dspp_torch_profiler_dir', None)
+    if args.dspp and torch_profile_dir and torch_profile_iteration > 0:
+        os.makedirs(torch_profile_dir, exist_ok=True)
+        warmup = 1 if torch_profile_iteration > 1 else 0
+        wait = max(0, torch_profile_iteration - warmup - 1)
+        torch_profiler = torch.profiler.profile(
+            activities=[
+                torch.profiler.ProfilerActivity.CPU,
+                torch.profiler.ProfilerActivity.CUDA,
+            ],
+            schedule=torch.profiler.schedule(
+                wait=wait, warmup=warmup, active=1, repeat=1
+            ),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler(
+                torch_profile_dir,
+                worker_name=f'rank_{torch.distributed.get_rank()}',
+            ),
+            record_shapes=False,
+            profile_memory=False,
+            with_stack=False,
+        )
+        torch_profiler.start()
+
     timers('interval-time', log_level=0).start(barrier=True)
     print_datetime('before the start of training step')
     report_memory_flag = 2
@@ -1037,6 +1084,10 @@ def train(forward_step_func, get_batch_func, model, optimizer, opt_param_schedul
                 gc.collect(0)
         if args.kaimm_profile_analysis:
             enable_perf_model()
+        dspp_metric_start = None
+        if args.dspp and torch.distributed.get_rank() == 0:
+            dspp_metric_start = torch.cuda.Event(enable_timing=True)
+            dspp_metric_start.record()
         with annotate_range(f"train_step rank_{torch.distributed.get_rank()} it_{iteration}"):
             loss_dict, skipped_iter, grad_norm, num_zeros_in_grad = \
                 train_step(forward_step_func,
@@ -1046,6 +1097,10 @@ def train(forward_step_func, get_batch_func, model, optimizer, opt_param_schedul
                            optimizer,
                            opt_param_scheduler,
                            skipped_iter)
+        dspp_metric_end = None
+        if dspp_metric_start is not None:
+            dspp_metric_end = torch.cuda.Event(enable_timing=True)
+            dspp_metric_end.record()
         iteration += 1
         args.consumed_train_samples += mpu.get_data_parallel_for_sample_world_size() * \
                                        args.micro_batch_size * \
@@ -1053,6 +1108,15 @@ def train(forward_step_func, get_batch_func, model, optimizer, opt_param_schedul
 
         # Logging.
         loss_scale = optimizer.get_loss_scale().item()
+        if dspp_metric_end is not None:
+            # loss_scale.item() is the pre-existing device synchronization;
+            # reading the two events here adds no per-iteration synchronize.
+            append_dspp_metric(
+                args,
+                dspp_metric_start.elapsed_time(dspp_metric_end),
+                peak_allocated=torch.cuda.max_memory_allocated(),
+                peak_reserved=torch.cuda.max_memory_reserved(),
+            )
         params_norm = None
         if args.log_params_norm:
             params_norm = calc_params_l2_norm(model)
@@ -1122,11 +1186,20 @@ def train(forward_step_func, get_batch_func, model, optimizer, opt_param_schedul
             print_datetime('exiting program at iteration {}'.format(iteration))
             sys.exit()
 
+        if torch_profiler is not None:
+            torch_profiler.step()
+
+    if torch_profiler is not None:
+        torch_profiler.stop()
+
     if args.kaimm_gc_interval > 0:
         gc.enable()
 
     # Copy optimizer params to model params in need when `overlap_gather`
     optimizer.gather_model_params(args, timers)
+
+    if args.dspp and torch.distributed.get_rank() == 0:
+        write_dspp_metrics(args)
 
     return iteration
 

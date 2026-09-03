@@ -169,10 +169,13 @@ def validate_args(args, defaults={}):
                 args.kaimm_num_layers_padding_back == 0, \
                 'V-shaped uneven layer allocation does not support padding layers'
             logical_stages = 2 * args.transformer_pipeline_model_parallel_size
-            assert (args.num_layers + 1) % logical_stages == 0, \
-                f'V-shaped scheduling requires num_layers + 1 ({args.num_layers + 1}) to be ' \
-                f'divisible by 2 * pipeline size ({logical_stages})'
-            expected_layers = (args.num_layers + 1) // logical_stages
+            balanced_dspp = args.dspp and args.dspp_v_layer_layout == 'balanced'
+            layer_slots = args.num_layers if balanced_dspp else args.num_layers + 1
+            assert layer_slots % logical_stages == 0, \
+                f'V-shaped scheduling requires {layer_slots} layer slots to be ' \
+                f'divisible by 2 * pipeline size ({logical_stages}); layout=' \
+                f'{args.dspp_v_layer_layout if args.dspp else "legacy-output-slot"}'
+            expected_layers = layer_slots // logical_stages
             assert args.num_layers_per_virtual_pipeline_stage == expected_layers, \
                 f'V-shaped scheduling requires num_layers_per_virtual_pipeline_stage={expected_layers}'
             args.virtual_pipeline_model_parallel_size = 2
@@ -1358,6 +1361,29 @@ def _add_distributed_args(parser):
     group.add_argument('--dspp', action='store_true',
                        help='Enable the DSPP variable-length packed training runtime. '
                        'Supports the single-GPU B1 path and PP=3/VPP=2 B2/B3 path.')
+    group.add_argument('--dspp-microbatch-order', type=str,
+                       default='warmup-short-steady-long',
+                       choices=['input', 'warmup-short-steady-long'],
+                       help='Physical-microbatch entrance order for distributed DSPP. '
+                       'The default applies the simulator C1 warmup/steady policy.')
+    group.add_argument('--dspp-v-layer-layout', type=str, default='balanced',
+                       choices=['balanced', 'legacy-output-slot'],
+                       help='DSPP V-pipeline Transformer-layer layout. balanced assigns '
+                       'the same number of Transformer layers to every logical stage; '
+                       'legacy-output-slot preserves the earlier (num_layers + 1) rule.')
+    group.add_argument('--dspp-order-profile', type=str, default=None,
+                       help='Optional C2 CUDA-event cost JSON used by C1 ordering. '
+                       'Unmatched shapes use the metadata cost proxy.')
+    group.add_argument('--dspp-timeline-dir', type=str, default=None,
+                       help='Directory for opt-in per-rank DSPP timeline JSON and merged SVG.')
+    group.add_argument('--dspp-timeline-iteration', type=int, default=0,
+                       help='One-based training iteration to trace; 0 disables CUDA-event tracing.')
+    group.add_argument('--dspp-torch-profiler-dir', type=str, default=None,
+                       help='Directory for opt-in per-rank PyTorch Profiler Chrome traces.')
+    group.add_argument('--dspp-torch-profiler-iteration', type=int, default=0,
+                       help='One-based DSPP iteration to capture with PyTorch Profiler; 0 disables it.')
+    group.add_argument('--dspp-metrics-path', type=str, default=None,
+                       help='Optional path for the compact rank-zero DSPP metrics JSON.')
     group.add_argument('--variable-seq-slicing', action='store_true',
                        help='Use variable-length sequence slicing with fixed-size chunks. '
                        'This keeps the original SlimPipe schedule unchanged.')

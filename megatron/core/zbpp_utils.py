@@ -80,6 +80,16 @@ class WeightGradStore:
     @classmethod
     def pop(cls, chunk=0, pop_num=None, timers=None):
         cls.lazy_init()
+        if pop_num is None:
+            pop_num = 1
+        available = len(cls.weight_grad_queue[chunk])
+        if pop_num < 0 or pop_num > available:
+            rank = parallel_state.get_pipeline_model_parallel_rank()
+            raise RuntimeError(
+                "deferred weight-gradient queue underflow: "
+                f"rank={rank}, chunk={chunk}, requested={pop_num}, "
+                f"available={available}"
+            )
         if timers is None:
             try:
                 timers = get_timers()
@@ -88,9 +98,6 @@ class WeightGradStore:
         timer = timers('w-compute', log_level=2) if timers is not None else None
         if timer is not None:
             timer.start()
-        if pop_num is None:
-            pop_num = 1
-        pop_num = min(pop_num, len(cls.weight_grad_queue[chunk]))
         for _ in range(pop_num):
             stored_grads = cls.weight_grad_queue[chunk].popleft()
             for pre_func, func in stored_grads:

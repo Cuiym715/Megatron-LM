@@ -15,6 +15,10 @@ from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
 from megatron import get_args
 from megatron.core import parallel_state
 from megatron.core.datasets.dspp_training import DsppTrainingBatch
+from megatron.core.datasets.dspp_ordering import (
+    build_dspp_ordering_plan,
+    render_dspp_microbatch_report,
+)
 from megatron.core.enums import ModelType
 from megatron.core.pipeline_parallel import offload, p2p_communication
 from megatron.core.kv_cache import Cache, DsppSequenceKVState
@@ -22,6 +26,7 @@ from megatron.core.pipeline_parallel.slice_v import (
     build_slice_v_execution_plan,
     build_slice_v_schedule,
 )
+from megatron.core.pipeline_parallel.dspp_timeline import DsppTimelineRecorder
 from megatron.core.zbpp_utils import WeightGradStore
 from megatron.core.transformer.moe.router import MoEAuxLossAutoScaler
 from megatron.core.utils import cuda_sync_and_record, get_attr_wrapped_model, get_model_type
@@ -1145,21 +1150,20 @@ def forward_backward_dspp_no_pipelining(*,
 class _DsppVTaskBatch:
     """Per-logical-batch activation state for one V-pipeline model chunk."""
 
-    def __init__(self, training_batch, forward_func, backward_func, loss_func,
-                 grad_scaler, token_weight, log_multiplier, chunk):
+    def __init__(self, training_batch, forward_func, backward_func,
+                 grad_scaler, total_valid_tokens, is_loss_stage, chunk):
         self.training_batch = training_batch
         self.forward_func = forward_func
         self.backward_func = backward_func
-        self.loss_func = loss_func
         self.grad_scaler = grad_scaler
-        self.token_weight = token_weight
-        self.log_multiplier = log_multiplier
+        self.total_valid_tokens = total_valid_tokens
+        self.is_loss_stage = is_loss_stage
         self.chunk = chunk
         self.kv_state = DsppSequenceKVState()
         self.inputs = {}
         self.outputs = {}
         self.output_grads = {}
-        self.loss_reduced = None
+        self.loss_contribution = None
 
     def forward(self, split, input_tensor):
         physical = self.training_batch.physical_microbatches[split]
@@ -1173,26 +1177,21 @@ class _DsppVTaskBatch:
         output_tensor = self.forward_func(model_batch, input_tensor, self.kv_state)
         self.inputs[split] = input_tensor
         self.outputs[split] = output_tensor
-        if self.loss_func is not None and len(self.outputs) == len(
-            self.training_batch.physical_microbatches
-        ):
-            ordered_outputs = [self.outputs[index] for index in range(len(self.outputs))]
-            combined_output = torch.cat(ordered_outputs, dim=-1)
-            loss, reduced = self.loss_func(combined_output)
-            scaled_loss = loss * self.token_weight
+        if self.is_loss_stage:
+            loss_sum = (output_tensor.float() * physical.loss_mask).sum()
+            loss = loss_sum / self.total_valid_tokens
+            self.loss_contribution = loss.detach()
+            scaled_loss = loss
             if self.grad_scaler is not None:
                 scaled_loss = self.grad_scaler(scaled_loss)
             if self.backward_func is not None:
-                grads = torch.autograd.grad(scaled_loss, ordered_outputs)
-                self.output_grads = dict(enumerate(grads))
-            self.loss_reduced = {
-                key: value * self.token_weight * self.log_multiplier
-                for key, value in reduced.items()
-            }
-        return None if self.loss_func is not None else output_tensor
+                self.output_grads[split] = torch.autograd.grad(
+                    scaled_loss, output_tensor
+                )[0]
+        return None if self.is_loss_stage else output_tensor
 
     def backward(self, split, output_tensor_grad):
-        if self.loss_func is not None:
+        if self.is_loss_stage:
             output_tensor_grad = self.output_grads.pop(split)
         input_tensor = self.inputs.pop(split)
         output_tensor = self.outputs.pop(split)
@@ -1291,10 +1290,18 @@ def pipelining_with_dspp_stage_local_v(*,
     total_valid_tokens = sum(batch.valid_token_count for batch, _ in logical_batches)
     if total_valid_tokens <= 0:
         raise RuntimeError("DSPP iteration contains no valid LM targets")
-    split_counts = [len(batch.physical_microbatches) for batch, _ in logical_batches]
+    args = get_args()
+    ordering = build_dspp_ordering_plan(
+        [batch for batch, _ in logical_batches],
+        pp_degree=pipeline_size,
+        mode=getattr(args, 'dspp_microbatch_order', 'warmup-short-steady-long'),
+        profile_path=getattr(args, 'dspp_order_profile', None),
+    )
+    schedule_groups = ordering.schedule_groups
+    split_counts = [len(group) for group in schedule_groups]
     schedule_split_counts = _pad_dspp_v_split_counts(split_counts, pipeline_size)
     schedules, _ = build_slice_v_schedule(
-        pipeline_size, num_microbatches, schedule_split_counts
+        pipeline_size, len(schedule_split_counts), schedule_split_counts
     )
     schedule = schedules[stage]
     if forward_only:
@@ -1315,19 +1322,70 @@ def pipelining_with_dspp_stage_local_v(*,
     )
 
     task_batches = {}
-    for logical_id, (training_batch, loss_func) in enumerate(logical_batches):
-        token_weight = training_batch.valid_token_count / total_valid_tokens
+    for logical_id, (training_batch, _loss_func) in enumerate(logical_batches):
         for chunk in range(2):
             task_batches[(logical_id, chunk)] = _DsppVTaskBatch(
                 training_batch=training_batch,
                 forward_func=forward_funcs[chunk],
                 backward_func=backward_func,
-                loss_func=loss_func if chunk == 1 and stage == 0 else None,
                 grad_scaler=grad_scaler,
-                token_weight=token_weight,
-                log_multiplier=num_microbatches,
+                total_valid_tokens=total_valid_tokens,
+                is_loss_stage=(chunk == 1 and stage == 0),
                 chunk=chunk,
             )
+
+    slot_to_task = {
+        (group_id, split): task
+        for group_id, group in enumerate(schedule_groups)
+        for split, task in enumerate(group)
+    }
+    ordering_metadata = {
+        'mode': getattr(args, 'dspp_microbatch_order', 'warmup-short-steady-long'),
+        'v_layer_layout': getattr(args, 'dspp_v_layer_layout', 'balanced'),
+        'cost_source': ordering.cost_source,
+        'warmup_count': ordering.warmup_count,
+        'warmup_task_count': ordering.warmup_task_count,
+        'warmup_short_only_count': ordering.warmup_short_only_count,
+        'entrance_order': ordering.entrance_order,
+        'schedule_group_sizes': split_counts,
+        'schedule_group_sizes_with_padding': schedule_split_counts,
+    }
+    timeline = DsppTimelineRecorder(
+        args,
+        stage=stage,
+        ordering=ordering_metadata,
+    )
+    if timeline.enabled and stage == 0:
+        model_layout = {}
+        balanced_layout = getattr(args, 'dspp_v_layer_layout', 'balanced') == 'balanced'
+        layer_slots = args.num_layers if balanced_layout else args.num_layers + 1
+        layers_per_logical_stage = layer_slots // (2 * pipeline_size)
+        for layout_stage in range(pipeline_size):
+            descriptions = []
+            for layout_chunk in range(2):
+                logical_stage = (
+                    layout_stage if layout_chunk == 0
+                    else 2 * pipeline_size - layout_stage - 1
+                )
+                begin = logical_stage * layers_per_logical_stage
+                end = min(args.num_layers, begin + layers_per_logical_stage)
+                layers = list(range(begin + 1, end + 1))
+                roles = []
+                if layout_stage == 0 and layout_chunk == 0:
+                    roles.append('embedding')
+                if layout_stage == 0 and layout_chunk == 1:
+                    roles.append('output-head/loss')
+                role_text = f" + {', '.join(roles)}" if roles else ''
+                descriptions.append(
+                    f"chunk{layout_chunk} transformer_layers={layers}{role_text}"
+                )
+            model_layout[layout_stage] = descriptions
+        timeline.microbatch_report = render_dspp_microbatch_report(
+            [batch for batch, _ in logical_batches],
+            ordering,
+            schedule_split_counts=schedule_split_counts,
+            model_layout=model_layout,
+        )
 
     def message_key(node):
         return (node.kind, node.chunk, node.microbatch, node.split)
@@ -1377,7 +1435,11 @@ def pipelining_with_dspp_stage_local_v(*,
                 parallel_state.get_pipeline_model_parallel_global_rank(peer),
                 group_for(stage, peer),
             )
-            request = dist.batch_isend_irecv([operation])[0]
+            if timeline.recording:
+                with timeline.communication(f"send_s{stage}_to_s{peer}/{key}"):
+                    request = dist.batch_isend_irecv([operation])[0]
+            else:
+                request = dist.batch_isend_irecv([operation])[0]
             send_requests.append((request, tensor))
             cursor += 1
         send_cursor[peer] = cursor
@@ -1401,8 +1463,15 @@ def pipelining_with_dspp_stage_local_v(*,
             parallel_state.get_pipeline_model_parallel_global_rank(sender),
             group_for(sender, stage),
         )
-        request = dist.batch_isend_irecv([operation])[0]
-        request.wait()
+        if timeline.recording:
+            with timeline.communication(
+                f"recv_s{sender}_to_s{stage}/{message_key(node)}"
+            ):
+                request = dist.batch_isend_irecv([operation])[0]
+                request.wait()
+        else:
+            request = dist.batch_isend_irecv([operation])[0]
+            request.wait()
         return tensor
 
     def detach_boundary(tensor):
@@ -1412,11 +1481,12 @@ def pipelining_with_dspp_stage_local_v(*,
 
     local_forward = {}
     local_backward = {}
-    forward_data_store = []
+    total_loss = None
     for node in schedule:
         parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
-        task_id = (node.microbatch, node.split)
-        is_padding = node.split >= split_counts[node.microbatch]
+        slot_id = (node.microbatch, node.split)
+        task_id = slot_to_task.get(slot_id)
+        is_padding = task_id is None
         if is_padding:
             if node.kind == 'F':
                 if node.chunk == 0:
@@ -1425,12 +1495,12 @@ def pipelining_with_dspp_stage_local_v(*,
                         if stage == 0 else receive(stage - 1, node)
                     )
                     if stage == pipeline_size - 1:
-                        local_forward[task_id] = tensor
+                        local_forward[slot_id] = tensor
                     else:
                         submit_send(stage + 1, node, tensor)
                 else:
                     tensor = (
-                        local_forward.pop(task_id)
+                        local_forward.pop(slot_id)
                         if stage == pipeline_size - 1 else receive(stage + 1, node)
                     )
                     if stage > 0:
@@ -1442,57 +1512,80 @@ def pipelining_with_dspp_stage_local_v(*,
                         if stage == 0 else receive(stage - 1, node)
                     )
                     if stage == pipeline_size - 1:
-                        local_backward[task_id] = tensor
+                        local_backward[slot_id] = tensor
                     else:
                         submit_send(stage + 1, node, tensor)
                 else:
                     tensor = (
-                        local_backward.pop(task_id)
+                        local_backward.pop(slot_id)
                         if stage == pipeline_size - 1 else receive(stage + 1, node)
                     )
                     if stage > 0:
                         submit_send(stage - 1, node, tensor)
             continue
-        task_batch = task_batches[(node.microbatch, node.chunk)]
+        logical_id, physical_id = task_id
+        task_batch = task_batches[(logical_id, node.chunk)]
+        if timeline.recording:
+            physical_meta = task_batch.training_batch.physical_microbatches[physical_id].meta
+            task_kind = f'{node.kind}{node.chunk}'
         if node.kind == 'F':
             if node.chunk == 0:
                 input_tensor = None if stage == 0 else receive(stage - 1, node)
             else:
                 input_tensor = (
-                    local_forward.pop(task_id)
+                    local_forward.pop(slot_id)
                     if stage == pipeline_size - 1
                     else receive(stage + 1, node)
                 )
-            output_tensor = task_batch.forward(node.split, input_tensor)
+            if timeline.recording:
+                with timeline.task(
+                    task_kind, task_id, physical_meta, chunk=node.chunk
+                ):
+                    output_tensor = task_batch.forward(physical_id, input_tensor)
+            else:
+                output_tensor = task_batch.forward(physical_id, input_tensor)
             if node.chunk == 0:
                 if stage == pipeline_size - 1:
-                    local_forward[task_id] = detach_boundary(output_tensor)
+                    local_forward[slot_id] = detach_boundary(output_tensor)
                 else:
                     submit_send(stage + 1, node, output_tensor)
             elif stage > 0:
                 submit_send(stage - 1, node, output_tensor)
-            if task_batch.loss_reduced is not None:
-                forward_data_store.append(task_batch.loss_reduced)
-                task_batch.loss_reduced = None
+            if task_batch.loss_contribution is not None:
+                contribution = task_batch.loss_contribution
+                total_loss = contribution if total_loss is None else total_loss + contribution
+                task_batch.loss_contribution = None
         elif node.kind == 'B':
             if node.chunk == 1:
                 output_grad = None if stage == 0 else receive(stage - 1, node)
             else:
                 output_grad = (
-                    local_backward.pop(task_id)
+                    local_backward.pop(slot_id)
                     if stage == pipeline_size - 1
                     else receive(stage + 1, node)
                 )
-            input_grad = task_batch.backward(node.split, output_grad)
+            if timeline.recording:
+                with timeline.task(
+                    task_kind, task_id, physical_meta, chunk=node.chunk
+                ):
+                    input_grad = task_batch.backward(physical_id, output_grad)
+            else:
+                input_grad = task_batch.backward(physical_id, output_grad)
             if node.chunk == 1:
                 if stage == pipeline_size - 1:
-                    local_backward[task_id] = input_grad
+                    local_backward[slot_id] = input_grad
                 else:
                     submit_send(stage + 1, node, input_grad)
             elif stage > 0:
                 submit_send(stage - 1, node, input_grad)
         elif node.kind == 'W':
-            task_batch.weight()
+            if timeline.recording:
+                with timeline.task(
+                    task_kind, task_id, physical_meta, chunk=node.chunk
+                ):
+                    task_batch.weight()
+            else:
+                task_batch.weight()
 
     for peer in expected_sends:
         flush_sends(peer)
@@ -1508,6 +1601,25 @@ def pipelining_with_dspp_stage_local_v(*,
             task_batch.kv_state.finish_iteration()
     if not forward_only:
         WeightGradStore.assert_empty()
+    real_tasks = len(ordering.entrance_order)
+    scheduled_tasks = sum(schedule_split_counts)
+    if stage == 0:
+        args._dspp_last_iteration_metrics = {
+            'valid_tokens': total_valid_tokens,
+            'physical_microbatches': real_tasks,
+            'physical_token_capacity': real_tasks * micro_seq_length,
+            'schedule_padding_slots': scheduled_tasks - real_tasks,
+            'schedule_slots': scheduled_tasks,
+            'order_cost_source': ordering.cost_source,
+        }
+    timeline.finish()
+    forward_data_store = []
+    if stage == 0 and total_loss is not None:
+        # Keep Megatron's established "average a list of logical microbatches"
+        # contract while the physical tasks themselves are globally reordered.
+        forward_data_store = [
+            {'lm loss': total_loss} for _ in range(num_microbatches)
+        ]
     return forward_data_store
 
 
