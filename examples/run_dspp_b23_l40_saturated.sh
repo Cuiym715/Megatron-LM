@@ -12,6 +12,10 @@ export NUM_ATTENTION_HEADS=${NUM_ATTENTION_HEADS:-16}
 export SEQ_LENGTH=${SEQ_LENGTH:-768}
 export MAX_POSITION_EMBEDDINGS=${MAX_POSITION_EMBEDDINGS:-768}
 export MICRO_SEQ_LENGTH=${MICRO_SEQ_LENGTH:-256}
+# Keep the hard feasibility floor below the measured efficiency knee. Offline
+# profiling finds 4096 efficient for this shape, but long inputs may require a
+# smaller chunk to fit; 256 remains the fallback floor and bootstrap size.
+export DSPP_MIN_CHUNK_SIZE=${DSPP_MIN_CHUNK_SIZE:-256}
 DEFAULT_DATA_PATH=/tmp/dspp_saturated_c256_text_document
 export DATA_PATH=${DATA_PATH:-$DEFAULT_DATA_PATH}
 

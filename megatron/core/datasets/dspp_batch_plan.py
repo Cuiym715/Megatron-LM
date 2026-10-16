@@ -363,17 +363,146 @@ def _pack_residuals(
     raise RuntimeError("failed to pack residual sequence segments")
 
 
+def _critical_pack_objective(bins: Sequence[_ResidualBin]) -> tuple:
+    """A deterministic proxy for residual-pack critical-path imbalance."""
+
+    loads = [float(item.total_flops) for item in bins if item.items]
+    if not loads:
+        return (0.0, 0.0, ())
+    return (max(loads), sum(load * load for load in loads), tuple(sorted(loads)))
+
+
+def _pack_residuals_critical(
+    residuals: Sequence[DsppSegment], chunk_size: int
+) -> List[_ResidualBin]:
+    """Continuation-safe LPT packing followed by bounded local exchanges.
+
+    The baseline packer is intentionally retained above.  This variant keeps
+    the same minimum number of bins and correctness constraints, but uses
+    attention work (``estimated_flops``) as a makespan proxy and repairs a
+    greedy imbalance with one deterministic pass of moves/swaps.  Its cost is
+    bounded by the number of residual items and does not enumerate packings.
+    """
+
+    if not residuals:
+        return []
+    tails = [item for item in residuals if item.has_history]
+    shorts = [item for item in residuals if not item.has_history]
+    bin_count = max(
+        len(tails),
+        math.ceil(sum(item.token_length for item in residuals) / float(chunk_size)),
+    )
+    bins = [_ResidualBin(index=index, items=[]) for index in range(bin_count)]
+    # Tail identity is irrelevant to the physical layout.  Seeding by work
+    # gives LPT the strongest initial bound while keeping sequence metadata.
+    for index, item in enumerate(
+        sorted(tails, key=lambda entry: (-entry.estimated_flops, entry.sequence_id))
+    ):
+        bins[index].add(item)
+    for item in sorted(
+        shorts,
+        key=lambda entry: (-entry.estimated_flops, -entry.token_length, entry.sequence_id),
+    ):
+        feasible = [
+            packed
+            for packed in bins
+            if packed.total_tokens + item.token_length <= chunk_size
+        ]
+        if not feasible:
+            # This should only be reachable if a future caller changes the
+            # lower-bound rule; preserve the baseline's robust fallback.
+            return _pack_residuals(residuals, chunk_size)
+        selected = min(
+            feasible,
+            key=lambda packed: (
+                packed.total_flops,
+                chunk_size - packed.total_tokens - item.token_length,
+                packed.index,
+            ),
+        )
+        selected.add(item)
+
+    # Local search only moves independent short items.  A continuation tail
+    # remains the first item of its original bin, so KV/gradient semantics are
+    # unchanged.  One pass is enough to avoid making plan construction itself
+    # a runtime bottleneck.
+    current = _critical_pack_objective(bins)
+    for source in bins:
+        for item in tuple(source.items):
+            if item.has_history:
+                continue
+            for target in bins:
+                if target is source or target.total_tokens + item.token_length > chunk_size:
+                    continue
+                if len(source.items) == 1:
+                    continue
+                source.items.remove(item)
+                source.total_tokens -= item.token_length
+                source.total_flops -= item.estimated_flops
+                target.add(item)
+                candidate = _critical_pack_objective(bins)
+                if candidate < current:
+                    current = candidate
+                    break
+                target.items.remove(item)
+                target.total_tokens -= item.token_length
+                target.total_flops -= item.estimated_flops
+                source.add(item)
+    # A bounded swap pass handles the common case where all bins are full and
+    # a relocation cannot improve the critical path.  Only independent short
+    # items are exchanged; tails remain anchored in their own bins.
+    for left_index, left in enumerate(bins):
+        for right in bins[left_index + 1 :]:
+            left_items = [item for item in left.items if not item.has_history]
+            right_items = [item for item in right.items if not item.has_history]
+            improved = False
+            for left_item in left_items:
+                for right_item in right_items:
+                    left_tokens = left.total_tokens - left_item.token_length + right_item.token_length
+                    right_tokens = right.total_tokens - right_item.token_length + left_item.token_length
+                    if left_tokens > chunk_size or right_tokens > chunk_size:
+                        continue
+                    left.items.remove(left_item)
+                    right.items.remove(right_item)
+                    left.total_tokens -= left_item.token_length
+                    left.total_flops -= left_item.estimated_flops
+                    right.total_tokens -= right_item.token_length
+                    right.total_flops -= right_item.estimated_flops
+                    left.add(right_item)
+                    right.add(left_item)
+                    candidate = _critical_pack_objective(bins)
+                    if candidate < current:
+                        current = candidate
+                        improved = True
+                        break
+                    left.items.remove(right_item)
+                    right.items.remove(left_item)
+                    left.total_tokens -= right_item.token_length
+                    left.total_flops -= right_item.estimated_flops
+                    right.total_tokens -= left_item.token_length
+                    right.total_flops -= left_item.estimated_flops
+                    left.add(left_item)
+                    right.add(right_item)
+                if improved:
+                    break
+    return [packed for packed in bins if packed.items]
+
+
 def build_dspp_batch_plan(
     sequence_lengths: Sequence[int],
     chunk_size: int,
     *,
     cost_fn: Optional[CostFn] = None,
+    pack_residuals: bool = True,
+    packing_strategy: str = "baseline",
     validate: bool = True,
 ) -> DsppBatchPlan:
     """Build the simulator-compatible full-chunk plus residual-pack layout."""
 
     if chunk_size <= 0:
         raise ValueError("chunk_size must be positive")
+    if packing_strategy not in ("baseline", "attention-critical"):
+        raise ValueError(f"unknown DSPP packing strategy: {packing_strategy}")
     normalized_lengths = tuple(int(length) for length in sequence_lengths)
     if not normalized_lengths or any(length <= 0 for length in normalized_lengths):
         raise ValueError("sequence_lengths must contain positive integers")
@@ -417,8 +546,16 @@ def build_dspp_batch_plan(
                 )
             )
 
-    residual_bins = _pack_residuals(residuals, chunk_size)
-    item_groups = full_microbatches + [tuple(packed.items) for packed in residual_bins]
+    if pack_residuals:
+        packer = (
+            _pack_residuals_critical
+            if packing_strategy == "attention-critical"
+            else _pack_residuals
+        )
+        residual_groups = [tuple(packed.items) for packed in packer(residuals, chunk_size)]
+    else:
+        residual_groups = [(item,) for item in residuals]
+    item_groups = full_microbatches + residual_groups
     microbatches = tuple(
         DsppMicrobatchMeta(
             microbatch_id=microbatch_id,

@@ -67,6 +67,33 @@ def test_ordering_keeps_long_chains_atomic_and_steady_longest_first():
             assert positions == sorted(positions)
 
 
+def test_input_order_reports_the_actual_stable_chain_order():
+    batches = [_batch([250, 150, 80, 60], chunk_size=100)]
+    plan = build_dspp_ordering_plan(batches, pp_degree=3, mode="input")
+
+    assert plan.schedule_groups == (
+        ((0, 0), (0, 1), (0, 3)),
+        ((0, 2), (0, 4)),
+        ((0, 5),),
+        ((0, 6),),
+    )
+    assert plan.entrance_order == tuple(
+        task for group in plan.schedule_groups for task in group
+    )
+    assert plan.entrance_order == (
+        (0, 0),
+        (0, 1),
+        (0, 3),
+        (0, 2),
+        (0, 4),
+        (0, 5),
+        (0, 6),
+    )
+    assert _long_sequence_ids(batches, plan.entrance_order) == (
+        [(0, 0)] * 3 + [(0, 1)] * 2
+    )
+
+
 def test_ordering_uses_sequence_chains_as_slice_v_microbatches():
     batches = [
         _batch([128, 768, 192, 768], chunk_size=256),
@@ -115,6 +142,30 @@ def test_ordering_uses_saved_machine_profile(tmp_path):
     assert "Constructed physical microbatches" in report
     assert "Final pipeline entrance order" in report
     assert "L0/S" in report
+
+
+def test_critical_ordering_keeps_chains_atomic():
+    batches = [_batch([500, 300, 90, 80, 70, 60, 50])]
+    plan = build_dspp_ordering_plan(
+        batches, pp_degree=2, mode="warmup-short-steady-critical"
+    )
+    group_by_task = {
+        task: group_id
+        for group_id, group in enumerate(plan.schedule_groups)
+        for task in group
+    }
+    for sequence_id, length in enumerate(batches[0].plan.sequence_lengths):
+        if length <= batches[0].plan.chunk_size:
+            continue
+        tasks = [
+            (0, physical_id)
+            for physical_id, physical in enumerate(batches[0].physical_microbatches)
+            if any(
+                item.sequence_id == sequence_id and not item.is_short_sequence
+                for item in physical.meta.items
+            )
+        ]
+        assert len({group_by_task[task] for task in tasks}) == 1
 
 
 def test_timeline_artifacts_and_metric_summary_are_pure_and_compact():

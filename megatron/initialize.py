@@ -338,9 +338,18 @@ def _warmup_jit_function():
             kv_cache = KVCache(dtype, shape, growth) if args.micro_seq_length else FakeCache()
             layer_idx = 0
             if args.micro_seq_length:
-                num_slices = args.seq_length // args.micro_seq_length
+                # Variable-length runtimes support a shorter final segment.
+                # Warm up the complete chain, including that tail, instead of
+                # silently dropping it through floor division.
+                num_slices = (
+                    args.seq_length + args.micro_seq_length - 1
+                ) // args.micro_seq_length
                 if args.kaimm_pipeline_attn_balance:
-                    num_slices -= (mpu.get_pipeline_model_parallel_world_size() - 1) // 2
+                    num_slices = max(
+                        1,
+                        num_slices
+                        - (mpu.get_pipeline_model_parallel_world_size() - 1) // 2,
+                    )
             else:
                 num_slices = 1
             outputs = []

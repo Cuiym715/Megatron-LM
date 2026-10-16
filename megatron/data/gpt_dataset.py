@@ -340,7 +340,12 @@ class DocumentGPTDataset(torch.utils.data.Dataset):
 
         rng = np.random.RandomState(seed=seed)
         self.shuffle_idx = np.arange(self.num_samples, dtype=np.int64)
-        rng.shuffle(self.shuffle_idx)
+        # The single-pass loader is used by deterministic benchmark runs.  In
+        # that mode preserve document order (while still cycling documents
+        # when num_samples exceeds the corpus); the cyclic loader retains the
+        # original randomized behavior.
+        if get_args().dataloader_type != 'single':
+            rng.shuffle(self.shuffle_idx)
 
         print_rank_0(
             f" > using document-level GPT dataset for variable sequence slicing: "

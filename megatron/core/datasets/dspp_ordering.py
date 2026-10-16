@@ -14,6 +14,7 @@ import json
 from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
 from .dspp_batch_plan import DsppMicrobatchMeta
+from .dspp_execution_cost import load_execution_cost_model
 from .dspp_training import DsppTrainingBatch
 
 
@@ -53,7 +54,13 @@ def task_signature(meta: DsppMicrobatchMeta) -> str:
 def _load_profile_costs(path: str) -> Mapping[str, float]:
     with open(path, "r", encoding="utf-8") as stream:
         payload = json.load(stream)
-    costs = payload.get("costs", payload)
+    costs = payload.get("costs") if isinstance(payload, dict) else None
+    if not isinstance(costs, dict):
+        # New execution-model JSON is consumed by DsppExecutionCostModel;
+        # this legacy exact-signature loader should simply report no hits.
+        costs = payload if isinstance(payload, dict) else {}
+        if any(isinstance(value, (list, dict)) for value in costs.values()):
+            return {}
     return {str(key): float(value) for key, value in costs.items()}
 
 
@@ -61,17 +68,19 @@ def _task_metadata(
     batches: Sequence[DsppTrainingBatch],
 ) -> Dict[TaskId, DsppMicrobatchMeta]:
     return {
-        (logical_id, physical_id): physical.meta
+        (logical_id, physical_id): meta
         for logical_id, batch in enumerate(batches)
-        for physical_id, physical in enumerate(batch.physical_microbatches)
+        for physical_id, meta in enumerate(batch.plan.microbatches)
     }
 
 
 def _task_workloads(
     metadata: Mapping[TaskId, DsppMicrobatchMeta],
     profile_path: Optional[str],
+    pipeline_size: int,
 ) -> Tuple[Dict[TaskId, float], str]:
     profile = _load_profile_costs(profile_path) if profile_path else {}
+    execution_model = load_execution_cost_model(profile_path)
     result = {}
     profile_hits = 0
     for task, meta in metadata.items():
@@ -80,13 +89,23 @@ def _task_workloads(
             result[task] = profile[signature]
             profile_hits += 1
         else:
-            # Metadata-only fallback. It never simulates runtime or delays GPU
-            # work; a saved true-machine profile takes precedence when present.
-            result[task] = sum(float(item.estimated_flops) for item in meta.items)
+            fallback = sum(float(item.estimated_flops) for item in meta.items)
+            predicted, model_source, _error = execution_model.predict_task_workload(
+                meta,
+                pipeline_size=pipeline_size,
+                fallback=fallback,
+            )
+            if model_source != "metadata-fallback":
+                result[task] = predicted
+                profile_hits += 1
+            else:
+                # Metadata-only fallback. It never simulates runtime or delays GPU
+                # work; a saved true-machine profile takes precedence when present.
+                result[task] = fallback
     if profile_hits == len(metadata) and metadata:
-        source = "profile"
+        source = "profile-model" if execution_model.fitted else "profile"
     elif profile_hits:
-        source = "profile+metadata-fallback"
+        source = "profile-model+metadata-fallback" if execution_model.fitted else "profile+metadata-fallback"
     else:
         source = "metadata-proxy"
     return result, source
@@ -184,18 +203,22 @@ def build_dspp_ordering_plan(
     if not batches:
         raise ValueError("DSPP ordering requires at least one logical batch")
     metadata = _task_metadata(batches)
-    workloads, source = _task_workloads(metadata, profile_path)
+    workloads, source = _task_workloads(metadata, profile_path, pp_degree)
     input_groups = tuple(
-        tuple((logical_id, physical_id) for physical_id in range(len(batch.physical_microbatches)))
+        tuple(
+            (logical_id, physical_id)
+            for physical_id in range(len(batch.plan.microbatches))
+        )
         for logical_id, batch in enumerate(batches)
     )
     input_order = tuple(task for group in input_groups for task in group)
     chains, long_tasks = _build_long_chains(metadata)
     if mode == "input":
         schedule_groups = _input_atomic_units(input_order, chains)
+        entrance_order = tuple(task for group in schedule_groups for task in group)
         return DsppOrderingPlan(
             mode=mode,
-            entrance_order=input_order,
+            entrance_order=entrance_order,
             schedule_groups=schedule_groups,
             workloads=workloads,
             warmup_count=0,
@@ -203,7 +226,7 @@ def build_dspp_ordering_plan(
             warmup_short_only_count=0,
             cost_source=source,
         )
-    if mode != "warmup-short-steady-long":
+    if mode not in ("warmup-short-steady-long", "warmup-short-steady-critical"):
         raise ValueError(f"unknown DSPP microbatch order: {mode}")
 
     # Slice-V split counts describe one sequence chain, not all physical
@@ -243,7 +266,15 @@ def build_dspp_ordering_plan(
     # inside a chain; this is a label used by ordering, not a scheduling fence.
     warmup_task_count = warmup_count
 
-    for chain in sorted(chains, key=lambda item: (-item.sequence_length, item.key)):
+    if mode == "warmup-short-steady-critical":
+        chain_key = lambda item: (
+            -sum(workloads[task] for task in item.tasks),
+            -item.sequence_length,
+            item.key,
+        )
+    else:
+        chain_key = lambda item: (-item.sequence_length, item.key)
+    for chain in sorted(chains, key=chain_key):
         if any(task in selected for task in chain.tasks):
             continue
         units.append(chain.tasks)
@@ -298,7 +329,7 @@ def render_dspp_microbatch_report(
     input_order = [
         (logical_id, physical_id)
         for logical_id, batch in enumerate(batches)
-        for physical_id in range(len(batch.physical_microbatches))
+        for physical_id in range(len(batch.plan.microbatches))
     ]
     group_by_task = {
         task: group_id

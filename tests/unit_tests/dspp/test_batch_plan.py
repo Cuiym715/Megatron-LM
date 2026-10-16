@@ -40,6 +40,38 @@ def test_build_plan_slices_and_packs_variable_sequences():
     plan.validate()
 
 
+def test_build_plan_can_disable_residual_packing_for_ablation():
+    plan = build_dspp_batch_plan(
+        [18, 8, 3, 2], chunk_size=8, pack_residuals=False
+    )
+
+    assert _signature(plan) == [
+        [(0, 0, 0, 8)],
+        [(0, 1, 8, 8)],
+        [(1, 0, 0, 8)],
+        [(0, 2, 16, 2)],
+        [(2, 0, 0, 3)],
+        [(3, 0, 0, 2)],
+    ]
+    plan.validate()
+
+
+def test_attention_critical_packing_preserves_constraints_and_bin_count():
+    baseline = build_dspp_batch_plan(
+        [18, 8, 3, 2, 11, 10, 5, 4, 3, 2], chunk_size=8
+    )
+    critical = build_dspp_batch_plan(
+        [18, 8, 3, 2, 11, 10, 5, 4, 3, 2],
+        chunk_size=8,
+        packing_strategy="attention-critical",
+    )
+    critical.validate()
+    assert len(critical.microbatches) == len(baseline.microbatches)
+    residuals = critical.microbatches[3:]
+    assert all(mb.valid_token_count <= 8 for mb in residuals)
+    assert all(sum(item.has_history for item in mb.items) <= 1 for mb in residuals)
+
+
 def test_plan_is_deterministic_and_balances_residual_cost():
     lengths = [11, 10, 5, 4, 3, 2]
 

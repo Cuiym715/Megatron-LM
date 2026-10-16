@@ -355,10 +355,17 @@ def initialize_model_parallel(
         from megatron import get_args
         if getattr(get_args(), 'dspp', False):
             edge_groups = []
+            share_directional_p2p = getattr(
+                get_args(), 'dspp_share_directional_p2p', False
+            )
             for edge in range(len(ranks) - 1):
                 edge_ranks = [ranks[edge], ranks[edge + 1]]
                 next_group = torch.distributed.new_group(edge_ranks)
-                prev_group = torch.distributed.new_group(edge_ranks)
+                prev_group = (
+                    next_group
+                    if share_directional_p2p
+                    else torch.distributed.new_group(edge_ranks)
+                )
                 edge_groups.append((edge_ranks, next_group, prev_group))
         if rank in ranks:
             _PIPELINE_MODEL_PARALLEL_GROUP = group

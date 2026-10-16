@@ -118,8 +118,8 @@ def _unpack_outputs(plan, outputs):
     ]
 
 
-def test_packed_flash_matches_unsliced_outputs_and_all_qkv_gradients():
-    lengths = [18, 8, 3, 2]
+@pytest.mark.parametrize("lengths", ([18, 8, 3, 2], [3, 2]))
+def test_packed_flash_matches_unsliced_outputs_and_all_qkv_gradients(lengths):
     plan = build_dspp_batch_plan(lengths, chunk_size=8)
     segmented_source = _make_qkv(lengths, seed=123)
     reference_source = [

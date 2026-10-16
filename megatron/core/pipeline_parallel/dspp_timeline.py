@@ -267,6 +267,10 @@ class DsppTimelineRecorder:
                     "kind": kind,
                     "stage": self.stage,
                     "chunk": chunk,
+                    # ``chunk`` above is the VPP model-chunk id (0/1), not
+                    # the sequence-slicing size.  Store the latter explicitly
+                    # so execution-cost calibration cannot confuse the two.
+                    "sequence_chunk_size": meta.chunk_size,
                     "logical_microbatch": task_id[0],
                     "physical_microbatch": task_id[1],
                     "microbatch_id": self.microbatch_ids.get(task_id),

@@ -1,9 +1,37 @@
-__pycache__
+# 本地环境与缓存
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 本地配置
+.env
+.env.*
+!.env.example
+
+# 原始性能采样
+*.pt.trace.json
+*.pt.trace.json.gz
+*.nsys-rep
+*.ncu-rep
+
+# 仓库根目录下的运行产物
+/results/
+/checkpoints/
+
+# 编译与安装产物
 *.so
-build
+*.o
+build/
+*.egg-info/
+
+# 保留原有忽略规则
 .coverage_*
-*.egg-info
 *~
 slurm*
-logs
-./results
+logs/

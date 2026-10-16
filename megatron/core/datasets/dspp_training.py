@@ -20,12 +20,16 @@ from .dspp_batch_plan import (
 )
 
 
-@dataclass(frozen=True)
+@dataclass
 class DsppTrainingBatch:
     """One logical dataloader batch expanded into physical microbatches."""
 
     plan: DsppBatchPlan
     physical_microbatches: Tuple[DsppPackedBatch, ...]
+    _source_sequences: Optional[Tuple[torch.Tensor, ...]] = None
+    _pad_token_id: int = 0
+    _pack_residuals: bool = True
+    _packing_strategy: str = "baseline"
 
     @property
     def loss_mask(self) -> torch.Tensor:
@@ -58,6 +62,34 @@ class DsppTrainingBatch:
                         f"{name} has shape {tuple(tensor.shape)}; expected {expected_shape}"
                     )
 
+    def rechunk_(self, chunk_size: int) -> None:
+        """Rebuild this iteration-owned batch with a different physical shape."""
+
+        if chunk_size == self.plan.chunk_size:
+            return
+        if self._source_sequences is None:
+            raise RuntimeError(
+                "DSPP batch cannot be rechunked because source sequences were not retained"
+            )
+        plan = build_dspp_batch_plan(
+            self.plan.sequence_lengths,
+            chunk_size=chunk_size,
+            pack_residuals=self._pack_residuals,
+            packing_strategy=self._packing_strategy,
+            validate=False,
+        )
+        self.plan = plan
+        self.physical_microbatches = plan.materialize(
+            self._source_sequences,
+            pad_token_id=self._pad_token_id,
+            device=self._source_sequences[0].device,
+        )
+
+    def release_rechunk_source_(self) -> None:
+        """Release source views once the iteration's chunk size is final."""
+
+        self._source_sequences = None
+
 
 def build_dspp_training_batch(
     tokens_with_labels: torch.Tensor,
@@ -67,7 +99,10 @@ def build_dspp_training_batch(
     pad_token_id: int = 0,
     max_sequence_length: Optional[int] = None,
     cost_fn: Optional[CostFn] = None,
+    pack_residuals: bool = True,
+    packing_strategy: str = "baseline",
     validate: bool = False,
+    retain_rechunk_source: bool = False,
 ) -> DsppTrainingBatch:
     """Build a DSPP training batch without inferring length from token values.
 
@@ -108,6 +143,8 @@ def build_dspp_training_batch(
         training_lengths,
         chunk_size=chunk_size,
         cost_fn=cost_fn,
+        pack_residuals=pack_residuals,
+        packing_strategy=packing_strategy,
         validate=False,
     )
     physical = plan.materialize(
@@ -115,7 +152,14 @@ def build_dspp_training_batch(
         pad_token_id=pad_token_id,
         device=tokens_with_labels.device,
     )
-    result = DsppTrainingBatch(plan=plan, physical_microbatches=physical)
+    result = DsppTrainingBatch(
+        plan=plan,
+        physical_microbatches=physical,
+        _source_sequences=(tuple(raw_sequences) if retain_rechunk_source else None),
+        _pad_token_id=pad_token_id,
+        _pack_residuals=pack_residuals,
+        _packing_strategy=packing_strategy,
+    )
     if validate:
         result.validate()
     return result

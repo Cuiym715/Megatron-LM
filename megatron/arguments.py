@@ -227,6 +227,36 @@ def validate_args(args, defaults={}):
             'DSPP currently requires unset --use-fast-rope'
         assert args.variable_seq_debug_num_batches >= 0, \
             'variable-seq-debug-num-batches must be >= 0'
+        if args.dspp_auto_chunk_size:
+            assert args.dspp_min_chunk_size > 0, \
+                '--dspp-min-chunk-size must be positive'
+            assert args.dspp_chunk_alignment > 0, \
+                '--dspp-chunk-alignment must be positive'
+            assert args.dspp_max_chunk_size >= 0, \
+                '--dspp-max-chunk-size must be non-negative'
+            assert 0.0 < args.dspp_memory_utilization <= 1.0, \
+                '--dspp-memory-utilization must be in (0, 1]'
+            assert args.dspp_memory_reserve_mib >= 0, \
+                '--dspp-memory-reserve-mib must be non-negative'
+            assert args.dspp_memory_safety_factor >= 1.0, \
+                '--dspp-memory-safety-factor must be at least 1'
+            assert args.dspp_activation_bytes_per_token >= 0.0, \
+                '--dspp-activation-bytes-per-token must be non-negative'
+            assert args.dspp_max_p2p_bytes >= 0, \
+                '--dspp-max-p2p-bytes must be non-negative'
+            assert args.dspp_saturation_chunk_size >= 0, \
+                '--dspp-saturation-chunk-size must be non-negative'
+            assert 0.0 <= args.dspp_saturation_slack < 1.0, \
+                '--dspp-saturation-slack must be in [0, 1)'
+            if args.dspp_chunk_selection == 'per-iteration-menu':
+                assert args.dspp_chunk_menu, \
+                    '--dspp-chunk-menu is required for per-iteration-menu selection'
+                assert args.dspp_execution_profile, \
+                    '--dspp-execution-profile is required for per-iteration-menu selection'
+        assert args.dspp_recv_lookahead >= 0, \
+            '--dspp-recv-lookahead must be non-negative'
+        assert args.dspp_send_inflight_depth > 0, \
+            '--dspp-send-inflight-depth must be positive'
 
     if args.variable_seq_slicing:
         assert args.micro_seq_length > 0, \
@@ -387,7 +417,11 @@ def validate_args(args, defaults={}):
         assert args.max_position_embeddings >= args.seq_length
     if args.decoder_seq_length is not None:
         assert args.max_position_embeddings >= args.decoder_seq_length
-    if args.micro_seq_length:
+    # DSPP builds physical microbatches from the current iteration's sequence
+    # lengths.  A final segment may be shorter than micro_seq_length and a
+    # sequence may consist of only one segment, so the fixed-slicing divisibility
+    # and per-sequence pipeline-fill checks below do not apply to DSPP.
+    if args.micro_seq_length and not args.dspp:
         if args.variable_seq_slicing:
             assert args.seq_length >= args.micro_seq_length, \
                 'variable sequence slicing requires --seq-length >= --micro-seq-length'
@@ -1363,9 +1397,18 @@ def _add_distributed_args(parser):
                        'Supports the single-GPU B1 path and PP=3/VPP=2 B2/B3 path.')
     group.add_argument('--dspp-microbatch-order', type=str,
                        default='warmup-short-steady-long',
-                       choices=['input', 'warmup-short-steady-long'],
+                       choices=['input', 'warmup-short-steady-long',
+                                'warmup-short-steady-critical'],
                        help='Physical-microbatch entrance order for distributed DSPP. '
                        'The default applies the simulator C1 warmup/steady policy.')
+    group.add_argument('--dspp-disable-residual-packing', action='store_true',
+                       help='Ablation only: place every short sequence or long-sequence '
+                       'tail in its own padded physical microbatch.')
+    group.add_argument('--dspp-packing-strategy', type=str, default='baseline',
+                       choices=['baseline', 'attention-critical'],
+                       help='Residual packing policy. baseline preserves the original '
+                       'greedy packer; attention-critical applies bounded continuation-safe '
+                       'LPT/local-improvement packing.')
     group.add_argument('--dspp-v-layer-layout', type=str, default='balanced',
                        choices=['balanced', 'legacy-output-slot'],
                        help='DSPP V-pipeline Transformer-layer layout. balanced assigns '
@@ -1374,6 +1417,77 @@ def _add_distributed_args(parser):
     group.add_argument('--dspp-order-profile', type=str, default=None,
                        help='Optional C2 CUDA-event cost JSON used by C1 ordering. '
                        'Unmatched shapes use the metadata cost proxy.')
+    group.add_argument('--dspp-execution-profile', type=str, default=None,
+                       help='Profile-backed F/B/W execution model used by chunk '
+                       'selection. Unmatched shapes fall back '
+                       'to metadata work.')
+    group.add_argument('--dspp-p2p-profile', type=str, default=None,
+                       help='Optional directed P2P latency/bandwidth profile used by '
+                       'the metadata critical-path planner.')
+    group.add_argument('--dspp-dag-communication-cost', type=str, default='profile',
+                       choices=['ignore', 'profile', 'analytical'],
+                       help='Communication cost used by the metadata DSPP DAG. '
+                       'profile uses measured P2P points and falls back to '
+                       'latency + payload/bandwidth; analytical always uses that '
+                       'fallback model.')
+    group.add_argument('--dspp-p2p-bandwidth-gbps', type=float, default=25.0,
+                       help='Fallback directed P2P bandwidth for DAG planning when '
+                       'no P2P profile is supplied.')
+    group.add_argument('--dspp-p2p-latency-us', type=float, default=20.0,
+                       help='Fallback one-message P2P latency for DAG planning.')
+    group.add_argument('--dspp-auto-chunk-size', action='store_true',
+                       help='Adapt DSPP chunk size per iteration using current sequence '
+                       'lengths, CUDA memory availability, and an online activation model. '
+                       '--micro-seq-length is the safe first-iteration bootstrap size.')
+    group.add_argument('--dspp-chunk-selection', type=str, default='memory',
+                       choices=['memory', 'structure-aware', 'per-iteration-menu'],
+                       help='Auto-chunk policy. structure-aware uses a bounded '
+                       'saturation-window selector; per-iteration-menu evaluates only '
+                       'the offline profiled menu on the current iteration metadata.')
+    group.add_argument('--dspp-chunk-menu', type=str, default=None,
+                       help='Offline compute chunk_menu.json used by '
+                       '--dspp-chunk-selection per-iteration-menu.')
+    group.add_argument('--dspp-saturation-chunk-size', type=int, default=0,
+                       help='Offline-calibrated minimum efficient chunk for the '
+                       'structure-aware selector; 0 uses --dspp-min-chunk-size.')
+    group.add_argument('--dspp-saturation-slack', type=float, default=0.20,
+                       help='Relative largest-task slack accepted in the saturation window.')
+    group.add_argument('--dspp-min-chunk-size', type=int, default=256,
+                       help='Minimum candidate chunk size for DSPP auto tuning.')
+    group.add_argument('--dspp-max-chunk-size', type=int, default=0,
+                       help='Maximum DSPP auto-tuned chunk size; 0 uses --seq-length.')
+    group.add_argument('--dspp-chunk-alignment', type=int, default=256,
+                       help='Token alignment for DSPP auto chunk candidates. This does not '
+                       'restrict candidates to powers of two.')
+    group.add_argument('--dspp-efficiency-top-k', type=int, default=4,
+                       help='Number of cheapest efficiency-screened chunks sent to the '
+                       'full DSPP DAG planner; boundary, local-peak and current-chunk '
+                       'candidates are added separately.')
+    group.add_argument('--dspp-efficiency-slack', type=float, default=0.05,
+                       help='Relative cheap-score plateau retained during DSPP efficiency '
+                       'screening.')
+    group.add_argument('--dspp-memory-utilization', type=float, default=0.90,
+                       help='Maximum fraction of locally usable CUDA memory available to DSPP.')
+    group.add_argument('--dspp-memory-reserve-mib', type=int, default=1024,
+                       help='CUDA memory headroom excluded from DSPP auto chunk selection.')
+    group.add_argument('--dspp-memory-safety-factor', type=float, default=1.05,
+                       help='Multiplier applied to the online DSPP activation-memory estimate.')
+    group.add_argument('--dspp-activation-bytes-per-token', type=float, default=0.0,
+                       help='Optional initial activation bytes per peak-live token. Zero learns '
+                       'it from the bootstrap iteration.')
+    group.add_argument('--dspp-max-p2p-bytes', type=int, default=0,
+                       help='Optional maximum DSPP activation payload per P2P message while auto '
+                       'tuning; 0 leaves the chunk bound to the memory model.')
+    group.add_argument('--dspp-recv-lookahead', type=int, default=2,
+                       help='Number of future receives and credits preposted per incoming DSPP '
+                       'lane after sender-ready notification.')
+    group.add_argument('--dspp-send-inflight-depth', type=int, default=2,
+                       help='Maximum number of matched NCCL sends simultaneously in flight per '
+                       'outgoing DSPP lane.')
+    group.add_argument('--dspp-share-directional-p2p', action='store_true',
+                       help='Ablation only: use one NCCL communicator per physical PP edge '
+                       'for both traffic directions. The default creates one communicator '
+                       'per direction so forward and reverse traffic progress independently.')
     group.add_argument('--dspp-timeline-dir', type=str, default=None,
                        help='Directory for opt-in per-rank DSPP timeline JSON and merged SVG.')
     group.add_argument('--dspp-timeline-iteration', type=int, default=0,

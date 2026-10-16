@@ -164,16 +164,13 @@ class DsppSequenceKVState:
         key_parts: List[torch.Tensor] = []
         value_parts: List[torch.Tensor] = []
         layouts: List[_ItemLayout] = []
+        direct_current = bool(meta.items) and all(
+            not item.has_history and item.is_last_segment for item in meta.items
+        )
         current_offset = 0
         for item in meta.items:
             current_end = current_offset + item.token_length
-            item_key = current_key[current_offset:current_end]
-            item_value = current_value[current_offset:current_end]
             entry, history = self._get_history(layer_idx, item)
-            key_parts.extend(segment.key for segment in history)
-            value_parts.extend(segment.value for segment in history)
-            key_parts.append(item_key)
-            value_parts.append(item_value)
             layouts.append(
                 _ItemLayout(
                     item=item,
@@ -182,6 +179,16 @@ class DsppSequenceKVState:
                     ),
                 )
             )
+            if direct_current:
+                current_offset = current_end
+                continue
+
+            item_key = current_key[current_offset:current_end]
+            item_value = current_value[current_offset:current_end]
+            key_parts.extend(segment.key for segment in history)
+            value_parts.extend(segment.value for segment in history)
+            key_parts.append(item_key)
+            value_parts.append(item_value)
 
             if not item.is_last_segment:
                 if len(meta.items) != 1:
@@ -197,11 +204,18 @@ class DsppSequenceKVState:
                 entry.next_segment_id = item.segment_id + 1
             current_offset = current_end
 
-        return (
-            torch.cat(key_parts, dim=0).contiguous(),
-            torch.cat(value_parts, dim=0).contiguous(),
-            tuple(layouts),
-        )
+        if direct_current:
+            # Independent final sequences already occupy current K/V in
+            # ``meta`` order. Avoid per-item tensor views and materialization.
+            assembled_key = current_key
+            assembled_value = current_value
+        elif len(key_parts) == 1:
+            assembled_key = key_parts[0]
+            assembled_value = value_parts[0]
+        else:
+            assembled_key = torch.cat(key_parts, dim=0).contiguous()
+            assembled_value = torch.cat(value_parts, dim=0).contiguous()
+        return assembled_key, assembled_value, tuple(layouts)
 
     @staticmethod
     def _accumulate(
@@ -220,8 +234,26 @@ class DsppSequenceKVState:
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Route history gradients backward and return current-segment gradients."""
 
-        current_key_grad = assembled_key_grad.new_empty(current_shape)
-        current_value_grad = assembled_value_grad.new_empty(current_shape)
+        direct_current = bool(layouts) and all(
+            not layout.history and layout.item.is_last_segment for layout in layouts
+        )
+        if direct_current:
+            if (
+                assembled_key_grad.shape != current_shape
+                or assembled_value_grad.shape != current_shape
+            ):
+                raise RuntimeError(
+                    "current K/V gradient shape does not match physical task"
+                )
+            # For an all-independent pack, FlashAttention's dK/dV layout is
+            # already the physical current-K/V layout.  No allocation or
+            # per-item scatter is needed.
+            return assembled_key_grad, assembled_value_grad
+
+        single_item = len(layouts) == 1
+        if not single_item:
+            current_key_grad = assembled_key_grad.new_empty(current_shape)
+            current_value_grad = assembled_value_grad.new_empty(current_shape)
         assembled_offset = 0
         current_offset = 0
         for layout in layouts:
@@ -247,7 +279,6 @@ class DsppSequenceKVState:
                 assembled_offset = end
 
             assembled_end = assembled_offset + item.token_length
-            current_end = current_offset + item.token_length
             key_grad = assembled_key_grad[assembled_offset:assembled_end]
             value_grad = assembled_value_grad[assembled_offset:assembled_end]
             if not item.is_last_segment:
@@ -271,10 +302,15 @@ class DsppSequenceKVState:
                 entry.segments.pop()
                 entry.next_segment_id = item.segment_id
 
-            current_key_grad[current_offset:current_end] = key_grad
-            current_value_grad[current_offset:current_end] = value_grad
+            if single_item:
+                current_key_grad = key_grad
+                current_value_grad = value_grad
+            else:
+                current_end = current_offset + item.token_length
+                current_key_grad[current_offset:current_end] = key_grad
+                current_value_grad[current_offset:current_end] = value_grad
+                current_offset = current_end
             assembled_offset = assembled_end
-            current_offset = current_end
 
             if not item.is_last_segment and item.segment_id == 0:
                 if entry is None or entry.segments:
@@ -287,6 +323,10 @@ class DsppSequenceKVState:
 
         if assembled_offset != assembled_key_grad.size(0):
             raise RuntimeError("assembled K/V gradient layout was not fully consumed")
+        if current_key_grad.shape != current_shape:
+            raise RuntimeError(
+                "current K/V gradient shape does not match physical task"
+            )
         return current_key_grad, current_value_grad
 
     def clear(self) -> None:
@@ -331,31 +371,37 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
             raise ValueError(
                 "DSPP packed FlashAttention requires CUDA FP16/BF16 tensors"
             )
-        if query.ndim != 3:
+        if query.ndim != 4 or query.size(1) != 1:
             raise ValueError(
-                "valid DSPP Q/K/V must have shape [tokens, heads, head_dim]"
+                "DSPP Q/K/V must have shape [chunk_size, 1, heads, head_dim]"
             )
         if current_key.shape != current_value.shape:
             raise ValueError("current key and value shapes must match")
-        if query.size(0) != current_key.size(0) or query.size(-1) != current_key.size(
-            -1
+        if (
+            query.size(0) != current_key.size(0)
+            or query.size(1) != current_key.size(1)
+            or query.size(-1) != current_key.size(-1)
         ):
             raise ValueError(
-                "query and K/V token counts and head dimensions must match"
+                "query and K/V sequence, batch, and head dimensions must match"
             )
+        valid_tokens = meta.valid_token_count
+        query_valid = query[:valid_tokens, 0].contiguous()
+        current_key_valid = current_key[:valid_tokens, 0].contiguous()
+        current_value_valid = current_value[:valid_tokens, 0].contiguous()
 
         assembled_key, assembled_value, layouts = state.build_key_value(
-            int(layer_idx), meta, current_key, current_value
+            int(layer_idx), meta, current_key_valid, current_value_valid
         )
         cu_q, cu_k = state.prepared_cu_seqlens(meta, query.device)
-        if assembled_key.size(0) != int(cu_k[-1].item()):
+        if assembled_key.size(0) != meta.cu_seqlens_k[-1]:
             raise RuntimeError("assembled K/V length does not match cu_seqlens_k")
 
-        original_head_dim = query.size(-1)
+        original_head_dim = query_valid.size(-1)
         padded_head_dim = (original_head_dim + 7) // 8 * 8
         if padded_head_dim != original_head_dim:
             query_padded = torch.nn.functional.pad(
-                query, (0, padded_head_dim - original_head_dim)
+                query_valid, (0, padded_head_dim - original_head_dim)
             )
             key_padded = torch.nn.functional.pad(
                 assembled_key, (0, padded_head_dim - original_head_dim)
@@ -364,7 +410,7 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
                 assembled_value, (0, padded_head_dim - original_head_dim)
             )
         else:
-            query_padded = query
+            query_padded = query_valid
             key_padded = assembled_key
             value_padded = assembled_value
         scale = float(softmax_scale or original_head_dim**-0.5)
@@ -405,8 +451,16 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
         ctx.layer_idx = int(layer_idx)
         ctx.scale = scale
         ctx.original_head_dim = original_head_dim
-        ctx.current_shape = current_key.shape
-        return output[..., :original_head_dim]
+        ctx.current_shape = current_key_valid.shape
+        ctx.query_physical_shape = query.shape
+        ctx.kv_physical_shape = current_key.shape
+        ctx.valid_tokens = valid_tokens
+        output_valid = output[..., :original_head_dim]
+        if valid_tokens == query.size(0):
+            return output_valid.unsqueeze(1)
+        physical_output = query.new_zeros(query.shape)
+        physical_output[:valid_tokens, 0] = output_valid
+        return physical_output
 
     @staticmethod
     def backward(ctx, output_grad: torch.Tensor):
@@ -420,16 +474,17 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
             cu_k,
             rng_state,
         ) = ctx.saved_tensors
-        if output_grad.size(-1) != query.size(-1):
-            output_grad = torch.nn.functional.pad(
-                output_grad, (0, query.size(-1) - output_grad.size(-1))
+        output_grad_valid = output_grad[: ctx.valid_tokens, 0]
+        if output_grad_valid.size(-1) != query.size(-1):
+            output_grad_valid = torch.nn.functional.pad(
+                output_grad_valid, (0, query.size(-1) - output_grad_valid.size(-1))
             )
-        output_grad = output_grad.contiguous()
+        output_grad_valid = output_grad_valid.contiguous()
         query_grad = torch.empty_like(query)
         key_grad = torch.empty_like(key)
         value_grad = torch.empty_like(value)
         _wrapped_flash_attn_varlen_backward(
-            output_grad,
+            output_grad_valid,
             query,
             key,
             value,
@@ -463,6 +518,20 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
             value_grad,
             ctx.current_shape,
         )
+        if ctx.valid_tokens == ctx.query_physical_shape[0]:
+            query_grad = query_grad.unsqueeze(1)
+            current_key_grad = current_key_grad.unsqueeze(1)
+            current_value_grad = current_value_grad.unsqueeze(1)
+        else:
+            physical_query_grad = query_grad.new_zeros(ctx.query_physical_shape)
+            physical_key_grad = current_key_grad.new_zeros(ctx.kv_physical_shape)
+            physical_value_grad = current_value_grad.new_zeros(ctx.kv_physical_shape)
+            physical_query_grad[: ctx.valid_tokens, 0] = query_grad
+            physical_key_grad[: ctx.valid_tokens, 0] = current_key_grad
+            physical_value_grad[: ctx.valid_tokens, 0] = current_value_grad
+            query_grad = physical_query_grad
+            current_key_grad = physical_key_grad
+            current_value_grad = physical_value_grad
         return (
             query_grad,
             current_key_grad,
@@ -508,16 +577,12 @@ def dspp_packed_flash_attention(
         )
     if query.size(0) != meta.chunk_size:
         raise ValueError("Q/K/V sequence dimension must equal metadata chunk_size")
-    valid_tokens = meta.valid_token_count
-    output_valid = _DsppPackedFlashAttention.apply(
-        query[:valid_tokens, 0].contiguous(),
-        key[:valid_tokens, 0].contiguous(),
-        value[:valid_tokens, 0].contiguous(),
+    return _DsppPackedFlashAttention.apply(
+        query,
+        key,
+        value,
         state,
         meta,
         int(layer_idx),
         softmax_scale,
     )
-    output = query.new_zeros(query.shape)
-    output[:valid_tokens, 0] = output_valid
-    return output

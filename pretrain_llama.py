@@ -12,7 +12,10 @@ from megatron import reference
 from megatron.core import parallel_state as mpu
 from megatron.core import tensor_parallel
 from megatron.core.enums import ModelType
-from megatron.core.datasets.dspp_training import build_dspp_training_batch
+from megatron.core.datasets.dspp_training import (
+    DsppTrainingBatch,
+    build_dspp_training_batch,
+)
 from megatron.data.gpt_dataset import build_train_valid_test_datasets
 from megatron.model import LlamaModel
 from megatron.training import pretrain
@@ -72,8 +75,11 @@ def get_batch(data_iterator):
             chunk_size=args.micro_seq_length,
             pad_token_id=max(args.variable_seq_pad_token_id, 0),
             max_sequence_length=args.seq_length,
+            pack_residuals=not getattr(args, 'dspp_disable_residual_packing', False),
+            packing_strategy=getattr(args, 'dspp_packing_strategy', 'baseline'),
+            retain_rechunk_source=getattr(args, 'dspp_auto_chunk_size', False),
         )
-        return training_batch, partial(loss_func, training_batch.loss_mask)
+        return training_batch, partial(loss_func, training_batch)
 
     if args.variable_seq_slicing:
         pad_to_multiple = (
@@ -104,6 +110,8 @@ def get_batch(data_iterator):
 
 
 def loss_func(loss_mask, output_tensor):
+    if isinstance(loss_mask, DsppTrainingBatch):
+        loss_mask = loss_mask.loss_mask
     losses = output_tensor.float()
     loss_mask = loss_mask.view(-1).float()
     loss = torch.sum(losses.view(-1) * loss_mask) / loss_mask.sum()
