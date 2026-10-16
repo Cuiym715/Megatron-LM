@@ -23,6 +23,7 @@ BACKWARD_RANGE_DEPTH = 0
 
 
 PERF_MODEL = False
+ANNOTATIONS_ENABLED = True
 GLOBAL_EVENTS = list()
 
 
@@ -70,6 +71,8 @@ def annotate_forward_backward(forward_msg, backward_msg):
     def decorator(forward_orig):
         @functools.wraps(forward_orig)
         def wrapper(*args, **kwargs):
+            if not ANNOTATIONS_ENABLED:
+                return forward_orig(*args, **kwargs)
             kwargs_items = list(kwargs.items())
             inputs_list = list(args) + [t[1] for t in kwargs_items]
             inputs_mask = [torch.is_tensor(x) and not isinstance(x, torch.nn.Parameter) for x in inputs_list]  # mask=True means should be applied
@@ -90,6 +93,9 @@ def annotate_forward_backward(forward_msg, backward_msg):
 
 @contextlib.contextmanager
 def annotate_range(msg, color=DEFAULT_COLOR):
+    if not ANNOTATIONS_ENABLED:
+        yield
+        return
     nvtx.push_range(msg, color=color)
     record_event((msg, "forward", "begin"))
     try:
@@ -136,6 +142,9 @@ class BackwardPopFunction(torch.autograd.Function):
 
 @contextlib.contextmanager
 def annotate_backward_range(msg):
+    if not ANNOTATIONS_ENABLED:
+        yield
+        return
     x1 = torch.empty(1, device="cuda", requires_grad=True)
     x1 = BackwardPushFunction.apply(msg, x1)
     x1.backward(x1)

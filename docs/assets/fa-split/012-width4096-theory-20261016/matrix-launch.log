@@ -1,0 +1,7 @@
+Starting hidden4096-short
+hidden4096-short {'B_count': 60, 'H_count': 24, 'all_H_immediately_follow_matching_B': True, 'no_H_for_no_history_B': True, 'all_mode_layouts_match': True}
+{"stage": 1, "model_chunk": 0, "layout_q_history": [[2048, 4096]], "count": 2, "median": {"fused_B_ms": 8.015359878540039, "after_dx_B_ms": 7.478272199630737, "H_ms": 2.0249600410461426, "B_plus_H_ms": 9.50323224067688, "B_start_to_H_end_ms": 9.505279541015625}}
+Starting hidden4096-long
+hidden4096-long {'B_count': 108, 'H_count': 72, 'all_H_immediately_follow_matching_B': True, 'no_H_for_no_history_B': True, 'all_mode_layouts_match': True}
+{"stage": 1, "model_chunk": 0, "layout_q_history": [[2048, 12288]], "count": 2, "median": {"fused_B_ms": 13.183487892150879, "after_dx_B_ms": 10.612735748291016, "H_ms": 6.283776044845581, "B_plus_H_ms": 16.896511793136597, "B_start_to_H_end_ms": 16.8985595703125}}
+{"stage": 1, "model_chunk": 0, "layout_q_history": [[2048, 4096]], "count": 2, "median": {"fused_B_ms": 8.468991756439209, "after_dx_B_ms": 7.350271940231323, "H_ms": 2.1217280626296997, "B_plus_H_ms": 9.472000002861023, "B_start_to_H_end_ms": 9.47406005859375}}

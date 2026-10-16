@@ -104,6 +104,18 @@ if [[ -n "$DSPP_GLOBAL_FIXED_TRACE" ]]; then
 fi
 
 EXTRA_ARGS=()
+if [[ "${DSPP_TASK_TIMING_ONLY:-0}" == 1 ]]; then
+  EXTRA_ARGS+=(--dspp-task-timing-only --timing-log-level 0)
+fi
+if [[ "${DSPP_SPLIT_ATTENTION_BACKWARD:-0}" == 1 ]]; then
+  EXTRA_ARGS+=(--dspp-split-attention-backward)
+fi
+if [[ "${DSPP_HISTORY_DKV_AFTER_DX:-0}" == 1 ]]; then
+  EXTRA_ARGS+=(--dspp-history-dkv-after-dx)
+fi
+if [[ -n "${NUM_QUERY_GROUPS:-}" ]]; then
+  EXTRA_ARGS+=(--group-query-attention --num-query-groups "$NUM_QUERY_GROUPS")
+fi
 if [[ -n "$DSPP_ORDER_PROFILE" ]]; then
   EXTRA_ARGS+=(--dspp-order-profile "$DSPP_ORDER_PROFILE")
 fi
@@ -152,7 +164,7 @@ if [[ -n "$DSPP_METRICS_PATH" ]]; then
 fi
 
 CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1,2} "$PYTHON_BIN" -m torch.distributed.run \
-  --standalone --nproc-per-node=3 pretrain_llama.py \
+  --standalone --nproc-per-node=3 "${TRAIN_ENTRYPOINT:-pretrain_llama.py}" \
   --tensor-model-parallel-size 1 \
   --pipeline-model-parallel-size 3 \
   --num-layers-per-virtual-pipeline-stage "$LAYERS_PER_VPP" \
@@ -166,8 +178,8 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1,2} "$PYTHON_BIN" -m torch.distr
   --micro-batch-size "$MICRO_BATCH_SIZE" \
   --global-batch-size "$GLOBAL_BATCH_SIZE" \
   --train-iters "$TRAIN_ITERS" \
-  --lr 0.001 \
-  --min-lr 0.0001 \
+  --lr "${LEARNING_RATE:-0.001}" \
+  --min-lr "${MIN_LEARNING_RATE:-0.0001}" \
   --lr-decay-style cosine \
   --weight-decay 0.1 \
   --clip-grad 1.0 \

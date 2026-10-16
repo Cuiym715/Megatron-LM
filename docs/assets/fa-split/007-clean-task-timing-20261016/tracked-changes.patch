@@ -1,0 +1,734 @@
+diff --git a/examples/run_dspp_b23_l40.sh b/examples/run_dspp_b23_l40.sh
+index b4dd675d9..1dfc27b5c 100755
+--- a/examples/run_dspp_b23_l40.sh
++++ b/examples/run_dspp_b23_l40.sh
+@@ -104,6 +104,18 @@ if [[ -n "$DSPP_GLOBAL_FIXED_TRACE" ]]; then
+ fi
+ 
+ EXTRA_ARGS=()
++if [[ "${DSPP_TASK_TIMING_ONLY:-0}" == 1 ]]; then
++  EXTRA_ARGS+=(--dspp-task-timing-only --timing-log-level 0)
++fi
++if [[ "${DSPP_SPLIT_ATTENTION_BACKWARD:-0}" == 1 ]]; then
++  EXTRA_ARGS+=(--dspp-split-attention-backward)
++fi
++if [[ "${DSPP_HISTORY_DKV_AFTER_DX:-0}" == 1 ]]; then
++  EXTRA_ARGS+=(--dspp-history-dkv-after-dx)
++fi
++if [[ -n "${NUM_QUERY_GROUPS:-}" ]]; then
++  EXTRA_ARGS+=(--group-query-attention --num-query-groups "$NUM_QUERY_GROUPS")
++fi
+ if [[ -n "$DSPP_ORDER_PROFILE" ]]; then
+   EXTRA_ARGS+=(--dspp-order-profile "$DSPP_ORDER_PROFILE")
+ fi
+@@ -152,7 +164,7 @@ if [[ -n "$DSPP_METRICS_PATH" ]]; then
+ fi
+ 
+ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1,2} "$PYTHON_BIN" -m torch.distributed.run \
+-  --standalone --nproc-per-node=3 pretrain_llama.py \
++  --standalone --nproc-per-node=3 "${TRAIN_ENTRYPOINT:-pretrain_llama.py}" \
+   --tensor-model-parallel-size 1 \
+   --pipeline-model-parallel-size 3 \
+   --num-layers-per-virtual-pipeline-stage "$LAYERS_PER_VPP" \
+@@ -166,8 +178,8 @@ CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1,2} "$PYTHON_BIN" -m torch.distr
+   --micro-batch-size "$MICRO_BATCH_SIZE" \
+   --global-batch-size "$GLOBAL_BATCH_SIZE" \
+   --train-iters "$TRAIN_ITERS" \
+-  --lr 0.001 \
+-  --min-lr 0.0001 \
++  --lr "${LEARNING_RATE:-0.001}" \
++  --min-lr "${MIN_LEARNING_RATE:-0.0001}" \
+   --lr-decay-style cosine \
+   --weight-decay 0.1 \
+   --clip-grad 1.0 \
+diff --git a/megatron/arguments.py b/megatron/arguments.py
+index 987e073e7..2bab1ffee 100644
+--- a/megatron/arguments.py
++++ b/megatron/arguments.py
+@@ -192,6 +192,23 @@ def validate_args(args, defaults={}):
+     else:
+         args.virtual_pipeline_model_parallel_size = None
+ 
++    if args.dspp_task_timing_only:
++        assert args.dspp, '--dspp-task-timing-only requires --dspp'
++        assert args.timing_log_level == 0, 'task-only timing requires --timing-log-level 0'
++        assert args.kaimm_cuda_synchronize_level == 0, 'task-only timing excludes debug CUDA synchronization'
++        assert not args.kaimm_profile_analysis and not args.profile, 'task-only timing excludes internal profilers'
++        assert not args.dspp_torch_profiler_dir, 'task-only timing excludes torch profiler'
++        assert not os.environ.get('DSPP_GPU_PROGRESS_DIR'), 'task-only timing excludes GPU progress recording'
++    if args.dspp_history_dkv_after_dx:
++        assert args.dspp_split_attention_backward, '--dspp-history-dkv-after-dx requires --dspp-split-attention-backward'
++    if args.dspp_split_attention_backward:
++        assert args.dspp, '--dspp-split-attention-backward requires --dspp'
++        assert args.bf16 and not args.fp16, 'DSPP split attention backward requires BF16'
++        split_head_dim = args.kv_channels or args.hidden_size // args.num_attention_heads
++        assert split_head_dim == 128, 'DSPP split attention backward requires head dimension 128'
++        assert args.transformer_impl == 'local', 'DSPP split attention backward requires local transformer'
++        assert not args.use_alibi, 'DSPP split attention backward does not support ALiBi'
++
+     if args.dspp:
+         assert not args.variable_seq_slicing, \
+             '--dspp and --variable-seq-slicing select different runtimes; enable only --dspp'
+@@ -1395,6 +1412,16 @@ def _add_distributed_args(parser):
+     group.add_argument('--dspp', action='store_true',
+                        help='Enable the DSPP variable-length packed training runtime. '
+                        'Supports the single-GPU B1 path and PP=3/VPP=2 B2/B3 path.')
++    group.add_argument('--dspp-split-attention-backward', action='store_true',
++                       help='Experimental FA2 dQ/current-dKV/history-dKV split. By default all '
++                       'execute inside packed backward; --dspp-history-dkv-after-dx moves '
++                       'history to a separate task after complete dx. Requires BF16/head-dim 128.')
++    group.add_argument('--dspp-history-dkv-after-dx', action='store_true',
++                       help='With split attention backward, publish complete stage dx first, '
++                       'then immediately run a separate history-dKV task. No intervening compute tasks.')
++    group.add_argument('--dspp-task-timing-only', action='store_true',
++                       help='Measure only B/H boundary CUDA events, with internal annotations and '
++                       'synchronizing timers disabled. Excludes profiler/progress diagnostics.')
+     group.add_argument('--dspp-microbatch-order', type=str,
+                        default='warmup-short-steady-long',
+                        choices=['input', 'warmup-short-steady-long',
+diff --git a/megatron/core/kv_cache/dspp_packed_attention.py b/megatron/core/kv_cache/dspp_packed_attention.py
+index 13a0d07c5..b75aa67bf 100644
+--- a/megatron/core/kv_cache/dspp_packed_attention.py
++++ b/megatron/core/kv_cache/dspp_packed_attention.py
+@@ -55,13 +55,65 @@ class _ItemLayout:
+ class DsppSequenceKVState:
+     """Iteration-scoped per-layer, per-logical-sequence K/V state."""
+ 
+-    def __init__(self, *, validate_runtime: bool = False) -> None:
++    def __init__(self, *, validate_runtime: bool = False,
++                 split_attention_backward: bool = False,
++                 history_dkv_after_dx: bool = False) -> None:
+         self._entries: Dict[Tuple[int, int], _SequenceLayerEntry] = {}
+         self._current_meta: Optional[DsppMicrobatchMeta] = None
+         self._prepared_cu_seqlens: Dict[
+             Tuple[int, torch.device], Tuple[torch.Tensor, torch.Tensor]
+         ] = {}
+         self.validate_runtime = bool(validate_runtime)
++        # Original split mode runs inside attention backward. Optional after-dx
++        # mode holds history states until a separate, immediately following H.
++        self.split_attention_backward = bool(split_attention_backward)
++        if history_dkv_after_dx and not split_attention_backward:
++            raise ValueError("history dKV after dx requires split attention backward")
++        self.history_dkv_after_dx = bool(history_dkv_after_dx)
++        self._history_task_id = None
++        self._history_task_ready = False
++        self._history_jobs = []
++
++    @property
++    def pending_history_count(self) -> int:
++        return len(self._history_jobs)
++
++    def begin_backward_task(self, microbatch_id: int) -> None:
++        """Own one B/H pair; no next backward until its H has been drained."""
++        if not self.history_dkv_after_dx:
++            raise RuntimeError("after-dx task mode is not enabled")
++        if self._history_task_id is not None or self._history_jobs:
++            raise RuntimeError("previous history task has not completed")
++        self._history_task_id = microbatch_id
++        self._history_task_ready = False
++
++    def mark_dx_ready(self, microbatch_id: int) -> None:
++        """Called only after the complete stage backward has returned."""
++        if self._history_task_id != microbatch_id or self._history_task_ready:
++            raise RuntimeError("invalid or duplicate dx-ready boundary")
++        self._history_task_ready = True
++
++    def run_history_task(self, microbatch_id: int) -> int:
++        """Execute all layers' history dKV immediately after dx publication.
++
++        This state owns tensor references until kernels and routing have been
++        submitted on the same stream used for B. No autograd graph is retained.
++        A failed task stays blocked rather than being silently retried.
++        """
++        if self._history_task_id != microbatch_id or not self._history_task_ready:
++            raise RuntimeError("history task requires its completed stage dx")
++        self._history_task_ready = False
++        from .fa_split import backward_dkv
++        count = len(self._history_jobs)
++        for split_state, layer_idx, layouts, current_shape in self._history_jobs:
++            dk, dv = backward_dkv(split_state, "history", compact=True)
++            self._route_key_value_grads(
++                layer_idx, layouts, dk, dv, current_shape,
++                route_history=True, return_current=False, compact_region="history",
++            )
++        self._history_jobs.clear()
++        self._history_task_id = None
++        return count
+ 
+     def __bool__(self) -> bool:
+         # An empty state is still an active cache for the first segment.
+@@ -234,10 +286,20 @@ class DsppSequenceKVState:
+     ) -> Tuple[torch.Tensor, torch.Tensor]:
+         """Route history gradients backward and return current-segment gradients."""
+ 
++        return self._route_key_value_grads(
++            layer_idx, layouts, assembled_key_grad, assembled_value_grad,
++            current_shape, route_history=True, return_current=True,
++        )
++
++    def _route_key_value_grads(
++        self, layer_idx, layouts, assembled_key_grad, assembled_value_grad,
++        current_shape, *, route_history, return_current, compact_region=None,
++    ):
++
+         direct_current = bool(layouts) and all(
+             not layout.history and layout.item.is_last_segment for layout in layouts
+         )
+-        if direct_current:
++        if direct_current and return_current:
+             if (
+                 assembled_key_grad.shape != current_shape
+                 or assembled_value_grad.shape != current_shape
+@@ -251,7 +313,7 @@ class DsppSequenceKVState:
+             return assembled_key_grad, assembled_value_grad
+ 
+         single_item = len(layouts) == 1
+-        if not single_item:
++        if return_current and not single_item:
+             current_key_grad = assembled_key_grad.new_empty(current_shape)
+             current_value_grad = assembled_value_grad.new_empty(current_shape)
+         assembled_offset = 0
+@@ -261,24 +323,28 @@ class DsppSequenceKVState:
+             key = self._entry_key(layer_idx, item.sequence_id)
+             entry = self._entries.get(key)
+             for segment_id, segment_length in layout.history:
++                if compact_region == "current":
++                    continue
+                 end = assembled_offset + segment_length
+-                if entry is None:
+-                    raise RuntimeError(
+-                        "KV state disappeared before history gradient routing"
++                if route_history:
++                    if entry is None or (not return_current and not any(
++                        segment.segment_id == segment_id for segment in entry.segments
++                    )):
++                        raise RuntimeError("history gradient consumer is no longer retained")
++                    self._accumulate(
++                        entry.pending_key_grads, segment_id,
++                        assembled_key_grad[assembled_offset:end],
++                    )
++                    self._accumulate(
++                        entry.pending_value_grads, segment_id,
++                        assembled_value_grad[assembled_offset:end],
+                     )
+-                self._accumulate(
+-                    entry.pending_key_grads,
+-                    segment_id,
+-                    assembled_key_grad[assembled_offset:end],
+-                )
+-                self._accumulate(
+-                    entry.pending_value_grads,
+-                    segment_id,
+-                    assembled_value_grad[assembled_offset:end],
+-                )
+                 assembled_offset = end
+ 
+-            assembled_end = assembled_offset + item.token_length
++            assembled_end = assembled_offset + (0 if compact_region == "history" else item.token_length)
++            if not return_current:
++                assembled_offset = assembled_end
++                continue
+             key_grad = assembled_key_grad[assembled_offset:assembled_end]
+             value_grad = assembled_value_grad[assembled_offset:assembled_end]
+             if not item.is_last_segment:
+@@ -323,6 +389,8 @@ class DsppSequenceKVState:
+ 
+         if assembled_offset != assembled_key_grad.size(0):
+             raise RuntimeError("assembled K/V gradient layout was not fully consumed")
++        if not return_current:
++            return None
+         if current_key_grad.shape != current_shape:
+             raise RuntimeError(
+                 "current K/V gradient shape does not match physical task"
+@@ -330,6 +398,8 @@ class DsppSequenceKVState:
+         return current_key_grad, current_value_grad
+ 
+     def clear(self) -> None:
++        if self._history_task_id is not None or self._history_jobs:
++            raise RuntimeError("cannot clear an unfinished history task")
+         self._entries.clear()
+         self._current_meta = None
+         self._prepared_cu_seqlens.clear()
+@@ -342,6 +412,8 @@ class DsppSequenceKVState:
+         self._prepared_cu_seqlens.clear()
+ 
+     def assert_empty(self) -> None:
++        if self._history_task_id is not None or self._history_jobs:
++            raise RuntimeError("DSPP history task has not completed")
+         if self._entries:
+             summary = {
+                 key: {
+@@ -385,6 +457,14 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
+             raise ValueError(
+                 "query and K/V sequence, batch, and head dimensions must match"
+             )
++        ctx.split_attention_backward = state.split_attention_backward
++        ctx.history_dkv_after_dx = state.history_dkv_after_dx
++        if ctx.split_attention_backward:
++            # Reject unsupported configurations before mutating retained KV state.
++            if query.dtype != torch.bfloat16 or query.size(-1) != 128:
++                raise ValueError("DSPP split attention backward requires BF16 and head dimension 128")
++            if current_key.size(2) <= 0 or query.size(2) % current_key.size(2):
++                raise ValueError("DSPP split attention backward requires Hq divisible by Hkv")
+         valid_tokens = meta.valid_token_count
+         query_valid = query[:valid_tokens, 0].contiguous()
+         current_key_valid = current_key[:valid_tokens, 0].contiguous()
+@@ -480,44 +560,80 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
+                 output_grad_valid, (0, query.size(-1) - output_grad_valid.size(-1))
+             )
+         output_grad_valid = output_grad_valid.contiguous()
+-        query_grad = torch.empty_like(query)
+-        key_grad = torch.empty_like(key)
+-        value_grad = torch.empty_like(value)
+-        _wrapped_flash_attn_varlen_backward(
+-            output_grad_valid,
+-            query,
+-            key,
+-            value,
+-            output,
+-            softmax_lse,
+-            query_grad,
+-            key_grad,
+-            value_grad,
+-            cu_q,
+-            cu_k,
+-            ctx.meta.max_seqlen_q,
+-            ctx.meta.max_seqlen_k,
+-            0.0,
+-            ctx.scale,
+-            True,
+-            -1,
+-            -1,
+-            0.0,
+-            None,
+-            False,
+-            rng_state,
+-            False,
+-        )
++        if ctx.history_dkv_after_dx and (
++            ctx.state._history_task_id != ctx.meta.microbatch_id
++            or ctx.state._history_task_ready
++        ):
++            raise RuntimeError("after-dx backward requires its active physical task")
++        if ctx.split_attention_backward:
++            from .fa_split import prepare_backward, backward_dq, backward_dkv
++
++            # Frozen forward metadata: never consult the state's currently
++            # selected microbatch during backward. Host tuples avoid a CUDA
++            # metadata round trip for the per-sequence prototype dispatcher.
++            split_inputs = (query, key, value, output, output_grad_valid, softmax_lse)
++            if ctx.history_dkv_after_dx:
++                split_inputs = tuple(t.detach() for t in split_inputs)
++            split_state = prepare_backward(
++                *split_inputs,
++                softmax_scale=ctx.scale,
++                cu_seqlens_q=ctx.meta.cu_seqlens_q,
++                cu_seqlens_k=ctx.meta.cu_seqlens_k,
++            )
++            query_grad = backward_dq(split_state)
++            key_grad, value_grad = backward_dkv(
++                split_state, "current", compact=ctx.history_dkv_after_dx,
++            )
++            if ctx.history_dkv_after_dx:
++                if any(layout.history for layout in ctx.layouts):
++                    ctx.state._history_jobs.append(
++                        (split_state, ctx.layer_idx, ctx.layouts, ctx.current_shape)
++                    )
++            else:
++                history_key_grad, history_value_grad = backward_dkv(split_state, "history")
++                key_grad.add_(history_key_grad)
++                value_grad.add_(history_value_grad)
++        else:
++            query_grad = torch.empty_like(query)
++            key_grad = torch.empty_like(key)
++            value_grad = torch.empty_like(value)
++            _wrapped_flash_attn_varlen_backward(
++                output_grad_valid,
++                query,
++                key,
++                value,
++                output,
++                softmax_lse,
++                query_grad,
++                key_grad,
++                value_grad,
++                cu_q,
++                cu_k,
++                ctx.meta.max_seqlen_q,
++                ctx.meta.max_seqlen_k,
++                0.0,
++                ctx.scale,
++                True,
++                -1,
++                -1,
++                0.0,
++                None,
++                False,
++                rng_state,
++                False,
++            )
+         query_grad = query_grad[..., : ctx.original_head_dim]
+         key_grad = key_grad[..., : ctx.original_head_dim]
+         value_grad = value_grad[..., : ctx.original_head_dim]
+-        current_key_grad, current_value_grad = ctx.state.distribute_key_value_grads(
+-            ctx.layer_idx,
+-            ctx.layouts,
+-            key_grad,
+-            value_grad,
+-            ctx.current_shape,
+-        )
++        if ctx.history_dkv_after_dx:
++            current_key_grad, current_value_grad = ctx.state._route_key_value_grads(
++                ctx.layer_idx, ctx.layouts, key_grad, value_grad, ctx.current_shape,
++                route_history=False, return_current=True, compact_region="current",
++            )
++        else:
++            current_key_grad, current_value_grad = ctx.state.distribute_key_value_grads(
++                ctx.layer_idx, ctx.layouts, key_grad, value_grad, ctx.current_shape,
++            )
+         if ctx.valid_tokens == ctx.query_physical_shape[0]:
+             query_grad = query_grad.unsqueeze(1)
+             current_key_grad = current_key_grad.unsqueeze(1)
+diff --git a/megatron/core/pipeline_parallel/dspp_timeline.py b/megatron/core/pipeline_parallel/dspp_timeline.py
+index 02e708ff9..739b04794 100644
+--- a/megatron/core/pipeline_parallel/dspp_timeline.py
++++ b/megatron/core/pipeline_parallel/dspp_timeline.py
+@@ -28,6 +28,8 @@ _COLORS = {
+     "B1": "#B85450",
+     "W0": "#9673A6",
+     "W1": "#D6B656",
++    "H0": "#00838F",
++    "H1": "#C628AD",
+ }
+ 
+ 
+@@ -145,7 +147,7 @@ def render_timeline_svg(records: Sequence[Mapping[str, Any]], title: str) -> str
+         f'<text x="20" y="28" font-family="sans-serif" font-size="18">{html.escape(title)}</text>',
+     ]
+     legend_x = left
+-    for kind in ("F0", "F1", "B0", "B1", "W0", "W1"):
++    for kind in ("F0", "F1", "B0", "B1", "W0", "W1", "H0", "H1"):
+         parts.append(
+             f'<rect x="{legend_x}" y="42" width="16" height="12" '
+             f'fill="{_COLORS[kind]}" stroke="#444" stroke-width="0.35"/>'
+@@ -154,7 +156,7 @@ def render_timeline_svg(records: Sequence[Mapping[str, Any]], title: str) -> str
+         legend_x += 72
+     parts.append(
+         f'<text x="{legend_x + 8}" y="53" font-family="sans-serif" font-size="11">'
+-        'One compute lane per stage; W shorter than 3 px is a visibility marker.</text>'
++        'One compute lane per stage; H = history dKV after stage dx; W shorter than 3 px is a visibility marker.</text>'
+     )
+     for stage in stages:
+         y = rows[stage]
+@@ -215,8 +217,14 @@ class DsppTimelineRecorder:
+             torch_profile_dir and torch_profile_selected == current
+         )
+         self.recording = self.enabled or self.torch_profile_enabled
++        self.task_timing_only = bool(getattr(args, 'dspp_task_timing_only', False))
+         self.stage = stage
+         self.iteration = current
++        self.backward_mode = (
++            'after_dx' if getattr(args, 'dspp_history_dkv_after_dx', False)
++            else 'split_immediate' if getattr(args, 'dspp_split_attention_backward', False)
++            else 'fused'
++        )
+         self.output_dir = Path(output_dir) if output_dir else None
+         self.ordering = dict(ordering)
+         self.microbatch_ids = {
+@@ -227,7 +235,20 @@ class DsppTimelineRecorder:
+         self.records: List[Dict[str, Any]] = []
+         self.anchor = None
+         self.anchor_cpu_ns = None
++        self._boundary_pairs = []
++        self._boundary_cursor = 0
++        self._boundary_records = []
+         if self.enabled:
++            if self.task_timing_only:
++                # Two VPP B tasks and at most two H tasks per physical item.
++                # Materialize lazy CUDA event handles BEFORE the measured work.
++                for _ in range(4 * len(self.microbatch_ids)):
++                    pair = (torch.cuda.Event(enable_timing=True),
++                            torch.cuda.Event(enable_timing=True))
++                    for event in pair:
++                        event.record()
++                    self._boundary_pairs.append(pair)
++                torch.cuda.synchronize()
+             dist.barrier()
+             self.anchor = torch.cuda.Event(enable_timing=True)
+             self.anchor.record()
+@@ -242,6 +263,20 @@ class DsppTimelineRecorder:
+         *,
+         chunk: int,
+     ):
++        if self.task_timing_only:
++            if not self.enabled or not kind.startswith(('B', 'H')):
++                yield
++                return
++            begin, end = self._boundary_pairs[self._boundary_cursor]
++            self._boundary_cursor += 1
++            begin.record()
++            try:
++                yield
++            finally:
++                end.record()
++            # No per-item metadata conversion, NVTX or JSON in the task loop.
++            self._boundary_records.append((kind, task_id, meta, chunk, begin, end))
++            return
+         if not self.enabled and not self.torch_profile_enabled:
+             yield
+             return
+@@ -294,6 +329,9 @@ class DsppTimelineRecorder:
+ 
+     @contextlib.contextmanager
+     def communication(self, label: str):
++        if self.task_timing_only:
++            yield
++            return
+         if not self.enabled and not self.torch_profile_enabled:
+             yield
+             return
+@@ -313,6 +351,19 @@ class DsppTimelineRecorder:
+         if not self.enabled:
+             return None
+         torch.cuda.synchronize()
++        for kind, task_id, meta, chunk, begin, end in self._boundary_records:
++            self.records.append({
++                'kind': kind, 'stage': self.stage, 'chunk': chunk,
++                'sequence_chunk_size': meta.chunk_size,
++                'logical_microbatch': task_id[0], 'physical_microbatch': task_id[1],
++                'microbatch_id': self.microbatch_ids.get(task_id),
++                'signature': task_signature(meta), 'valid_tokens': meta.valid_token_count,
++                'items': [dict(sequence_id=i.sequence_id, segment_id=i.segment_id,
++                               segment_count=i.segment_count, token_offset=i.token_offset,
++                               token_length=i.token_length, sequence_length=i.sequence_length)
++                          for i in meta.items],
++                '_begin': begin, '_end': end,
++            })
+         serializable = []
+         for record in self.records:
+             begin, end = record.pop("_begin"), record.pop("_end")
+@@ -330,6 +381,8 @@ class DsppTimelineRecorder:
+                     "rank": rank,
+                     "stage": self.stage,
+                     "anchor_cpu_ns": self.anchor_cpu_ns,
++                    "backward_mode": self.backward_mode,
++                    "task_timing_only": self.task_timing_only,
+                     "peak_allocated_bytes": torch.cuda.max_memory_allocated(),
+                     "peak_reserved_bytes": torch.cuda.max_memory_reserved(),
+                     "ordering": self.ordering,
+@@ -363,17 +416,24 @@ class DsppTimelineRecorder:
+             all_records.sort(key=lambda item: (item["start_ms"], item["stage"]))
+             stem = self.output_dir / f"iteration_{self.iteration:06d}"
+             with stem.with_suffix(".svg").open("w", encoding="utf-8") as stream:
+-                stream.write(render_timeline_svg(all_records, f"DSPP iteration {self.iteration}"))
++                scope = 'B/H intervals only' if self.task_timing_only else 'all compute tasks'
++                stream.write(render_timeline_svg(all_records, f"DSPP iteration {self.iteration}: {scope}"))
+             with Path(f"{stem}_summary.json").open("w", encoding="utf-8") as stream:
+                 summary = summarize_timeline(all_records)
+                 summary["memory_by_stage"] = memory_by_stage
++                if self.task_timing_only:
++                    summary['task_scope'] = 'B/H only; missing F/W intervals are not pipeline bubbles'
++                    for stage_summary in summary['stages'].values():
++                        stage_summary.pop('bubble_ms', None)
++                        stage_summary.pop('compute_utilization', None)
+                 json.dump(summary, stream, indent=2)
+-            with Path(f"{stem}_costs.json").open("w", encoding="utf-8") as stream:
+-                json.dump(
+-                    {"source": "CUDA events", "costs": build_profile_costs(all_records)},
+-                    stream,
+-                    indent=2,
+-                )
++            if not self.task_timing_only:
++                with Path(f"{stem}_costs.json").open("w", encoding="utf-8") as stream:
++                    json.dump(
++                        {"source": "CUDA events", "costs": build_profile_costs(all_records)},
++                        stream,
++                        indent=2,
++                    )
+             if self.microbatch_report is not None:
+                 with Path(f"{stem}_microbatches.md").open("w", encoding="utf-8") as stream:
+                     stream.write(self.microbatch_report)
+diff --git a/megatron/core/pipeline_parallel/schedules.py b/megatron/core/pipeline_parallel/schedules.py
+index 50af9a376..d844a29d4 100644
+--- a/megatron/core/pipeline_parallel/schedules.py
++++ b/megatron/core/pipeline_parallel/schedules.py
+@@ -1495,7 +1495,11 @@ def forward_backward_dspp_no_pipelining(*,
+                 flush=True,
+             )
+ 
+-        state = DsppSequenceKVState(validate_runtime=debug_runtime)
++        state = DsppSequenceKVState(
++            validate_runtime=debug_runtime,
++            split_attention_backward=getattr(get_args(), 'dspp_split_attention_backward', False),
++            history_dkv_after_dx=getattr(get_args(), 'dspp_history_dkv_after_dx', False),
++        )
+         outputs = []
+         for physical in training_batch.physical_microbatches:
+             state.set_microbatch(physical.meta)
+@@ -1530,10 +1534,15 @@ def forward_backward_dspp_no_pipelining(*,
+         if grad_scaler is not None:
+             loss = grad_scaler(loss)
+         output_grads = torch.autograd.grad(loss, outputs)
+-        for output, output_grad in reversed(
+-            list(zip(outputs, output_grads, strict=True))
++        for physical, output, output_grad in reversed(
++            list(zip(training_batch.physical_microbatches, outputs, output_grads, strict=True))
+         ):
++            if state.history_dkv_after_dx:
++                state.begin_backward_task(physical.meta.microbatch_id)
+             backward_func(None, output, output_grad)
++            if state.history_dkv_after_dx:
++                state.mark_dx_ready(physical.meta.microbatch_id)
++                state.run_history_task(physical.meta.microbatch_id)
+         state.finish_iteration()
+ 
+     _finish_dspp_activation_observation(
+@@ -1547,7 +1556,8 @@ class _DsppVTaskBatch:
+     """Per-logical-batch activation state for one V-pipeline model chunk."""
+ 
+     def __init__(self, training_batch, forward_func, backward_func,
+-                 grad_scaler, total_valid_tokens, is_loss_stage, chunk):
++                 grad_scaler, total_valid_tokens, is_loss_stage, chunk,
++                 split_attention_backward=False, history_dkv_after_dx=False):
+         self.training_batch = training_batch
+         self.forward_func = forward_func
+         self.backward_func = backward_func
+@@ -1555,7 +1565,10 @@ class _DsppVTaskBatch:
+         self.total_valid_tokens = total_valid_tokens
+         self.is_loss_stage = is_loss_stage
+         self.chunk = chunk
+-        self.kv_state = DsppSequenceKVState()
++        self.kv_state = DsppSequenceKVState(
++            split_attention_backward=split_attention_backward,
++            history_dkv_after_dx=history_dkv_after_dx,
++        )
+         self.inputs = {}
+         self.outputs = {}
+         self.output_grads = {}
+@@ -1587,6 +1600,10 @@ class _DsppVTaskBatch:
+         return None if self.is_loss_stage else output_tensor
+ 
+     def backward(self, split, output_tensor_grad):
++        if self.kv_state.history_dkv_after_dx:
++            self.kv_state.begin_backward_task(
++                self.training_batch.physical_microbatches[split].meta.microbatch_id
++            )
+         if self.is_loss_stage:
+             output_tensor_grad = self.output_grads.pop(split)
+         input_tensor = self.inputs.pop(split)
+@@ -1596,8 +1613,17 @@ class _DsppVTaskBatch:
+                 input_tensor, output_tensor, output_tensor_grad
+             )
+             WeightGradStore.flush(chunk=self.chunk)
++        if self.kv_state.history_dkv_after_dx:
++            self.kv_state.mark_dx_ready(
++                self.training_batch.physical_microbatches[split].meta.microbatch_id
++            )
+         return input_tensor_grad
+ 
++    def history(self, split):
++        return self.kv_state.run_history_task(
++            self.training_batch.physical_microbatches[split].meta.microbatch_id
++        )
++
+     def weight(self, progress_tracker=None, progress_parent=None):
+         WeightGradStore.pop(
+             chunk=self.chunk,
+@@ -1748,6 +1774,8 @@ def pipelining_with_dspp_stage_local_v(*,
+                 total_valid_tokens=total_valid_tokens,
+                 is_loss_stage=(chunk == 1 and stage == 0),
+                 chunk=chunk,
++                split_attention_backward=getattr(args, 'dspp_split_attention_backward', False),
++                history_dkv_after_dx=getattr(args, 'dspp_history_dkv_after_dx', False),
+             )
+ 
+     slot_to_task = {
+@@ -2304,6 +2332,21 @@ def pipelining_with_dspp_stage_local_v(*,
+                     submit_send(stage + 1, node, input_grad)
+             elif stage > 0:
+                 submit_send(stage - 1, node, input_grad)
++            # The complete stage dx is now published to the existing local/P2P
++            # boundary. H is a separate task, immediately next on this stream;
++            # no F/B/W task may consume historical gradients before it finishes.
++            if task_batch.kv_state.history_dkv_after_dx:
++                if task_batch.kv_state.pending_history_count:
++                    history_kind = f'H{node.chunk}'
++                    history_token = progress.begin_compute(history_kind, node, task_id)
++                    if timeline.recording:
++                        with timeline.task(history_kind, task_id, physical_meta, chunk=node.chunk):
++                            task_batch.history(physical_id)
++                    else:
++                        task_batch.history(physical_id)
++                    progress.end_compute(history_token)
++                else:
++                    task_batch.history(physical_id)
+         elif node.kind == 'W':
+             progress_token = progress.begin_compute(
+                 f'W{node.chunk}', node, task_id
+diff --git a/megatron/core/utils.py b/megatron/core/utils.py
+index 4a692e7ad..066d900db 100644
+--- a/megatron/core/utils.py
++++ b/megatron/core/utils.py
+@@ -306,4 +306,6 @@ def cuda_sync_and_record(*, sync_level):
+ 
+ 
+ def cuda_sync_and_record_at_backward(x, *, sync_level):
++    if sync_level > get_args().kaimm_cuda_synchronize_level:
++        return x
+     return SyncAtBackwardFunction.apply(x, sync_level)
+diff --git a/megatron/initialize.py b/megatron/initialize.py
+index 9be281d73..9d0bed0a2 100644
+--- a/megatron/initialize.py
++++ b/megatron/initialize.py
+@@ -59,6 +59,10 @@ def initialize_megatron(extra_args_provider=None, args_defaults={},
+     # set global args, build tokenizer, and set adlr-autoresume,
+     # tensorboard-writer, and timers.
+     set_global_variables(args)
++    if args.dspp_task_timing_only:
++        # Disable annotation-only autograd nodes before any model forward.
++        from megatron import profile_utils
++        profile_utils.ANNOTATIONS_ENABLED = False
+ 
+     # torch.distributed initialization
+     def finish_mpu_init():
+diff --git a/megatron/profile_utils.py b/megatron/profile_utils.py
+index 7d91a1246..cbade9a75 100644
+--- a/megatron/profile_utils.py
++++ b/megatron/profile_utils.py
+@@ -23,6 +23,7 @@ BACKWARD_RANGE_DEPTH = 0
+ 
+ 
+ PERF_MODEL = False
++ANNOTATIONS_ENABLED = True
+ GLOBAL_EVENTS = list()
+ 
+ 
+@@ -70,6 +71,8 @@ def annotate_forward_backward(forward_msg, backward_msg):
+     def decorator(forward_orig):
+         @functools.wraps(forward_orig)
+         def wrapper(*args, **kwargs):
++            if not ANNOTATIONS_ENABLED:
++                return forward_orig(*args, **kwargs)
+             kwargs_items = list(kwargs.items())
+             inputs_list = list(args) + [t[1] for t in kwargs_items]
+             inputs_mask = [torch.is_tensor(x) and not isinstance(x, torch.nn.Parameter) for x in inputs_list]  # mask=True means should be applied
+@@ -90,6 +93,9 @@ def annotate_forward_backward(forward_msg, backward_msg):
+ 
+ @contextlib.contextmanager
+ def annotate_range(msg, color=DEFAULT_COLOR):
++    if not ANNOTATIONS_ENABLED:
++        yield
++        return
+     nvtx.push_range(msg, color=color)
+     record_event((msg, "forward", "begin"))
+     try:
+@@ -136,6 +142,9 @@ class BackwardPopFunction(torch.autograd.Function):
+ 
+ @contextlib.contextmanager
+ def annotate_backward_range(msg):
++    if not ANNOTATIONS_ENABLED:
++        yield
++        return
+     x1 = torch.empty(1, device="cuda", requires_grad=True)
+     x1 = BackwardPushFunction.apply(msg, x1)
+     x1.backward(x1)

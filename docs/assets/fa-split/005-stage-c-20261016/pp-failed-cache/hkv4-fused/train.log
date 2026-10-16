@@ -1,0 +1,780 @@
+
+*****************************************
+Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+*****************************************
+/workspace/src/Megatron-LM-kwai/megatron/core/utils.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import packaging
+/workspace/src/Megatron-LM-kwai/megatron/core/utils.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import packaging
+/workspace/src/Megatron-LM-kwai/megatron/core/utils.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import packaging
+/usr/local/lib/python3.12/dist-packages/torch/library.py:357: UserWarning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: flash_attn::_flash_attn_backward(Tensor dout, Tensor q, Tensor k, Tensor v, Tensor out, Tensor softmax_lse, Tensor(a6!)? dq, Tensor(a7!)? dk, Tensor(a8!)? dv, float dropout_p, float softmax_scale, bool causal, SymInt window_size_left, SymInt window_size_right, float softcap, Tensor? alibi_slopes, bool deterministic, Tensor? rng_state=None) -> Tensor
+    registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926
+  dispatch key: ADInplaceOrView
+  previous kernel: no debug info
+       new kernel: registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926 (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/core/dispatch/OperatorEntry.cpp:208.)
+  self.m.impl(
+/usr/local/lib/python3.12/dist-packages/torch/library.py:357: UserWarning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: flash_attn::_flash_attn_backward(Tensor dout, Tensor q, Tensor k, Tensor v, Tensor out, Tensor softmax_lse, Tensor(a6!)? dq, Tensor(a7!)? dk, Tensor(a8!)? dv, float dropout_p, float softmax_scale, bool causal, SymInt window_size_left, SymInt window_size_right, float softcap, Tensor? alibi_slopes, bool deterministic, Tensor? rng_state=None) -> Tensor
+    registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926
+  dispatch key: ADInplaceOrView
+  previous kernel: no debug info
+       new kernel: registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926 (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/core/dispatch/OperatorEntry.cpp:208.)
+  self.m.impl(
+/usr/local/lib/python3.12/dist-packages/torch/library.py:357: UserWarning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: flash_attn::_flash_attn_backward(Tensor dout, Tensor q, Tensor k, Tensor v, Tensor out, Tensor softmax_lse, Tensor(a6!)? dq, Tensor(a7!)? dk, Tensor(a8!)? dv, float dropout_p, float softmax_scale, bool causal, SymInt window_size_left, SymInt window_size_right, float softcap, Tensor? alibi_slopes, bool deterministic, Tensor? rng_state=None) -> Tensor
+    registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926
+  dispatch key: ADInplaceOrView
+  previous kernel: no debug info
+       new kernel: registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926 (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/core/dispatch/OperatorEntry.cpp:208.)
+  self.m.impl(
+/workspace/src/Megatron-LM-kwai/megatron/core/pipeline_parallel/schedules.py:54: SyntaxWarning: invalid escape sequence '\_'
+  """Retrieves the appropriate forward_backward function given the
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+using world size: 3, data-parallel-size: 1, tensor-model-parallel size: 1, pipeline-model-parallel size: 3, context-parallel size: 1
+WARNING: overriding default arguments for tokenizer_type:GPT2BPETokenizer                        with tokenizer_type:SentencePieceTokenizer
+accumulate and all-reduce gradients in fp32 for bfloat16 data type.
+using torch.bfloat16 for parameters ...
+------------------------ arguments ------------------------
+  accumulate_allreduce_grads_in_fp32 .............. True
+  adam_beta1 ...................................... 0.9
+  adam_beta2 ...................................... 0.999
+  adam_eps ........................................ 1e-08
+  add_bias_linear ................................. False
+  add_position_embedding .......................... False
+  adlr_autoresume ................................. False
+  adlr_autoresume_interval ........................ 1000
+  alibi_bias_max .................................. 0
+  anomaly_times ................................... 1.1
+  apply_layernorm_1p .............................. False
+  apply_query_key_layer_scaling ................... False
+  apply_residual_connection_post_layernorm ........ False
+  async_tensor_model_parallel_allreduce ........... True
+  attention_dropout ............................... 0.0
+  attention_softmax_in_fp32 ....................... False
+  barrier_with_L1_time ............................ True
+  bert_binary_head ................................ True
+  bert_embedder_type .............................. megatron
+  bert_load ....................................... None
+  bf16 ............................................ True
+  bias_dropout_fusion ............................. True
+  bias_gelu_fusion ................................ False
+  bias_swiglu_fusion .............................. True
+  biencoder_projection_dim ........................ 0
+  biencoder_shared_query_context_model ............ False
+  block_data_path ................................. None
+  classes_fraction ................................ 1.0
+  clip_grad ....................................... 1.0
+  clone_scatter_output_in_embedding ............... True
+  consecutive_anomalies_steps ..................... 3
+  consumed_train_samples .......................... 0
+  consumed_valid_samples .......................... 0
+  context_parallel_comm_overlap_gemm .............. True
+  context_parallel_size ........................... 1
+  custom_lr_scheduler ............................. False
+  data_cache_path ................................. None
+  data_impl ....................................... mmap
+  data_parallel_random_init ....................... False
+  data_parallel_size .............................. 1
+  data_path ....................................... ['/workspace/.cache/dspp-fa-split/stage-c-pp-20261016/data']
+  data_per_class_fraction ......................... 1.0
+  data_sharding ................................... True
+  dataloader_type ................................. cyclic
+  DDP_impl ........................................ local
+  decoder_num_layers .............................. None
+  decoder_seq_length .............................. None
+  dino_bottleneck_size ............................ 256
+  dino_freeze_last_layer .......................... 1
+  dino_head_hidden_size ........................... 2048
+  dino_local_crops_number ......................... 10
+  dino_local_img_size ............................. 96
+  dino_norm_last_layer ............................ False
+  dino_teacher_temp ............................... 0.07
+  dino_warmup_teacher_temp ........................ 0.04
+  dino_warmup_teacher_temp_epochs ................. 30
+  disable_output_scale_init ....................... False
+  distribute_saved_activations .................... False
+  distributed_backend ............................. nccl
+  distributed_timeout_minutes ..................... 10
+  dspp ............................................ True
+  dspp_activation_bytes_per_token ................. 0.0
+  dspp_auto_chunk_size ............................ False
+  dspp_chunk_alignment ............................ 256
+  dspp_chunk_menu ................................. None
+  dspp_chunk_selection ............................ memory
+  dspp_dag_communication_cost ..................... profile
+  dspp_disable_residual_packing ................... False
+  dspp_efficiency_slack ........................... 0.05
+  dspp_efficiency_top_k ........................... 4
+  dspp_execution_profile .......................... None
+  dspp_max_chunk_size ............................. 0
+  dspp_max_p2p_bytes .............................. 0
+  dspp_memory_reserve_mib ......................... 1024
+  dspp_memory_safety_factor ....................... 1.05
+  dspp_memory_utilization ......................... 0.9
+  dspp_metrics_path ............................... None
+  dspp_microbatch_order ........................... warmup-short-steady-long
+  dspp_min_chunk_size ............................. 256
+  dspp_order_profile .............................. None
+  dspp_p2p_bandwidth_gbps ......................... 25.0
+  dspp_p2p_latency_us ............................. 20.0
+  dspp_p2p_profile ................................ None
+  dspp_packing_strategy ........................... baseline
+  dspp_recv_lookahead ............................. 2
+  dspp_saturation_chunk_size ...................... 0
+  dspp_saturation_slack ........................... 0.2
+  dspp_send_inflight_depth ........................ 2
+  dspp_share_directional_p2p ...................... False
+  dspp_split_attention_backward ................... False
+  dspp_timeline_dir ............................... None
+  dspp_timeline_iteration ......................... 0
+  dspp_torch_profiler_dir ......................... None
+  dspp_torch_profiler_iteration ................... 0
+  dspp_v_layer_layout ............................. balanced
+  embedding_path .................................. None
+  embedding_weights_in_fp32 ....................... False
+  empty_unused_memory_level ....................... 0
+  encoder_num_layers .............................. 6
+  encoder_seq_length .............................. 256
+  end_weight_decay ................................ 0.1
+  eod_mask_loss ................................... False
+  eval_interval ................................... 1000
+  eval_iters ...................................... 0
+  evidence_data_path .............................. None
+  exit_duration_in_mins ........................... None
+  exit_interval ................................... None
+  exit_on_missing_checkpoint ...................... False
+  exit_signal_handler ............................. False
+  expert_hidden_size .............................. None
+  expert_model_parallel_size ...................... 1
+  ffn_hidden_size ................................. 1024
+  finetune ........................................ False
+  fp16 ............................................ False
+  fp16_lm_cross_entropy ........................... False
+  fp32_residual_connection ........................ False
+  fp8_amax_compute_algo ........................... most_recent
+  fp8_amax_history_len ............................ 1
+  fp8_e4m3 ........................................ False
+  fp8_hybrid ...................................... False
+  fp8_interval .................................... 1
+  fp8_margin ...................................... 0
+  fp8_wgrad ....................................... True
+  gate_mlp ........................................ False
+  global_batch_size ............................... 8
+  gradient_accumulation_fusion .................... True
+  group_query_attention ........................... False
+  head_lr_mult .................................... 1.0
+  hidden_dropout .................................. 0.0
+  hidden_size ..................................... 512
+  hysteresis ...................................... 2
+  ict_head_size ................................... None
+  ict_load ........................................ None
+  ignore_index .................................... -100
+  img_h ........................................... 224
+  img_w ........................................... 224
+  indexer_batch_size .............................. 128
+  indexer_log_interval ............................ 1000
+  inference_batch_times_seqlen_threshold .......... 512
+  init_method_beta ................................ 1.0
+  init_method_std ................................. 0.02
+  init_method_std_emb ............................. None
+  init_method_xavier_normal ....................... False
+  init_method_xavier_uniform ...................... False
+  initial_loss_scale .............................. 4294967296
+  iter_per_epoch .................................. 1250
+  kaimm_async_dataloader .......................... False
+  kaimm_context_parallel_impl ..................... key-value
+  kaimm_cuda_synchronize_level .................... 0
+  kaimm_gc_interval ............................... 0
+  kaimm_kv_cache_impl ............................. chunked
+  kaimm_num_layers_padding_back ................... 0
+  kaimm_num_layers_padding_front .................. 0
+  kaimm_offload_activation_ratio .................. 0.0
+  kaimm_offload_delay_to_next_stage ............... False
+  kaimm_overlap_cp_slow_ctas ...................... None
+  kaimm_overlap_gather_ratio ...................... 0.2
+  kaimm_overlap_optimizer_communication ........... False
+  kaimm_overlap_optimizer_no_barrier .............. False
+  kaimm_overlap_optimizer_slow_ctas ............... 4
+  kaimm_overlap_reduce_ratio ...................... 0.2
+  kaimm_overlap_tune_ratio ........................ False
+  kaimm_overlap_tuning_target_time_ratio .......... 0.85
+  kaimm_pipeline_attn_balance ..................... 0
+  kaimm_post_lm_processing_slice_size ............. None
+  kaimm_profile_analysis .......................... False
+  kaimm_recompute_mlp_activation_func ............. False
+  kaimm_recompute_mlp_fc1 ......................... False
+  kaimm_recompute_norm ............................ False
+  kaimm_recompute_token_dispatcher ................ False
+  kaimm_vocab_in_pipeline_parallel ................ False
+  kaimm_warmup_iters .............................. 0
+  kv_channels ..................................... 128
+  layernorm_epsilon ............................... 1e-05
+  lazy_mpu_init ................................... None
+  load ............................................ None
+  local_rank ...................................... None
+  log_batch_size_to_tensorboard ................... False
+  log_interval .................................... 1
+  log_learning_rate_to_tensorboard ................ True
+  log_loss_scale_to_tensorboard ................... True
+  log_memory_to_tensorboard ....................... False
+  log_num_zeros_in_grad ........................... False
+  log_params_norm ................................. False
+  log_timers_to_tensorboard ....................... False
+  log_validation_ppl_to_tensorboard ............... False
+  log_world_size_to_tensorboard ................... False
+  loss_median_window .............................. 10
+  loss_scale ...................................... None
+  loss_scale_window ............................... 1000
+  lr .............................................. 0.001
+  lr_decay_iters .................................. None
+  lr_decay_samples ................................ None
+  lr_decay_style .................................. cosine
+  lr_warmup_fraction .............................. None
+  lr_warmup_iters ................................. 0
+  lr_warmup_samples ............................... 0
+  make_main_grad_addresss_divisible_by ............ 1
+  make_vocab_size_divisible_by .................... 128
+  mask_factor ..................................... 1.0
+  mask_padded_vocab_in_ce_loss .................... False
+  mask_prob ....................................... 0.15
+  mask_type ....................................... random
+  masked_softmax_fusion ........................... True
+  master_addr ..................................... 127.0.0.1:8389
+  max_position_embeddings ......................... 256
+  max_tokens_to_oom ............................... 12000
+  merge_file ...................................... None
+  micro_batch_size ................................ 4
+  micro_seq_length ................................ 64
+  min_loss_scale .................................. 1.0
+  min_lr .......................................... 0.0001
+  mmap_warmup ..................................... False
+  moe_aux_loss_coeff .............................. 0.0
+  moe_expert_capacity_factor ...................... None
+  moe_first ....................................... False
+  moe_grouped_gemm ................................ False
+  moe_input_jitter_eps ............................ None
+  moe_layer_interval .............................. 1
+  moe_layer_recompute ............................. False
+  moe_pad_expert_input_to_capacity ................ False
+  moe_per_layer_logging ........................... False
+  moe_router_force_load_balancing ................. False
+  moe_router_load_balancing_type .................. aux_loss
+  moe_router_topk ................................. 2
+  moe_te_grouped_gemm ............................. False
+  moe_token_dispatcher_type ....................... allgather
+  moe_token_drop_policy ........................... probs
+  moe_z_loss_coeff ................................ None
+  nccl_communicator_config_path ................... None
+  no_load_optim ................................... None
+  no_load_rng ..................................... None
+  no_persist_layer_norm ........................... False
+  no_save_optim ................................... None
+  no_save_rng ..................................... None
+  num_attention_heads ............................. 4
+  num_channels .................................... 3
+  num_classes ..................................... 1000
+  num_experts ..................................... None
+  num_layers ...................................... 6
+  num_layers_per_virtual_pipeline_stage ........... 1
+  num_query_groups ................................ 1
+  num_workers ..................................... 2
+  onnx_safe ....................................... None
+  openai_gelu ..................................... False
+  optimizer ....................................... adam
+  output_bert_embeddings .......................... False
+  overlap_p2p_comm ................................ False
+  overlap_sp_ag ................................... False
+  overlap_sp_rs ................................... False
+  override_opt_param_scheduler .................... False
+  pad_token_id .................................... None
+  padding_side .................................... right
+  params_dtype .................................... torch.bfloat16
+  patch_dim ....................................... 16
+  perform_initialization .......................... True
+  pipeline_model_parallel_size .................... 3
+  pipeline_model_parallel_split_rank .............. None
+  prefetch_factor ................................. 2
+  profile ......................................... False
+  profile_ranks ................................... [0]
+  profile_step_end ................................ 12
+  profile_step_start .............................. 10
+  query_in_block_prob ............................. 0.1
+  rampup_batch_size ............................... None
+  rank ............................................ 0
+  recompute_granularity ........................... None
+  recompute_method ................................ None
+  recompute_num_layers ............................ 1
+  reset_attention_mask ............................ False
+  reset_position_ids .............................. False
+  restart_skip_counter ............................ 0
+  retriever_report_topk_accuracies ................ []
+  retriever_score_scaling ......................... False
+  retriever_seq_length ............................ 256
+  retro_add_retriever ............................. False
+  retro_cyclic_train_iters ........................ None
+  retro_encoder_attention_dropout ................. 0.1
+  retro_encoder_hidden_dropout .................... 0.1
+  retro_encoder_layers ............................ 2
+  retro_num_neighbors ............................. 2
+  retro_num_retrieved_chunks ...................... 2
+  retro_return_doc_ids ............................ False
+  retro_workdir ................................... None
+  rms_norm ........................................ True
+  rope_theta ...................................... 10000.0
+  rotary_percent .................................. 1.0
+  sample_rate ..................................... 1.0
+  save ............................................ None
+  save_interval ................................... None
+  scatter_gather_tensors_in_pipeline .............. True
+  seed ............................................ 1234
+  seq_length ...................................... 256
+  sequence_parallel ............................... False
+  sgd_momentum .................................... 0.9
+  shared_expert_combine_method .................... add
+  shared_expert_hidden_size ....................... None
+  short_seq_prob .................................. 0.1
+  skip_steps ...................................... 5
+  spec ............................................ None
+  split ........................................... 100,0,0
+  squared_relu .................................... False
+  stability_protection ............................ False
+  standalone_embedding_stage ...................... False
+  start_weight_decay .............................. 0.1
+  swiglu .......................................... True
+  swin_backbone_type .............................. tiny
+  tensor_model_parallel_size ...................... 1
+  tensorboard_dir ................................. None
+  tensorboard_log_interval ........................ 1
+  tensorboard_queue_size .......................... 1000
+  test_data_path .................................. None
+  timer_record_dir ................................ None
+  timer_record_end_iter ........................... -1
+  timer_record_start_iter ......................... 0
+  timing_log_level ................................ 0
+  timing_log_option ............................... minmax
+  titles_data_path ................................ None
+  tokenizer_model ................................. /workspace/src/tokenizers/Mistral-7B-v0.1/tokenizer.model
+  tokenizer_type .................................. SentencePieceTokenizer
+  train_data_path ................................. None
+  train_golden_model .............................. False
+  train_iters ..................................... 3
+  train_samples ................................... None
+  transformer_impl ................................ local
+  transformer_pipeline_model_parallel_size ........ 3
+  untie_embeddings_and_output_weights ............. False
+  use_alibi ....................................... False
+  use_checkpoint_args ............................. False
+  use_checkpoint_opt_param_scheduler .............. False
+  use_contiguous_buffers_in_local_ddp ............. True
+  use_cpu_initialization .......................... None
+  use_distributed_optimizer ....................... False
+  use_fast ........................................ False
+  use_fast_rms_norm ............................... False
+  use_fast_rope ................................... False
+  use_flash_attn .................................. True
+  use_memory_efficient_norm ....................... False
+  use_one_sent_docs ............................... False
+  use_ring_exchange_p2p ........................... False
+  use_rotary_position_embeddings .................. True
+  valid_data_path ................................. None
+  variable_seq_debug_num_batches .................. 3
+  variable_seq_lengths ............................ True
+  variable_seq_pad_to_pipeline_size ............... False
+  variable_seq_pad_token_id ....................... 0
+  variable_seq_schedule ........................... 1f1b
+  variable_seq_slicing ............................ False
+  virtual_pipeline_model_parallel_size ............ 2
+  vision_backbone_type ............................ vit
+  vision_pretraining .............................. False
+  vision_pretraining_type ......................... classify
+  vocab_extra_ids ................................. 0
+  vocab_file ...................................... None
+  vocab_size ...................................... None
+  warmup_init_lr .................................. 0.0
+  weight_decay .................................... 0.1
+  weight_decay_incr_style ......................... constant
+  world_size ...................................... 3
+-------------------- end of arguments ---------------------
+setting number of micro-batches to constant 2
+> building SentencePieceTokenizer tokenizer ...
+ > padded vocab (size: 32005) with 123 dummy tokens (new size: 32128)
+> initializing torch distributed ...
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 2 peer ranks. Expected number of connected peer ranks is : 2
+[Gloo] Rank 2 is connected to 2[Gloo] Rank  peer ranks. Expected number of connected peer ranks is : 21
+ is connected to 2 peer ranks. Expected number of connected peer ranks is : 2
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+> initialized tensor model parallel with size 1
+> initialized pipeline model parallel with size 3
+> setting random seeds to 1234 ...
+> compiling dataset index builder ...
+make: Entering directory '/workspace/src/Megatron-LM-kwai/megatron/data'
+make: Nothing to be done for 'default'.
+make: Leaving directory '/workspace/src/Megatron-LM-kwai/megatron/data'
+>>> done with dataset index builder. Compilation time: 0.003 seconds
+> compiling and loading fused kernels ...
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+ninja: no work to do.
+ninja: no work to do.
+ninja: no work to do.
+ninja: no work to do.
+ninja: no work to do.
+ninja: no work to do.
+/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py:83: UserWarning: barrier(): using the device under current context. You can specify `device_id` in `init_process_group` to mute this warning.
+  return func(*args, **kwargs)
+[rank0]:[W1016 07:19:25.669147508 ProcessGroupNCCL.cpp:5163] Guessing device ID based on global rank. This can cause a hang if rank to GPU mapping is heterogeneous. You can specify device_id in init_process_group()
+[rank1]:[W1016 07:19:27.580593073 init.cpp:774] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+>>> done with compiling and loading fused kernels. Compilation time: 2.765 seconds
+[rank2]:[W1016 07:19:27.580933697 init.cpp:774] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank0]:[W1016 07:19:27.581077001 init.cpp:774] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+> compiling swiglu ...
+[rank2]: Traceback (most recent call last):
+[rank2]:   File "/workspace/src/Megatron-LM-kwai/tools/validate_dspp_split_training.py", line 130, in <module>
+[rank2]:     runpy.run_path(str(REPO/'pretrain_llama.py'),run_name='__main__')
+[rank2]:   File "<frozen runpy>", line 286, in run_path
+[rank2]:   File "<frozen runpy>", line 98, in _run_module_code
+[rank2]:   File "<frozen runpy>", line 88, in _run_code
+[rank2]:   File "/workspace/src/Megatron-LM-kwai/pretrain_llama.py", line 162, in <module>
+[rank2]:     pretrain(train_valid_test_datasets_provider,
+[rank2]:   File "/workspace/src/Megatron-LM-kwai/megatron/training.py", line 107, in pretrain
+[rank2]:     set_jit_fusion_options()
+[rank2]:   File "/workspace/src/Megatron-LM-kwai/megatron/initialize.py", line 276, in set_jit_fusion_options
+[rank2]:     _warmup_jit_function()
+[rank2]:   File "/workspace/src/Megatron-LM-kwai/megatron/initialize.py", line 303, in _warmup_jit_function
+[rank2]:     output = swiglu(input)
+[rank2]:              ^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_dynamo/eval_frame.py", line 940, in compile_wrapper
+[rank2]:     raise e.remove_dynamo_frames() from None  # see TORCHDYNAMO_VERBOSE=1
+[rank2]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_fx.py", line 1019, in _compile_fx_inner
+[rank2]:     raise InductorError(e, currentframe()).with_traceback(
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_fx.py", line 1003, in _compile_fx_inner
+[rank2]:     mb_compiled_graph = fx_codegen_and_compile(
+[rank2]:                         ^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_fx.py", line 1757, in fx_codegen_and_compile
+[rank2]:     return scheme.codegen_and_compile(gm, example_inputs, inputs_to_check, graph_kwargs)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_fx.py", line 1537, in codegen_and_compile
+[rank2]:     compiled_module = graph.compile_to_module()
+[rank2]:                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/graph.py", line 2410, in compile_to_module
+[rank2]:     return self._compile_to_module()
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/graph.py", line 2416, in _compile_to_module
+[rank2]:     self.codegen_with_cpp_wrapper() if self.cpp_wrapper else self.codegen()
+[rank2]:                                                              ^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/graph.py", line 2352, in codegen
+[rank2]:     self.scheduler.codegen()
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/scheduler.py", line 5851, in codegen
+[rank2]:     self._codegen_partitions()
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/scheduler.py", line 5992, in _codegen_partitions
+[rank2]:     self._codegen(partition)
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/scheduler.py", line 6097, in _codegen
+[rank2]:     self.get_backend(device).codegen_node(node)
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/cuda_combined_scheduling.py", line 130, in codegen_node
+[rank2]:     return self._triton_scheduling.codegen_node(node)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/simd.py", line 1808, in codegen_node
+[rank2]:     return self._codegen_nodes(nodes, coalesce_analysis)  # type: ignore[arg-type]
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/simd.py", line 1781, in _codegen_nodes
+[rank2]:     return self.codegen_node_schedule(
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/simd.py", line 1871, in codegen_node_schedule
+[rank2]:     src_code = kernel.codegen_kernel()
+[rank2]:                ^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/triton.py", line 5283, in codegen_kernel
+[rank2]:     **self.inductor_meta_common(),
+[rank2]:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/triton.py", line 5085, in inductor_meta_common
+[rank2]:     "backend_hash": torch.utils._triton.triton_hash_with_backend(),
+[rank2]:                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_triton.py", line 200, in triton_hash_with_backend
+[rank2]:     backend = triton_backend()
+[rank2]:               ^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_triton.py", line 192, in triton_backend
+[rank2]:     target = driver.active.get_current_target()
+[rank2]:              ^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/driver.py", line 28, in active
+[rank2]:     self._active = self.default
+[rank2]:                    ^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/driver.py", line 22, in default
+[rank2]:     self._default = _create_driver()
+[rank2]:                     ^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/driver.py", line 10, in _create_driver
+[rank2]:     return active_drivers[0]()
+[rank2]:            ^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/triton/backends/nvidia/driver.py", line 720, in __init__
+[rank2]:     self.utils = CudaUtils()  # TODO: make static
+[rank2]:                  ^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/triton/backends/nvidia/driver.py", line 62, in __init__
+[rank2]:     mod = compile_module_from_src(
+[rank2]:           ^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/build.py", line 78, in compile_module_from_src
+[rank2]:     cache = get_cache_manager(key)
+[rank2]:             ^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/cache.py", line 248, in get_cache_manager
+[rank2]:     return cls(_base32(key))
+[rank2]:            ^^^^^^^^^^^^^^^^^
+[rank2]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/cache.py", line 55, in __init__
+[rank2]:     os.makedirs(self.cache_dir, exist_ok=True)
+[rank2]:   File "<frozen os>", line 215, in makedirs
+[rank2]:   File "<frozen os>", line 215, in makedirs
+[rank2]:   File "<frozen os>", line 225, in makedirs
+[rank2]: torch._inductor.exc.InductorError: PermissionError: [Errno 13] Permission denied: '/.triton'
+
+[rank2]: Set TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch). For even more developer context, set TORCH_LOGS="+dynamo"
+
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/workspace/src/Megatron-LM-kwai/tools/validate_dspp_split_training.py", line 130, in <module>
+[rank0]:     runpy.run_path(str(REPO/'pretrain_llama.py'),run_name='__main__')
+[rank0]:   File "<frozen runpy>", line 286, in run_path
+[rank0]:   File "<frozen runpy>", line 98, in _run_module_code
+[rank0]:   File "<frozen runpy>", line 88, in _run_code
+[rank0]:   File "/workspace/src/Megatron-LM-kwai/pretrain_llama.py", line 162, in <module>
+[rank0]:     pretrain(train_valid_test_datasets_provider,
+[rank0]:   File "/workspace/src/Megatron-LM-kwai/megatron/training.py", line 107, in pretrain
+[rank0]:     set_jit_fusion_options()
+[rank0]:   File "/workspace/src/Megatron-LM-kwai/megatron/initialize.py", line 276, in set_jit_fusion_options
+[rank0]:     _warmup_jit_function()
+[rank0]:   File "/workspace/src/Megatron-LM-kwai/megatron/initialize.py", line 303, in _warmup_jit_function
+[rank0]:     output = swiglu(input)
+[rank0]:              ^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_dynamo/eval_frame.py", line 940, in compile_wrapper
+[rank0]:     raise e.remove_dynamo_frames() from None  # see TORCHDYNAMO_VERBOSE=1
+[rank0]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_fx.py", line 1019, in _compile_fx_inner
+[rank0]:     raise InductorError(e, currentframe()).with_traceback(
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_fx.py", line 1003, in _compile_fx_inner
+[rank0]:     mb_compiled_graph = fx_codegen_and_compile(
+[rank0]:                         ^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_fx.py", line 1757, in fx_codegen_and_compile
+[rank0]:     return scheme.codegen_and_compile(gm, example_inputs, inputs_to_check, graph_kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_fx.py", line 1537, in codegen_and_compile
+[rank0]:     compiled_module = graph.compile_to_module()
+[rank0]:                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/graph.py", line 2410, in compile_to_module
+[rank0]:     return self._compile_to_module()
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/graph.py", line 2416, in _compile_to_module
+[rank0]:     self.codegen_with_cpp_wrapper() if self.cpp_wrapper else self.codegen()
+[rank0]:                                                              ^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/graph.py", line 2352, in codegen
+[rank0]:     self.scheduler.codegen()
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/scheduler.py", line 5851, in codegen
+[rank0]:     self._codegen_partitions()
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/scheduler.py", line 5992, in _codegen_partitions
+[rank0]:     self._codegen(partition)
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/scheduler.py", line 6097, in _codegen
+[rank0]:     self.get_backend(device).codegen_node(node)
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/cuda_combined_scheduling.py", line 130, in codegen_node
+[rank0]:     return self._triton_scheduling.codegen_node(node)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/simd.py", line 1808, in codegen_node
+[rank0]:     return self._codegen_nodes(nodes, coalesce_analysis)  # type: ignore[arg-type]
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/simd.py", line 1781, in _codegen_nodes
+[rank0]:     return self.codegen_node_schedule(
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/simd.py", line 1871, in codegen_node_schedule
+[rank0]:     src_code = kernel.codegen_kernel()
+[rank0]:                ^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/triton.py", line 5283, in codegen_kernel
+[rank0]:     **self.inductor_meta_common(),
+[rank0]:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/triton.py", line 5085, in inductor_meta_common
+[rank0]:     "backend_hash": torch.utils._triton.triton_hash_with_backend(),
+[rank0]:                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_triton.py", line 200, in triton_hash_with_backend
+[rank0]:     backend = triton_backend()
+[rank0]:               ^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_triton.py", line 192, in triton_backend
+[rank0]:     target = driver.active.get_current_target()
+[rank0]:              ^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/driver.py", line 28, in active
+[rank0]:     self._active = self.default
+[rank0]:                    ^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/driver.py", line 22, in default
+[rank0]:     self._default = _create_driver()
+[rank0]:                     ^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/driver.py", line 10, in _create_driver
+[rank0]:     return active_drivers[0]()
+[rank0]:            ^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/triton/backends/nvidia/driver.py", line 720, in __init__
+[rank0]:     self.utils = CudaUtils()  # TODO: make static
+[rank0]:                  ^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/triton/backends/nvidia/driver.py", line 62, in __init__
+[rank0]:     mod = compile_module_from_src(
+[rank0]:           ^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/build.py", line 78, in compile_module_from_src
+[rank0]:     cache = get_cache_manager(key)
+[rank0]:             ^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/cache.py", line 248, in get_cache_manager
+[rank0]:     return cls(_base32(key))
+[rank0]:            ^^^^^^^^^^^^^^^^^
+[rank0]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/cache.py", line 55, in __init__
+[rank0]:     os.makedirs(self.cache_dir, exist_ok=True)
+[rank0]:   File "<frozen os>", line 215, in makedirs
+[rank0]:   File "<frozen os>", line 215, in makedirs
+[rank0]:   File "<frozen os>", line 225, in makedirs
+[rank0]: torch._inductor.exc.InductorError: PermissionError: [Errno 13] Permission denied: '/.triton'
+
+[rank0]: Set TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch). For even more developer context, set TORCH_LOGS="+dynamo"
+
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "/workspace/src/Megatron-LM-kwai/tools/validate_dspp_split_training.py", line 130, in <module>
+[rank1]:     runpy.run_path(str(REPO/'pretrain_llama.py'),run_name='__main__')
+[rank1]:   File "<frozen runpy>", line 286, in run_path
+[rank1]:   File "<frozen runpy>", line 98, in _run_module_code
+[rank1]:   File "<frozen runpy>", line 88, in _run_code
+[rank1]:   File "/workspace/src/Megatron-LM-kwai/pretrain_llama.py", line 162, in <module>
+[rank1]:     pretrain(train_valid_test_datasets_provider,
+[rank1]:   File "/workspace/src/Megatron-LM-kwai/megatron/training.py", line 107, in pretrain
+[rank1]:     set_jit_fusion_options()
+[rank1]:   File "/workspace/src/Megatron-LM-kwai/megatron/initialize.py", line 276, in set_jit_fusion_options
+[rank1]:     _warmup_jit_function()
+[rank1]:   File "/workspace/src/Megatron-LM-kwai/megatron/initialize.py", line 303, in _warmup_jit_function
+[rank1]:     output = swiglu(input)
+[rank1]:              ^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_dynamo/eval_frame.py", line 940, in compile_wrapper
+[rank1]:     raise e.remove_dynamo_frames() from None  # see TORCHDYNAMO_VERBOSE=1
+[rank1]:     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_fx.py", line 1019, in _compile_fx_inner
+[rank1]:     raise InductorError(e, currentframe()).with_traceback(
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_fx.py", line 1003, in _compile_fx_inner
+[rank1]:     mb_compiled_graph = fx_codegen_and_compile(
+[rank1]:                         ^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_fx.py", line 1757, in fx_codegen_and_compile
+[rank1]:     return scheme.codegen_and_compile(gm, example_inputs, inputs_to_check, graph_kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_fx.py", line 1537, in codegen_and_compile
+[rank1]:     compiled_module = graph.compile_to_module()
+[rank1]:                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/graph.py", line 2410, in compile_to_module
+[rank1]:     return self._compile_to_module()
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/graph.py", line 2416, in _compile_to_module
+[rank1]:     self.codegen_with_cpp_wrapper() if self.cpp_wrapper else self.codegen()
+[rank1]:                                                              ^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/graph.py", line 2352, in codegen
+[rank1]:     self.scheduler.codegen()
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/scheduler.py", line 5851, in codegen
+[rank1]:     self._codegen_partitions()
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/scheduler.py", line 5992, in _codegen_partitions
+[rank1]:     self._codegen(partition)
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/scheduler.py", line 6097, in _codegen
+[rank1]:     self.get_backend(device).codegen_node(node)
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/cuda_combined_scheduling.py", line 130, in codegen_node
+[rank1]:     return self._triton_scheduling.codegen_node(node)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/simd.py", line 1808, in codegen_node
+[rank1]:     return self._codegen_nodes(nodes, coalesce_analysis)  # type: ignore[arg-type]
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/simd.py", line 1781, in _codegen_nodes
+[rank1]:     return self.codegen_node_schedule(
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/simd.py", line 1871, in codegen_node_schedule
+[rank1]:     src_code = kernel.codegen_kernel()
+[rank1]:                ^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/triton.py", line 5283, in codegen_kernel
+[rank1]:     **self.inductor_meta_common(),
+[rank1]:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/codegen/triton.py", line 5085, in inductor_meta_common
+[rank1]:     "backend_hash": torch.utils._triton.triton_hash_with_backend(),
+[rank1]:                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_triton.py", line 200, in triton_hash_with_backend
+[rank1]:     backend = triton_backend()
+[rank1]:               ^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_triton.py", line 192, in triton_backend
+[rank1]:     target = driver.active.get_current_target()
+[rank1]:              ^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/driver.py", line 28, in active
+[rank1]:     self._active = self.default
+[rank1]:                    ^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/driver.py", line 22, in default
+[rank1]:     self._default = _create_driver()
+[rank1]:                     ^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/driver.py", line 10, in _create_driver
+[rank1]:     return active_drivers[0]()
+[rank1]:            ^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/triton/backends/nvidia/driver.py", line 720, in __init__
+[rank1]:     self.utils = CudaUtils()  # TODO: make static
+[rank1]:                  ^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/triton/backends/nvidia/driver.py", line 62, in __init__
+[rank1]:     mod = compile_module_from_src(
+[rank1]:           ^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/build.py", line 78, in compile_module_from_src
+[rank1]:     cache = get_cache_manager(key)
+[rank1]:             ^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/cache.py", line 248, in get_cache_manager
+[rank1]:     return cls(_base32(key))
+[rank1]:            ^^^^^^^^^^^^^^^^^
+[rank1]:   File "/usr/local/lib/python3.12/dist-packages/triton/runtime/cache.py", line 55, in __init__
+[rank1]:     os.makedirs(self.cache_dir, exist_ok=True)
+[rank1]:   File "<frozen os>", line 215, in makedirs
+[rank1]:   File "<frozen os>", line 215, in makedirs
+[rank1]:   File "<frozen os>", line 225, in makedirs
+[rank1]: torch._inductor.exc.InductorError: PermissionError: [Errno 13] Permission denied: '/.triton'
+
+[rank1]: Set TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch). For even more developer context, set TORCH_LOGS="+dynamo"
+
+[rank1]:[W1016 07:19:32.058503680 ProcessGroupNCCL.cpp:1565] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank2]:[W1016 07:19:32.115344086 ProcessGroupNCCL.cpp:1565] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank0]:[W1016 07:19:32.258018962 ProcessGroupNCCL.cpp:1565] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+W1016 07:19:34.790000 225 torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 294 closing signal SIGTERM
+W1016 07:19:34.792000 225 torch/distributed/elastic/multiprocessing/api.py:1010] Sending process 295 closing signal SIGTERM
+E1016 07:19:35.061000 225 torch/distributed/elastic/multiprocessing/api.py:984] failed (exitcode: 1) local_rank: 2 (pid: 296) of binary: /workspace/src/venvs/megatron/bin/python
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 995, in <module>
+    main()
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 362, in wrapper
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 991, in main
+    run(args)
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 982, in run
+    elastic_launch(
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 170, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 317, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+tools/validate_dspp_split_training.py FAILED
+------------------------------------------------------------
+Failures:
+[1]:
+  time      : 2026-10-16_07:19:35
+  host      : fa21ee59545a
+  rank      : 0 (local_rank: 0)
+  exitcode  : -15 (pid: 294)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 294
+[2]:
+  time      : 2026-10-16_07:19:35
+  host      : fa21ee59545a
+  rank      : 1 (local_rank: 1)
+  exitcode  : -15 (pid: 295)
+  error_file: <N/A>
+  traceback : Signal 15 (SIGTERM) received by PID 295
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-10-16_07:19:34
+  host      : fa21ee59545a
+  rank      : 2 (local_rank: 2)
+  exitcode  : 1 (pid: 296)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================

@@ -1,0 +1,297 @@
+{
+  "scope": "Useful matmul FLOPs and an explicitly hypothetical equal-rate time reference.\n\nFLOPs exclude separate W, elementwise/softmax/reductions, padding tiles, memory,\nlaunch/host gaps, routing and communication. They are not hardware instruction\ncounts. Equivalent-rate times are NOT measured split-kernel predictions.\n",
+  "assumptions": "TP1; dQ width equals hidden; GQA2; SwiGLU FFN=2*hidden; one block per B; full stage input backward excludes separate W.",
+  "formulas": {
+    "history_pairs": "Ah=q*history",
+    "current_pairs": "Ac=q*(q+1)/2",
+    "linear_B": "2*q*[D*(D+2*Dkv)+D^2+3*D*F]",
+    "fused_attention": "10*D*(Ah+Ac)",
+    "removed_from_B": "4*D*Ah",
+    "split_attention_B": "6*D*Ah+10*D*Ac",
+    "H": "8*D*Ah",
+    "extra_recomputation": "4*D*Ah"
+  },
+  "width_scaling": [
+    {
+      "q": 2048,
+      "history": 4096,
+      "hidden": 512,
+      "ffn": 1024,
+      "kv_width": 256,
+      "gflops": {
+        "linear_B": 9.663676416,
+        "attention_B": 53.69233408,
+        "fused_B": 63.356010496,
+        "removed_from_B": 17.179869184,
+        "split_B": 46.176141312,
+        "H": 34.359738368,
+        "split_B_plus_H": 80.53587968,
+        "extra_recomputation": 17.179869184
+      },
+      "B_reduction_percent": 27.116399927177635,
+      "attention_B_reduction_percent": 31.99687530514598,
+      "B_plus_H_increase_percent": 27.116399927177635,
+      "H_over_fused_B_flops": 0.5423279985435527
+    },
+    {
+      "q": 2048,
+      "history": 12288,
+      "hidden": 512,
+      "ffn": 1024,
+      "kv_width": 256,
+      "gflops": {
+        "linear_B": 9.663676416,
+        "attention_B": 139.59168,
+        "fused_B": 149.255356416,
+        "removed_from_B": 51.539607552,
+        "split_B": 97.715748864,
+        "H": 103.079215104,
+        "split_B_plus_H": 200.794963968,
+        "extra_recomputation": 51.539607552
+      },
+      "B_reduction_percent": 34.53116108500011,
+      "attention_B_reduction_percent": 36.92169014084507,
+      "B_plus_H_increase_percent": 34.53116108500011,
+      "H_over_fused_B_flops": 0.6906232217000021
+    },
+    {
+      "q": 2048,
+      "history": 4096,
+      "hidden": 2048,
+      "ffn": 4096,
+      "kv_width": 1024,
+      "gflops": {
+        "linear_B": 154.618822656,
+        "attention_B": 214.76933632,
+        "fused_B": 369.388158976,
+        "removed_from_B": 68.719476736,
+        "split_B": 300.66868224,
+        "H": 137.438953472,
+        "split_B_plus_H": 438.107635712,
+        "extra_recomputation": 68.719476736
+      },
+      "B_reduction_percent": 18.603594908537623,
+      "attention_B_reduction_percent": 31.99687530514598,
+      "B_plus_H_increase_percent": 18.603594908537623,
+      "H_over_fused_B_flops": 0.3720718981707525
+    },
+    {
+      "q": 2048,
+      "history": 12288,
+      "hidden": 2048,
+      "ffn": 4096,
+      "kv_width": 1024,
+      "gflops": {
+        "linear_B": 154.618822656,
+        "attention_B": 558.36672,
+        "fused_B": 712.985542656,
+        "removed_from_B": 206.158430208,
+        "split_B": 506.827112448,
+        "H": 412.316860416,
+        "split_B_plus_H": 919.143972864,
+        "extra_recomputation": 206.158430208
+      },
+      "B_reduction_percent": 28.914812134902846,
+      "attention_B_reduction_percent": 36.92169014084507,
+      "B_plus_H_increase_percent": 28.914812134902846,
+      "H_over_fused_B_flops": 0.5782962426980569
+    },
+    {
+      "q": 2048,
+      "history": 4096,
+      "hidden": 4096,
+      "ffn": 8192,
+      "kv_width": 2048,
+      "gflops": {
+        "linear_B": 618.475290624,
+        "attention_B": 429.53867264,
+        "fused_B": 1048.013963264,
+        "removed_from_B": 137.438953472,
+        "split_B": 910.575009792,
+        "H": 274.877906944,
+        "split_B_plus_H": 1185.452916736,
+        "extra_recomputation": 137.438953472
+      },
+      "B_reduction_percent": 13.1142292268656,
+      "attention_B_reduction_percent": 31.99687530514598,
+      "B_plus_H_increase_percent": 13.1142292268656,
+      "H_over_fused_B_flops": 0.262284584537312
+    },
+    {
+      "q": 2048,
+      "history": 12288,
+      "hidden": 4096,
+      "ffn": 8192,
+      "kv_width": 2048,
+      "gflops": {
+        "linear_B": 618.475290624,
+        "attention_B": 1116.73344,
+        "fused_B": 1735.208730624,
+        "removed_from_B": 412.316860416,
+        "split_B": 1322.891870208,
+        "H": 824.633720832,
+        "split_B_plus_H": 2147.52559104,
+        "extra_recomputation": 412.316860416
+      },
+      "B_reduction_percent": 23.76180185929138,
+      "attention_B_reduction_percent": 36.92169014084507,
+      "B_plus_H_increase_percent": 23.76180185929138,
+      "H_over_fused_B_flops": 0.47523603718582763
+    }
+  ],
+  "measured_comparisons": [
+    {
+      "run": "hidden4096-short",
+      "history": 4096,
+      "n": 2,
+      "theory": {
+        "q": 2048,
+        "history": 4096,
+        "hidden": 4096,
+        "ffn": 8192,
+        "kv_width": 2048,
+        "gflops": {
+          "linear_B": 618.475290624,
+          "attention_B": 429.53867264,
+          "fused_B": 1048.013963264,
+          "removed_from_B": 137.438953472,
+          "split_B": 910.575009792,
+          "H": 274.877906944,
+          "split_B_plus_H": 1185.452916736,
+          "extra_recomputation": 137.438953472
+        },
+        "B_reduction_percent": 13.1142292268656,
+        "attention_B_reduction_percent": 31.99687530514598,
+        "B_plus_H_increase_percent": 13.1142292268656,
+        "H_over_fused_B_flops": 0.262284584537312
+      },
+      "measured_median_ms": {
+        "fused_B_ms": 8.015359878540039,
+        "after_dx_B_ms": 7.478272199630737,
+        "H_ms": 2.0249600410461426,
+        "B_plus_H_ms": 9.50323224067688,
+        "B_start_to_H_end_ms": 9.505279541015625
+      },
+      "measured_B_reduction_percent": 6.7007306851845305,
+      "measured_B_delta_ms": 0.5370876789093018,
+      "hypothetical_equal_rate_ms": {
+        "split_B_ms": 6.964207210710081,
+        "H_ms": 2.102305335659914,
+        "B_plus_H_ms": 9.066512546369996
+      },
+      "equal_rate_B_saving_ms": 1.051152667829957,
+      "measured_over_equal_rate": {
+        "split_B_ms": 1.07381529201631,
+        "H_ms": 0.9632092953854904,
+        "B_plus_H_ms": 1.0481684321367575
+      },
+      "useful_flops_per_ms_TF_s": {
+        "fused_B": 130.7507060375299,
+        "split_B": 121.76275287719032,
+        "H": 135.74485489698432
+      }
+    },
+    {
+      "run": "hidden4096-long",
+      "history": 4096,
+      "n": 2,
+      "theory": {
+        "q": 2048,
+        "history": 4096,
+        "hidden": 4096,
+        "ffn": 8192,
+        "kv_width": 2048,
+        "gflops": {
+          "linear_B": 618.475290624,
+          "attention_B": 429.53867264,
+          "fused_B": 1048.013963264,
+          "removed_from_B": 137.438953472,
+          "split_B": 910.575009792,
+          "H": 274.877906944,
+          "split_B_plus_H": 1185.452916736,
+          "extra_recomputation": 137.438953472
+        },
+        "B_reduction_percent": 13.1142292268656,
+        "attention_B_reduction_percent": 31.99687530514598,
+        "B_plus_H_increase_percent": 13.1142292268656,
+        "H_over_fused_B_flops": 0.262284584537312
+      },
+      "measured_median_ms": {
+        "fused_B_ms": 8.468991756439209,
+        "after_dx_B_ms": 7.350271940231323,
+        "H_ms": 2.1217280626296997,
+        "B_plus_H_ms": 9.472000002861023,
+        "B_start_to_H_end_ms": 9.47406005859375
+      },
+      "measured_B_reduction_percent": 13.209598596636862,
+      "measured_B_delta_ms": 1.1187198162078857,
+      "hypothetical_equal_rate_ms": {
+        "split_B_ms": 7.358348764295419,
+        "H_ms": 2.2212859842875785,
+        "B_plus_H_ms": 9.579634748582997
+      },
+      "equal_rate_B_saving_ms": 1.110642992143789,
+      "measured_over_equal_rate": {
+        "split_B_ms": 0.9989023591674144,
+        "H_ms": 0.9551800522930821,
+        "B_plus_H_ms": 0.988764211940555
+      },
+      "useful_flops_per_ms_TF_s": {
+        "fused_B": 123.74719369246829,
+        "split_B": 123.88317292153722,
+        "H": 129.55378768159028
+      }
+    },
+    {
+      "run": "hidden4096-long",
+      "history": 12288,
+      "n": 2,
+      "theory": {
+        "q": 2048,
+        "history": 12288,
+        "hidden": 4096,
+        "ffn": 8192,
+        "kv_width": 2048,
+        "gflops": {
+          "linear_B": 618.475290624,
+          "attention_B": 1116.73344,
+          "fused_B": 1735.208730624,
+          "removed_from_B": 412.316860416,
+          "split_B": 1322.891870208,
+          "H": 824.633720832,
+          "split_B_plus_H": 2147.52559104,
+          "extra_recomputation": 412.316860416
+        },
+        "B_reduction_percent": 23.76180185929138,
+        "attention_B_reduction_percent": 36.92169014084507,
+        "B_plus_H_increase_percent": 23.76180185929138,
+        "H_over_fused_B_flops": 0.47523603718582763
+      },
+      "measured_median_ms": {
+        "fused_B_ms": 13.183487892150879,
+        "after_dx_B_ms": 10.612735748291016,
+        "H_ms": 6.283776044845581,
+        "B_plus_H_ms": 16.896511793136597,
+        "B_start_to_H_end_ms": 16.8985595703125
+      },
+      "measured_B_reduction_percent": 19.49978765020466,
+      "measured_B_delta_ms": 2.5707521438598633,
+      "hypothetical_equal_rate_ms": {
+        "split_B_ms": 10.050853621074316,
+        "H_ms": 6.265268542153122,
+        "B_plus_H_ms": 16.31612216322744
+      },
+      "equal_rate_B_saving_ms": 3.132634271076562,
+      "measured_over_equal_rate": {
+        "split_B_ms": 1.0559039210399566,
+        "H_ms": 1.002953983946249,
+        "B_plus_H_ms": 1.0355715423127447
+      },
+      "useful_flops_per_ms_TF_s": {
+        "fused_B": 131.61985241076454,
+        "split_B": 124.65135301432782,
+        "H": 131.23219461464188
+      }
+    }
+  ]
+}

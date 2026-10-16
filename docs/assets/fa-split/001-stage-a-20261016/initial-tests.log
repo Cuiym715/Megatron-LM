@@ -1,0 +1,106 @@
+Running 27 items in this shard
+SPLIT_CHECK {"length": 1, "heads": 1, "head_dim": 128, "scale": 0.08838834764831845, "amplitude": 1.0, "gradients": {"dq": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 4.4517219066619873e-07, "relative_l2": 2125122.559136386}, "fused_vs_fp64": {"max_abs": 4.4517219066619873e-07, "relative_l2": 2125122.559136386}}, "dk": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 5.066394805908203e-07, "relative_l2": 1876283.0342241097}, "fused_vs_fp64": {"max_abs": 5.066394805908203e-07, "relative_l2": 1876283.0342241097}}, "dv": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.0, "relative_l2": 0.0}, "fused_vs_fp64": {"max_abs": 0.0, "relative_l2": 0.0}}}}
+.SPLIT_CHECK {"length": 17, "heads": 2, "head_dim": 128, "scale": 0.08838834764831845, "amplitude": 1.0, "gradients": {"dq": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.007107013377651961, "relative_l2": 0.0028172511907925053}, "fused_vs_fp64": {"max_abs": 0.007107013377651961, "relative_l2": 0.0028172511907925053}}, "dk": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.006718988152035976, "relative_l2": 0.0025730510475914675}, "fused_vs_fp64": {"max_abs": 0.006718988152035976, "relative_l2": 0.0025730510475914675}}, "dv": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.010904007243559555, "relative_l2": 0.0020992430821419735}, "fused_vs_fp64": {"max_abs": 0.010904007243559555, "relative_l2": 0.0020992430821419735}}}}
+.SPLIT_CHECK {"length": 63, "heads": 4, "head_dim": 128, "scale": 0.08838834764831845, "amplitude": 1.0, "gradients": {"dq": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.007809219090900488, "relative_l2": 0.0027091203337366743}, "fused_vs_fp64": {"max_abs": 0.007809219090900488, "relative_l2": 0.0027091203337366743}}, "dk": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.010324685426297053, "relative_l2": 0.002671088743288868}, "fused_vs_fp64": {"max_abs": 0.010324685426297053, "relative_l2": 0.002671088743288868}}, "dv": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.014050140023998736, "relative_l2": 0.0022481802319145186}, "fused_vs_fp64": {"max_abs": 0.014050140023998736, "relative_l2": 0.0022481802319145186}}}}
+.SPLIT_CHECK {"length": 64, "heads": 4, "head_dim": 128, "scale": 0.08838834764831845, "amplitude": 1.0, "gradients": {"dq": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.007809219090900488, "relative_l2": 0.0027093795180734197}, "fused_vs_fp64": {"max_abs": 0.007809219090900488, "relative_l2": 0.0027093795180734197}}, "dk": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.010195875774114072, "relative_l2": 0.00271165990160195}, "fused_vs_fp64": {"max_abs": 0.010195875774114072, "relative_l2": 0.00271165990160195}}, "dv": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.012591584168315073, "relative_l2": 0.002221466458394747}, "fused_vs_fp64": {"max_abs": 0.012591584168315073, "relative_l2": 0.002221466458394747}}}}
+.SPLIT_CHECK {"length": 65, "heads": 4, "head_dim": 128, "scale": 0.08838834764831845, "amplitude": 1.0, "gradients": {"dq": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.007809219090900488, "relative_l2": 0.0027060292215727515}, "fused_vs_fp64": {"max_abs": 0.007809219090900488, "relative_l2": 0.0027060292215727515}}, "dk": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.008533931957900975, "relative_l2": 0.002684958588143236}, "fused_vs_fp64": {"max_abs": 0.008533931957900975, "relative_l2": 0.002684958588143236}}, "dv": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.017439080090229986, "relative_l2": 0.0022994380849665837}, "fused_vs_fp64": {"max_abs": 0.017439080090229986, "relative_l2": 0.0022994380849665837}}}}
+.SPLIT_CHECK {"length": 127, "heads": 2, "head_dim": 128, "scale": 0.08838834764831845, "amplitude": 1.0, "gradients": {"dq": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.007107013377651961, "relative_l2": 0.0025507670494817887}, "fused_vs_fp64": {"max_abs": 0.007107013377651961, "relative_l2": 0.0025507670494817887}}, "dk": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.0065349663395544155, "relative_l2": 0.002459328225856191}, "fused_vs_fp64": {"max_abs": 0.0065349663395544155, "relative_l2": 0.002459328225856191}}, "dv": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.013119236428072334, "relative_l2": 0.0022267172687521946}, "fused_vs_fp64": {"max_abs": 0.013119236428072334, "relative_l2": 0.0022267172687521946}}}}
+.SPLIT_CHECK {"length": 128, "heads": 4, "head_dim": 128, "scale": 0.08838834764831845, "amplitude": 1.0, "gradients": {"dq": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.007809219090900488, "relative_l2": 0.0026163639613498773}, "fused_vs_fp64": {"max_abs": 0.007809219090900488, "relative_l2": 0.0026163639613498773}}, "dk": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.010412006343733182, "relative_l2": 0.0026046949466988043}, "fused_vs_fp64": {"max_abs": 0.010412006343733182, "relative_l2": 0.0026046949466988043}}, "dv": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.012098261321805026, "relative_l2": 0.0022594564818781203}, "fused_vs_fp64": {"max_abs": 0.012098261321805026, "relative_l2": 0.0022594564818781203}}}}
+.SPLIT_CHECK {"length": 129, "heads": 4, "head_dim": 128, "scale": 0.08838834764831845, "amplitude": 1.0, "gradients": {"dq": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.007809219090900488, "relative_l2": 0.0026186951518079424}, "fused_vs_fp64": {"max_abs": 0.007809219090900488, "relative_l2": 0.0026186951518079424}}, "dk": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.008691551849898671, "relative_l2": 0.0025879240601427065}, "fused_vs_fp64": {"max_abs": 0.008691551849898671, "relative_l2": 0.0025879240601427065}}, "dv": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.013080749324145824, "relative_l2": 0.002304509930743923}, "fused_vs_fp64": {"max_abs": 0.013080749324145824, "relative_l2": 0.002304509930743923}}}}
+.SPLIT_CHECK {"length": 257, "heads": 16, "head_dim": 128, "scale": 0.08838834764831845, "amplitude": 1.0, "gradients": {"dq": {"split_vs_fused": {"max_abs": 0.0009765625, "relative_l2": 8.673332095783966e-06}, "split_vs_fp64": {"max_abs": 0.008550286880024682, "relative_l2": 0.0025498598887746466}, "fused_vs_fp64": {"max_abs": 0.008550286880024682, "relative_l2": 0.0025498639537749005}}, "dk": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.010058812029865027, "relative_l2": 0.002544371023122196}, "fused_vs_fp64": {"max_abs": 0.010058812029865027, "relative_l2": 0.002544371023122196}}, "dv": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.017298627402612787, "relative_l2": 0.0022934134665890493}, "fused_vs_fp64": {"max_abs": 0.017298627402612787, "relative_l2": 0.0022934134665890493}}}}
+.SPLIT_CHECK {"length": 513, "heads": 2, "head_dim": 128, "scale": 0.08838834764831845, "amplitude": 1.0, "gradients": {"dq": {"split_vs_fused": {"max_abs": 0.00048828125, "relative_l2": 9.97355655943189e-06}, "split_vs_fp64": {"max_abs": 0.00710701337765185, "relative_l2": 0.0025059906736373642}, "fused_vs_fp64": {"max_abs": 0.00710701337765185, "relative_l2": 0.0025059957371254137}}, "dk": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.009529934418452513, "relative_l2": 0.002481120251348799}, "fused_vs_fp64": {"max_abs": 0.009529934418452513, "relative_l2": 0.002481120251348799}}, "dv": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.011044520450671058, "relative_l2": 0.0022511538888688653}, "fused_vs_fp64": {"max_abs": 0.011044520450671058, "relative_l2": 0.0022511538888688653}}}}
+.SPLIT_CHECK {"length": 129, "heads": 2, "head_dim": 128, "scale": 0.037, "amplitude": 1.0, "gradients": {"dq": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.0031705950629766777, "relative_l2": 0.0024601949334323793}, "fused_vs_fp64": {"max_abs": 0.0031705950629766777, "relative_l2": 0.0024601949334323793}}, "dk": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.002611855999165358, "relative_l2": 0.0024866670646911644}, "fused_vs_fp64": {"max_abs": 0.002611855999165358, "relative_l2": 0.0024866670646911644}}, "dv": {"split_vs_fused": {"max_abs": 0.0, "relative_l2": 0.0}, "split_vs_fp64": {"max_abs": 0.008354434144065781, "relative_l2": 0.0021916514649768593}, "fused_vs_fp64": {"max_abs": 0.008354434144065781, "relative_l2": 0.0021916514649768593}}}}
+.F...............
+=================================== FAILURES ===================================
+_______ test_split_matches_fused_and_fp64[65-2-0.08838834764831845-2.0] ________
+
+length = 65, heads = 2, scale = 0.08838834764831845, amplitude = 2.0
+
+    @pytest.mark.parametrize("length,heads,scale,amplitude", [
+        (1, 1, 128**-0.5, 1.0), (17, 2, 128**-0.5, 1.0),
+        (63, 4, 128**-0.5, 1.0), (64, 4, 128**-0.5, 1.0),
+        (65, 4, 128**-0.5, 1.0), (127, 2, 128**-0.5, 1.0),
+        (128, 4, 128**-0.5, 1.0), (129, 4, 128**-0.5, 1.0),
+        (257, 16, 128**-0.5, 1.0), (513, 2, 128**-0.5, 1.0),
+        (129, 2, 0.037, 1.0), (65, 2, 128**-0.5, 2.0),
+    ])
+    def test_split_matches_fused_and_fp64(length, heads, scale, amplitude):
+        q, k, v, dout = inputs(length, heads, amplitude=amplitude)
+        out, lse, rng = fa_forward(q, k, v, scale)
+        fused = fa_backward(q, k, v, out, dout, lse, rng, scale)
+        state = prepare_backward(q, k, v, out, dout, lse, softmax_scale=scale)
+        # Calling dKV first proves it does not rely on dQ execution/workspace.
+        dk, dv = backward_dkv(state)
+        dq = backward_dq(state)
+        split = dq, dk, dv
+        ref_out, ref_grads = math_reference(q, k, v, dout, scale)
+        torch.testing.assert_close(out.double(), ref_out, atol=0.04, rtol=0.04)
+        torch.testing.assert_close(
+            state.delta[:, :length], (out.float() * dout.float()).sum(-1).T,
+            atol=1e-4, rtol=1e-5,
+        )
+        record = {"length": length, "heads": heads, "head_dim": 128,
+                  "scale": scale, "amplitude": amplitude, "gradients": {}}
+        for name, got, base, ref in zip(("dq", "dk", "dv"), split, fused, ref_grads):
+            assert got.dtype == q.dtype and got.shape == q.shape
+            assert not got.requires_grad
+            torch.testing.assert_close(got, base, atol=0.004, rtol=0.01)
+            for value in (got, base):
+>               torch.testing.assert_close(value.double(), ref, atol=0.04, rtol=0.04)
+E               AssertionError: Tensor-likes are not close!
+E               
+E               Mismatched elements: 13 / 16640 (0.1%)
+E               Greatest absolute difference: 0.06405525194788297 at index (34, 0, 50) (up to 0.04 allowed)
+E               Greatest relative difference: 24.01074941368636 at index (34, 0, 9) (up to 0.04 allowed)
+
+tests/unit_tests/dspp/test_fa_split.py:100: AssertionError
+=============================== warnings summary ===============================
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute
+
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute
+
+megatron/core/utils.py:5
+  /workspace/src/Megatron-LM-kwai/megatron/core/utils.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    from pkg_resources import packaging
+
+../../../usr/local/lib/python3.12/dist-packages/torch/jit/_script.py:1480: 11 warnings
+  /usr/local/lib/python3.12/dist-packages/torch/jit/_script.py:1480: DeprecationWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+../../../usr/local/lib/python3.12/dist-packages/torch/library.py:357
+  /usr/local/lib/python3.12/dist-packages/torch/library.py:357: UserWarning: Warning only once for all operators,  other operators may also be overridden.
+    Overriding a previously registered kernel for the same operator and the same dispatch key
+    operator: flash_attn::_flash_attn_backward(Tensor dout, Tensor q, Tensor k, Tensor v, Tensor out, Tensor softmax_lse, Tensor(a6!)? dq, Tensor(a7!)? dk, Tensor(a8!)? dv, float dropout_p, float softmax_scale, bool causal, SymInt window_size_left, SymInt window_size_right, float softcap, Tensor? alibi_slopes, bool deterministic, Tensor? rng_state=None) -> Tensor
+      registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926
+    dispatch key: ADInplaceOrView
+    previous kernel: no debug info
+         new kernel: registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926 (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/core/dispatch/OperatorEntry.cpp:208.)
+    self.m.impl(
+
+../../../usr/local/lib/python3.12/dist-packages/torch/jit/_script.py:362: 14 warnings
+  /usr/local/lib/python3.12/dist-packages/torch/jit/_script.py:362: DeprecationWarning: `torch.jit.script_method` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/unit_tests/dspp/test_fa_split.py::test_split_matches_fused_and_fp64[1-1-0.08838834764831845-1.0]
+  /usr/local/lib/python3.12/dist-packages/torch/autograd/graph.py:865: UserWarning: Attempting to run cuBLAS, but there was no current CUDA context! Attempting to set the primary context... (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/cuda/CublasHandlePool.cpp:330.)
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+
+../../../usr/local/lib/python3.12/dist-packages/_pytest/cacheprovider.py:446
+  /usr/local/lib/python3.12/dist-packages/_pytest/cacheprovider.py:446: PytestCacheWarning: cache could not write path /workspace/src/Megatron-LM-kwai/.pytest_cache/v/cache/nodeids: [Errno 13] Permission denied: '/workspace/src/Megatron-LM-kwai/.pytest_cache/v/cache/nodeids'
+    config.cache.set("cache/nodeids", sorted(self.cached_nodeids))
+
+../../../usr/local/lib/python3.12/dist-packages/_pytest/cacheprovider.py:398
+  /usr/local/lib/python3.12/dist-packages/_pytest/cacheprovider.py:398: PytestCacheWarning: cache could not write path /workspace/src/Megatron-LM-kwai/.pytest_cache/v/cache/lastfailed: [Errno 13] Permission denied: '/workspace/src/Megatron-LM-kwai/.pytest_cache/v/cache/lastfailed'
+    config.cache.set("cache/lastfailed", self.lastfailed)
+
+../../../usr/local/lib/python3.12/dist-packages/_pytest/stepwise.py:57
+  /usr/local/lib/python3.12/dist-packages/_pytest/stepwise.py:57: PytestCacheWarning: cache could not write path /workspace/src/Megatron-LM-kwai/.pytest_cache/v/cache/stepwise: [Errno 13] Permission denied: '/workspace/src/Megatron-LM-kwai/.pytest_cache/v/cache/stepwise'
+    session.config.cache.set(STEPWISE_CACHE_DIR, [])
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/unit_tests/dspp/test_fa_split.py::test_split_matches_fused_and_fp64[65-2-0.08838834764831845-2.0]
+1 failed, 26 passed, 33 warnings in 6.03s
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute

@@ -1,0 +1,34 @@
+{
+  "created_utc": "2026-10-16T11:01:28.213078+00:00",
+  "git_head": "abd39e566b49e06dce32df5f218fa7c1ead7dddd",
+  "scope": "CPU-only plotting of prior raw B/H CUDA-event measurements; no new GPU experiment.",
+  "source_json_sha256": {
+    "012-width4096-theory-20261016/hidden4096-long/fused/timeline/iteration_000003_rank_0.json": "844b47fc3a0481e4927580f035799ccd3bbc505fb5e9b0bafac84407ae94f752",
+    "012-width4096-theory-20261016/hidden4096-long/fused/timeline/iteration_000003_rank_1.json": "292a2ec4fc8ab735821e2a9a0d6559e70f0d0d5d803d5411f9efb3c3a1fc08a7",
+    "012-width4096-theory-20261016/hidden4096-long/fused/timeline/iteration_000003_rank_2.json": "45b945b36af87fc65b030bfd90998b9f008107a7a75465362b2a591189f9ec72",
+    "012-width4096-theory-20261016/hidden4096-long/after_dx/timeline/iteration_000003_rank_0.json": "c7dbf225eff3fb911bb984c93d4d37d0395b0eb7c27a0df8d5c2900124dc91e4",
+    "012-width4096-theory-20261016/hidden4096-long/after_dx/timeline/iteration_000003_rank_1.json": "c5ff37737c855f0f06dacf6b44af433326381470d9e130fd4e00926ccce2da3d",
+    "012-width4096-theory-20261016/hidden4096-long/after_dx/timeline/iteration_000003_rank_2.json": "fa90dd874638a926d9c8f6e2c27d66c22fe1cff816214fc71fd15fdba5773418"
+  },
+  "plan_sha256": "f25185bf8114f9b18986e7ecf2c73511d04aa5602d79b46efc3a896f93846eae",
+  "evidence_sha256": {
+    "paired-long-history.png": "74432b49e8d8e9a3f443d85660f1f358bb45bac73c3e4875b64c170d26ee7297",
+    "paired-long-history.svg": "d68c336bf8fafaa893d228faee99f94b2755a56e17cf0c338c395979a51e53a6",
+    "plot.log": "91520d0a9a2ddfb10b3d74b1d05d43703c2548e90795a78a851c312eea5b650e",
+    "plot_measured_bh.py": "7dee3561f25a91cf8bf12292112eb930cb2d94c002abd6c770c5cebb2c0e747c",
+    "plotted-data.json": "9779cde2293dfb6f273abcee5b55e051d759d9ccf7481a2a525f68308b2c01ac",
+    "stage1-local-window.png": "ce62d12e28f55d950a3de42e2975c49ae0e96996bb206bef6576ca1a344f19a2",
+    "stage1-local-window.svg": "7e61b82e3bdc6d5a6168a7dac9e125ae7820b64d616adfe50f482e3c503694ea",
+    "three-stage-bh-overview.png": "0c55de2e312eead1b29d386fd1ea612e9c6cc28fde81004b21fb7b8aaddb8abc",
+    "three-stage-bh-overview.svg": "fd09b529d7231f2bde048b08975556a1ade10608b8322b582da115c48643568a"
+  },
+  "reproduce": "docker run --rm --user 1001:1001 -v /home/cuiym:/workspace -v /usr/share/fonts/opentype/noto:/plot-fonts:ro -w /workspace/src/Megatron-LM-kwai -e MPLCONFIGDIR=/tmp/dspp-plot-mpl nvcr.io/nvidia/pytorch:26.01-py3 python docs/assets/fa-split/013-measured-bh-timeline-20261016/plot_measured_bh.py",
+  "validation": [
+    "Six input JSON hashes match immutable archive012 manifest.",
+    "All two preselected pairs plotted; medians reproduce archive012.",
+    "Overview includes all108 fused B,108 split B,72 H.",
+    "Figures visually inspected; no fabricated F/W or communication bars.",
+    "Per-rank local CUDA anchors retained; no inference of bubble or iteration speedup.",
+    "No production source changes, training rerun, commit or push."
+  ]
+}

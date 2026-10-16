@@ -1,0 +1,7 @@
+hidden4096-short loss_match True
+  history 4096 n 2 {'fused_B_ms': 8.015359878540039, 'after_dx_B_ms': 7.478272199630737, 'H_ms': 2.0249600410461426, 'B_plus_H_ms': 9.50323224067688, 'B_start_to_H_end_ms': 9.505279541015625} B change% -6.7007306851845305 faster 2
+  all-task B sums 494.9218554496765 476.53385639190674
+hidden4096-long loss_match True
+  history 4096 n 2 {'fused_B_ms': 8.468991756439209, 'after_dx_B_ms': 7.350271940231323, 'H_ms': 2.1217280626296997, 'B_plus_H_ms': 9.472000002861023, 'B_start_to_H_end_ms': 9.47406005859375} B change% -13.209598596636862 faster 2
+  history 12288 n 2 {'fused_B_ms': 13.183487892150879, 'after_dx_B_ms': 10.612735748291016, 'H_ms': 6.283776044845581, 'B_plus_H_ms': 16.896511793136597, 'B_start_to_H_end_ms': 16.8985595703125} B change% -19.49978765020466 faster 2
+  all-task B sums 1171.4529237747192 1038.1711044311523

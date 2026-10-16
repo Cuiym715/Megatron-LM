@@ -1,0 +1,455 @@
+{
+  "created_utc": "2026-10-16T10:07:53.084687+00:00",
+  "git_head": "abd39e566b49e06dce32df5f218fa7c1ead7dddd",
+  "environment": {
+    "image": "nvcr.io/nvidia/pytorch:26.01-py3",
+    "gpu": "3 x NVIDIA L40 (SM89)",
+    "host_driver": "550.120",
+    "torch": "2.10.0a0+a36e1d39eb.nv26.01.42222806",
+    "cuda_toolkit": "13.1",
+    "flash_attn": "2.7.4.post1",
+    "python": "/workspace/src/venvs/megatron/bin/python (3.12)",
+    "container_user": "1001:1001",
+    "mount": "/home/cuiym:/workspace",
+    "extension_cache_key": "51ac35cd4a46e186"
+  },
+  "scope": "Actual PP3/VPP2 complete B/H scaling with width and longest sequence. No production algorithm changes; no end-to-end speedup claim.",
+  "source_files": {
+    "docs/dspp-history-dkv-split-implementation-plan.md": {
+      "bytes": 106767,
+      "sha256": "7f734411b334c3345486898cf25d4413a335e3922b8fb575be8e4f060fcd6e3c"
+    },
+    "examples/measure_dspp_clean_tasks.sh": {
+      "bytes": 1844,
+      "sha256": "e910edec03cc1ccf135b831f9fbfdb6479e38f6853dbb9ef3952ab03327d037b"
+    },
+    "examples/measure_dspp_combined_tasks.sh": {
+      "bytes": 2026,
+      "sha256": "7b58af17a90721066524856834d6d3a52e93e9ae3300e0866dcebb18d1fb6dff"
+    },
+    "examples/measure_dspp_history_after_dx.sh": {
+      "bytes": 1444,
+      "sha256": "d54b628ac8b563e46dbb988d55a2958d455f37375cc3b9b54fde47d6c7b3d027"
+    },
+    "examples/run_dspp_b23_l40.sh": {
+      "bytes": 8938,
+      "sha256": "1aaf10723a91b1599440fe1f459547362bbda0be72c46d7dac43d2849bd352a5"
+    },
+    "examples/validate_dspp_split_training.sh": {
+      "bytes": 2960,
+      "sha256": "fe9d677581be346bca831147fff21fc0fe37502adf4dbacd9e8d8dcd81a5011b"
+    },
+    "megatron/arguments.py": {
+      "bytes": 111313,
+      "sha256": "f5d32d856821357648e0fe68634d220649b7fb8a031906a0767912a54066f4fe"
+    },
+    "megatron/core/kv_cache/dspp_packed_attention.py": {
+      "bytes": 29147,
+      "sha256": "8789e68453bceeef3ce689b5e15e45f4a71756979177842dd72c0f5a4979d875"
+    },
+    "megatron/core/kv_cache/fa_split.py": {
+      "bytes": 9896,
+      "sha256": "762422f97a80532376378a0c9d054e17e15b0ad9c2fa46d73911a9df0a6780f7"
+    },
+    "megatron/core/kv_cache/fa_split_build.py": {
+      "bytes": 4656,
+      "sha256": "6c65289406b2d447930ec4bfa8b829fca7988e1b3deaad96d3ee860c2189de03"
+    },
+    "megatron/core/kv_cache/fa_split_src/LICENSE.cutlass": {
+      "bytes": 1547,
+      "sha256": "6fc6ad419e4d26571a14c7c4d26b65345865c20dd8686ddcf5e8673f54d3d233"
+    },
+    "megatron/core/kv_cache/fa_split_src/LICENSE.flash-attention": {
+      "bytes": 1558,
+      "sha256": "8c9ccb96c065e706135b6cbad279b721da6156e51f3a5f27c6b3329af9416d73"
+    },
+    "megatron/core/kv_cache/fa_split_src/THIRD_PARTY.md": {
+      "bytes": 2242,
+      "sha256": "e0298387948f587ee48330d291b34022a6b7ab4d2b6e23dbc9a3b747253598ea"
+    },
+    "megatron/core/kv_cache/fa_split_src/backward.cu": {
+      "bytes": 14194,
+      "sha256": "63a3c390099a23b75ac82d614cffbba2b10a28aa0f8f671b41df63d021cca953"
+    },
+    "megatron/core/kv_cache/fa_split_src/bindings.cpp": {
+      "bytes": 1488,
+      "sha256": "564c3aa76e48d7c9f014c60bf4064669159768963aa80b31fa28ec7a0384125b"
+    },
+    "megatron/core/kv_cache/fa_split_src/flash_bwd_split.patch": {
+      "bytes": 4546,
+      "sha256": "cf305e245ecde91a2f54659b2df254bf02a706445ebcb94ce7622f54ea23109f"
+    },
+    "megatron/core/kv_cache/fa_split_src/upstream.json": {
+      "bytes": 351,
+      "sha256": "163c55a7526f5f78f8d1924021e163e4cb7c58daf505c64d74e463cb6778057e"
+    },
+    "megatron/core/pipeline_parallel/dspp_timeline.py": {
+      "bytes": 19293,
+      "sha256": "0da8f40344ed860ca7b529fae6ee6d44c275deb817aef7b61ee7f08288097724"
+    },
+    "megatron/core/pipeline_parallel/schedules.py": {
+      "bytes": 196277,
+      "sha256": "ca61880a34dea59c208ef28d3ab1f83f57b2f581b35bc78df9dc8481c1079319"
+    },
+    "megatron/core/utils.py": {
+      "bytes": 13313,
+      "sha256": "288977b84558394506b8892dbbd22fc3540269a736d1a0639c9dab6e21ef910d"
+    },
+    "megatron/initialize.py": {
+      "bytes": 22431,
+      "sha256": "2b964d6547ff64ae38cbd5b5d5baa30526f0d5c97ce2639de5b3d90af320deee"
+    },
+    "megatron/model/transformer.py": {
+      "bytes": 101119,
+      "sha256": "d8a8bdaf7e02d97a653239516f3acbbc83392a5c43c5af4f8980d1364dfc6eb9"
+    },
+    "megatron/profile_utils.py": {
+      "bytes": 8154,
+      "sha256": "1d2c3a5319d643f0ff20f4e639465936fb861d1ad291df7af809a5b632acd3d3"
+    },
+    "tests/unit_tests/dspp/test_clean_task_timing.py": {
+      "bytes": 4807,
+      "sha256": "3ed25ad28094d3ae89c670a7c36fc1b2a8a87e6a1d46bb2ad4f428bafb5b11ad"
+    },
+    "tests/unit_tests/dspp/test_fa_combined_current.py": {
+      "bytes": 6105,
+      "sha256": "47cac126480dce3697ee63db2fea73b99e692ae4eeba349fa71d6dba621ed13a"
+    },
+    "tests/unit_tests/dspp/test_fa_split.py": {
+      "bytes": 10246,
+      "sha256": "beecb34fb5001b9e987b3e4cdfc81ec1019815d2ae25947c419d6e03179910ae"
+    },
+    "tests/unit_tests/dspp/test_fa_split_regions.py": {
+      "bytes": 13848,
+      "sha256": "6a16a302910729e0162106217c27cc409ec737b68d244d0d84be0026e93dafe8"
+    },
+    "tests/unit_tests/dspp/test_history_after_dx.py": {
+      "bytes": 8091,
+      "sha256": "6acd07429ff69791c52bc1e0e2490f262cea8fc214cac605b9fb1a99512a7592"
+    },
+    "tests/unit_tests/dspp/test_kv_state.py": {
+      "bytes": 3401,
+      "sha256": "b5fa0662cd1feb89c3144a2f30304f912f58b1fa5b71883569ffd1b39582833e"
+    },
+    "tests/unit_tests/dspp/test_ordering_and_metrics.py": {
+      "bytes": 7796,
+      "sha256": "d3ded5ef67da29ddad3e663e3b7866bb9dc5b94c304c0c8af8f21a851bc54ef8"
+    },
+    "tests/unit_tests/dspp/test_packed_attention.py": {
+      "bytes": 17593,
+      "sha256": "2bfd2d1072661ae9a513ca792f057f525630389ff2357d1fc29b01a90af0e8cd"
+    },
+    "tests/unit_tests/dspp/test_packed_split.py": {
+      "bytes": 15228,
+      "sha256": "23219874635616fa86d4e32b991bfa79a75f17f981c02204a94ef293bd188d21"
+    },
+    "tests/unit_tests/dspp/test_training_runtime.py": {
+      "bytes": 10425,
+      "sha256": "4514042ef5747f1564367dcb8cc85e12d97615371e4ff445a0ffb70e59242a91"
+    },
+    "tools/audit_dspp_task_timing.py": {
+      "bytes": 3138,
+      "sha256": "03355fbe822258a777b57a0b62e79f5d0ee36c0119725cd58aa0da49a5837cb8"
+    },
+    "tools/build_dspp_fa_split.py": {
+      "bytes": 815,
+      "sha256": "4c53dc5e1c0b1f33350c0901d506ea29373785a0991b540a7360a0616e68e515"
+    },
+    "tools/build_dspp_synthetic_dataset.py": {
+      "bytes": 5326,
+      "sha256": "968d5582fe88c69370a235946fd0e7e728c16b6e9a11744587436ce981de4e23"
+    },
+    "tools/diagnose_dspp_attention_cost.py": {
+      "bytes": 7989,
+      "sha256": "8b7c6c270f8b54152ee2f08438316d8bf617b2c115beff2d57efd656365fd1d3"
+    },
+    "tools/diagnose_dspp_training_cost.py": {
+      "bytes": 2874,
+      "sha256": "af50a26b4ba00591686ce1e2a143ad12e61d6cd642fc13771bfd2648ec8a28ab"
+    },
+    "tools/summarize_dspp_clean_tasks.py": {
+      "bytes": 2410,
+      "sha256": "b5ce3ad63a77b3a5298fd0f1fde2a53a7f325de2cf612c34852b200ca8ca260b"
+    },
+    "tools/summarize_dspp_cost_diagnosis.py": {
+      "bytes": 3258,
+      "sha256": "c9e0606f894d1a5f56c49726eb44136f961f95bd42e0b77ab1e2b2cf120b02b5"
+    },
+    "tools/summarize_dspp_history_tasks.py": {
+      "bytes": 4635,
+      "sha256": "0f29eacbf08c7c77fcd292959bd486a0b300b0d722e85ad00805275b74ad7143"
+    },
+    "tools/validate_dspp_split_training.py": {
+      "bytes": 7078,
+      "sha256": "b62971380914f4993158208539cfbe4065af7430c994fe1ac2de8d8679b6d4f0"
+    }
+  },
+  "source_files_unchanged_from_011": [
+    "examples/measure_dspp_clean_tasks.sh",
+    "examples/measure_dspp_combined_tasks.sh",
+    "examples/measure_dspp_history_after_dx.sh",
+    "examples/run_dspp_b23_l40.sh",
+    "examples/validate_dspp_split_training.sh",
+    "megatron/arguments.py",
+    "megatron/core/kv_cache/dspp_packed_attention.py",
+    "megatron/core/kv_cache/fa_split.py",
+    "megatron/core/kv_cache/fa_split_build.py",
+    "megatron/core/kv_cache/fa_split_src/LICENSE.cutlass",
+    "megatron/core/kv_cache/fa_split_src/LICENSE.flash-attention",
+    "megatron/core/kv_cache/fa_split_src/THIRD_PARTY.md",
+    "megatron/core/kv_cache/fa_split_src/backward.cu",
+    "megatron/core/kv_cache/fa_split_src/bindings.cpp",
+    "megatron/core/kv_cache/fa_split_src/flash_bwd_split.patch",
+    "megatron/core/kv_cache/fa_split_src/upstream.json",
+    "megatron/core/pipeline_parallel/dspp_timeline.py",
+    "megatron/core/pipeline_parallel/schedules.py",
+    "megatron/core/utils.py",
+    "megatron/initialize.py",
+    "megatron/model/transformer.py",
+    "megatron/profile_utils.py",
+    "tests/unit_tests/dspp/test_clean_task_timing.py",
+    "tests/unit_tests/dspp/test_fa_split.py",
+    "tests/unit_tests/dspp/test_fa_split_regions.py",
+    "tests/unit_tests/dspp/test_history_after_dx.py",
+    "tests/unit_tests/dspp/test_kv_state.py",
+    "tests/unit_tests/dspp/test_ordering_and_metrics.py",
+    "tests/unit_tests/dspp/test_packed_attention.py",
+    "tests/unit_tests/dspp/test_packed_split.py",
+    "tests/unit_tests/dspp/test_training_runtime.py",
+    "tools/audit_dspp_task_timing.py",
+    "tools/build_dspp_fa_split.py",
+    "tools/build_dspp_synthetic_dataset.py",
+    "tools/diagnose_dspp_attention_cost.py",
+    "tools/diagnose_dspp_training_cost.py",
+    "tools/summarize_dspp_clean_tasks.py",
+    "tools/summarize_dspp_cost_diagnosis.py",
+    "tools/summarize_dspp_history_tasks.py",
+    "tools/validate_dspp_split_training.py"
+  ],
+  "external_inputs": {
+    "/home/cuiym/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data.json": {
+      "bytes": 343,
+      "sha256": "7ba3bb62288c9e2036b16c33c35f6f244fc0958f4ccf7fa3922d4e06084f5dcd"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data.bin": {
+      "bytes": 1540992,
+      "sha256": "235e6d7721d15a9f4222b2339c1392965f1cf6bc659a4471b38fc6be3edc0d1b"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data.idx": {
+      "bytes": 2602,
+      "sha256": "f77dca272855e39145d1bfdb489d7e1c458926483677720dea7cd302422e1e73"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/workload-scaling-20261016/long-data.json": {
+      "bytes": 345,
+      "sha256": "f7fbb1f0bf98140891e19be72ef4190ccbf4327eb316e15623df97285a7fdacf"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/workload-scaling-20261016/long-data.bin": {
+      "bytes": 2589568,
+      "sha256": "dbea6a46793e9f6009c8aa3a443397ff1beb8e32f98212378426336767baaa3f"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/workload-scaling-20261016/long-data.idx": {
+      "bytes": 2602,
+      "sha256": "a48dd1f9bb41c2b218d2a346fbbc7c6e0ddb9a4c7ecc802d48ea884fbb67cd2f"
+    }
+  },
+  "evidence_files": {
+    "clean-timing-measure-final-20261016-data.json": {
+      "bytes": 343,
+      "sha256": "7ba3bb62288c9e2036b16c33c35f6f244fc0958f4ccf7fa3922d4e06084f5dcd"
+    },
+    "compare_theory.py": {
+      "bytes": 3793,
+      "sha256": "cf8e265aeb222b40ccf61759623cace7e20fb0c9fa1a4564c5b86191b673b4f1"
+    },
+    "configurations.json": {
+      "bytes": 1484,
+      "sha256": "99c542b099e1eedce876b4189566e2c78363c8955ec0d74469d3b114582649ea"
+    },
+    "finalize_archive.py": {
+      "bytes": 2812,
+      "sha256": "26a6c951b6b0cf214c79bb2a310ac98f2ae1762a98987e87976529e78f2f7601"
+    },
+    "hidden4096-long/after_dx/timeline/iteration_000003.svg": {
+      "bytes": 32234,
+      "sha256": "ee990a556782358393cf01650581dee97828e57284fbfc0307ade42d2629688b"
+    },
+    "hidden4096-long/after_dx/timeline/iteration_000003_microbatches.md": {
+      "bytes": 4094,
+      "sha256": "3c321846a0ada700a184904af9bb7f9f7794629657bbfdd6758dffed85c23d06"
+    },
+    "hidden4096-long/after_dx/timeline/iteration_000003_rank_0.json": {
+      "bytes": 38319,
+      "sha256": "c7dbf225eff3fb911bb984c93d4d37d0395b0eb7c27a0df8d5c2900124dc91e4"
+    },
+    "hidden4096-long/after_dx/timeline/iteration_000003_rank_1.json": {
+      "bytes": 38295,
+      "sha256": "c5ff37737c855f0f06dacf6b44af433326381470d9e130fd4e00926ccce2da3d"
+    },
+    "hidden4096-long/after_dx/timeline/iteration_000003_rank_2.json": {
+      "bytes": 38309,
+      "sha256": "fa90dd874638a926d9c8f6e2c27d66c22fe1cff816214fc71fd15fdba5773418"
+    },
+    "hidden4096-long/after_dx/timeline/iteration_000003_summary.json": {
+      "bytes": 2626,
+      "sha256": "cc45afd3e6906c1a11e93713e79111c12fa9cc4e3d40906fe65bdb75f017741b"
+    },
+    "hidden4096-long/after_dx/train.log": {
+      "bytes": 35944,
+      "sha256": "8fd1e1b175e0849e1428550bf1295559946d9d303ec3914971d878c093682b0b"
+    },
+    "hidden4096-long/fused/timeline/iteration_000003.svg": {
+      "bytes": 22466,
+      "sha256": "63bf34606537cb6b56488046813faa5dd51edb80665f24929669914ce5d1c0b5"
+    },
+    "hidden4096-long/fused/timeline/iteration_000003_microbatches.md": {
+      "bytes": 4094,
+      "sha256": "3c321846a0ada700a184904af9bb7f9f7794629657bbfdd6758dffed85c23d06"
+    },
+    "hidden4096-long/fused/timeline/iteration_000003_rank_0.json": {
+      "bytes": 23866,
+      "sha256": "844b47fc3a0481e4927580f035799ccd3bbc505fb5e9b0bafac84407ae94f752"
+    },
+    "hidden4096-long/fused/timeline/iteration_000003_rank_1.json": {
+      "bytes": 23888,
+      "sha256": "292a2ec4fc8ab735821e2a9a0d6559e70f0d0d5d803d5411f9efb3c3a1fc08a7"
+    },
+    "hidden4096-long/fused/timeline/iteration_000003_rank_2.json": {
+      "bytes": 23858,
+      "sha256": "45b945b36af87fc65b030bfd90998b9f008107a7a75465362b2a591189f9ec72"
+    },
+    "hidden4096-long/fused/timeline/iteration_000003_summary.json": {
+      "bytes": 1900,
+      "sha256": "baea92b0b5d9a34e976fbd0e91ddb88bef94e591cf757f635e543aecc6e8e752"
+    },
+    "hidden4096-long/fused/train.log": {
+      "bytes": 35943,
+      "sha256": "92339cfc0f3a36833d0ca6dcd3117df3f5d194cd82cb880d863dba3267b37564"
+    },
+    "hidden4096-long/task-times.json": {
+      "bytes": 74195,
+      "sha256": "ace31a2b1a1a5a57e65162ef08cbe529aacb840ce5245e75f966d360a36bee17"
+    },
+    "hidden4096-long-launch.log": {
+      "bytes": 255,
+      "sha256": "ba152a9b54d42e4a6b3e8d446172eb8f93d13878bb18174991f2ed0075046d14"
+    },
+    "hidden4096-short/after_dx/timeline/iteration_000003.svg": {
+      "bytes": 18845,
+      "sha256": "0e0c67bbcbe4ffa42137debdc04cb85514e0781d111902543e8baaaf644d4e51"
+    },
+    "hidden4096-short/after_dx/timeline/iteration_000003_microbatches.md": {
+      "bytes": 2813,
+      "sha256": "22a013fa28f951ee1085d4325de18352fc983fba9e42fd3d071cd9a68b9a4fd4"
+    },
+    "hidden4096-short/after_dx/timeline/iteration_000003_rank_0.json": {
+      "bytes": 18717,
+      "sha256": "490aa8fe9569f5509bc4b972a31b3e4c504df06f76a79348bc086631351523d6"
+    },
+    "hidden4096-short/after_dx/timeline/iteration_000003_rank_1.json": {
+      "bytes": 18713,
+      "sha256": "e6e9c64e28d1faf58420679ee359f0cb91f16f517379c0809bb83894b152ca7d"
+    },
+    "hidden4096-short/after_dx/timeline/iteration_000003_rank_2.json": {
+      "bytes": 18712,
+      "sha256": "99096c48ef0928fb41b6990a95ca1d9597dfaac165e61bf1e6a3b4750ae54f16"
+    },
+    "hidden4096-short/after_dx/timeline/iteration_000003_summary.json": {
+      "bytes": 2642,
+      "sha256": "04f207f9eddc7d864ffe3707812403661eb44d726e6910a1751d1b10b59cceff"
+    },
+    "hidden4096-short/after_dx/train.log": {
+      "bytes": 35939,
+      "sha256": "3a42eac3a2e85bd33007f5c4dd8b75029009a1f3a29f303d9b571f5ba286dca1"
+    },
+    "hidden4096-short/fused/timeline/iteration_000003.svg": {
+      "bytes": 15018,
+      "sha256": "719c77f5f8147222915a9b113d4f40f704371449acb983be53de1c8f85184970"
+    },
+    "hidden4096-short/fused/timeline/iteration_000003_microbatches.md": {
+      "bytes": 2813,
+      "sha256": "22a013fa28f951ee1085d4325de18352fc983fba9e42fd3d071cd9a68b9a4fd4"
+    },
+    "hidden4096-short/fused/timeline/iteration_000003_rank_0.json": {
+      "bytes": 13915,
+      "sha256": "b8ca5c413b865a4082ffeadcb793e0ac27b5f5a158e33e8127064bc0b27fa975"
+    },
+    "hidden4096-short/fused/timeline/iteration_000003_rank_1.json": {
+      "bytes": 13913,
+      "sha256": "48dfa2b7ca22d8d816d265b976061cc2138dfc5aa4edff978a574649bf0a75d0"
+    },
+    "hidden4096-short/fused/timeline/iteration_000003_rank_2.json": {
+      "bytes": 13914,
+      "sha256": "e80ef1fe0311a35551287327e6a682fff6e57be8a51d2b28e1f87f3dc3d04d1c"
+    },
+    "hidden4096-short/fused/timeline/iteration_000003_summary.json": {
+      "bytes": 1912,
+      "sha256": "aa1dd1e10897bccaa183a470216d9aaeb3792eab58523211a63bc16cf01dc46c"
+    },
+    "hidden4096-short/fused/train.log": {
+      "bytes": 35939,
+      "sha256": "b1cef6e71545ec8843101220690178dacfc0e096e9807ecfb8160281133bcd0c"
+    },
+    "hidden4096-short/task-times.json": {
+      "bytes": 42248,
+      "sha256": "aaeb04b2c4e4063776dbaf41a391a3d046ca5f937b283624d2f8a95a6c642d1c"
+    },
+    "hidden4096-short-launch.log": {
+      "bytes": 255,
+      "sha256": "56cd8823de1779c8f4159a95f68a0c66ad16ef9dcb363955d4be89f7551bee9e"
+    },
+    "matrix-launch.log": {
+      "bytes": 1155,
+      "sha256": "043e1f3709833fe535850e91119737d96f5f864d86f951ba842567a621e3b236"
+    },
+    "run_matrix.py": {
+      "bytes": 2053,
+      "sha256": "6c2e9c25b46a6c866e254a7808fe9823953103612e19f134d894b3d74f5b6bba"
+    },
+    "shape-correctness.log": {
+      "bytes": 3305,
+      "sha256": "7e91907ee66641b2531017dcbd5a704b0eb75d4655bdd87e623945d6f5869638"
+    },
+    "source-snapshot.tar.gz": {
+      "bytes": 191011,
+      "sha256": "3d09b1736264abb7f35905157b0b7f4b040523e9f5fe4412d175c703864611c9"
+    },
+    "summarize_scaling.py": {
+      "bytes": 4072,
+      "sha256": "e698dce31093d9c283fc6940e0ce44bed33236f233b85f7d7f133a9b56044c47"
+    },
+    "summary-output.txt": {
+      "bytes": 871,
+      "sha256": "febde01bbf0eb4a0469ce1dda270013c9fed29539d61f7980885affd61fe6084"
+    },
+    "summary.json": {
+      "bytes": 441688,
+      "sha256": "5b7bcf51c713117d89d561baffd6734af2393e61ee8aab4e71ed5be2b78ac163"
+    },
+    "theory-comparison.json": {
+      "bytes": 9740,
+      "sha256": "5d0b47011c0027afc4f8608d35e1e272557e33662076440ea24544cb4be0a0f8"
+    },
+    "theory-output.txt": {
+      "bytes": 2692,
+      "sha256": "fb2c86d30ddc64478bf3a0d50e14260c2f2b3a4e479f9f27fab4e0f3952569e1"
+    },
+    "workload-scaling-20261016-data.json": {
+      "bytes": 345,
+      "sha256": "f7fbb1f0bf98140891e19be72ef4190ccbf4327eb316e15623df97285a7fdacf"
+    }
+  },
+  "commands": [
+    "python3 /home/cuiym/src/Megatron-LM-kwai/docs/assets/fa-split/012-width4096-theory-20261016/run_matrix.py",
+    "python3 /home/cuiym/src/Megatron-LM-kwai/docs/assets/fa-split/012-width4096-theory-20261016/compare_theory.py",
+    "python3 /home/cuiym/src/Megatron-LM-kwai/docs/assets/fa-split/012-width4096-theory-20261016/summarize_scaling.py",
+    "docker exec dspp-width4096 /workspace/src/venvs/megatron/bin/python -m pytest -q -s -p no:cacheprovider tests/unit_tests/dspp/test_fa_combined_current.py -k 'combined_long and 32-16'"
+  ],
+  "validation": [
+    "Two new 32/16-head independent attention numerical comparisons; dQ/current/history gradients all checked.",
+    "Only complete B/H boundary events in formal training; profiler and correctness tests separate.",
+    "One pair/config; no repeat because all preselected paired B samples improve with separated ranges. Samples in a run are not independent runs.",
+    "All matched layouts and B/H ordering checks pass. Per-pair loss matches at log precision, not a substitute for full gradient validation.",
+    "All stage/layout samples retained; task work summed across ranks is not iteration time.",
+    "No git add/commit/push; archives001\u2013011 preserved."
+  ]
+}

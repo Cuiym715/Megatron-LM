@@ -1,0 +1,541 @@
+{
+  "source": "docs/assets/fa-split/010-mha-comparison-20261016/attention-h16/execution.pt.trace.json",
+  "scope": "Intrusive profiler, not clean timing; nested ranges overlap. Task ownership uses temporal containment across autograd threads; operator ownership matches thread.",
+  "unassigned_event_count": 0,
+  "unassigned_names": {},
+  "ranges": [
+    {
+      "range": "COST/fused",
+      "cpu_duration_us": 2201.356,
+      "gpu_events": 3,
+      "gpu_time_sum_us": 1465.15,
+      "gpu_busy_union_us": 1465.150146484375,
+      "first_to_last_gpu_us": 1466.5888671875,
+      "gap_inside_gpu_span_us": 1.438720703125,
+      "kernels": [
+        {
+          "name": "void flash::flash_bwd_dot_do_o_kernel<true, Flash_bwd_kernel_traits<128, 64, 64, 8, 4, 2, 2, true, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 8, cutlass::bfloat16_t> > >(flash::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1285967340912.704,
+          "dur": 28.736,
+          "args": {
+            "External id": 8,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 57,
+            "registers per thread": 49,
+            "shared memory": 0,
+            "blocks per SM": 3.605634,
+            "warps per SM": 28.84507,
+            "grid": [
+              32,
+              1,
+              16
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        },
+        {
+          "name": "void flash::flash_bwd_dq_dk_dv_loop_seqk_parallel_kernel<Flash_bwd_kernel_traits<128, 64, 64, 8, 4, 2, 2, true, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 8, cutlass::bfloat16_t> >, false, true, false, false, false, true, false>(flash::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1285967340942.176,
+          "dur": 1423.997,
+          "args": {
+            "External id": 8,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 61,
+            "registers per thread": 255,
+            "shared memory": 81920,
+            "blocks per SM": 10.816901,
+            "warps per SM": 86.53521,
+            "grid": [
+              96,
+              1,
+              16
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "void flash::flash_bwd_convert_dq_kernel<Flash_bwd_kernel_traits<128, 64, 64, 8, 4, 2, 2, true, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 8, cutlass::bfloat16_t> > >(flash::Flash_bwd_params, int)",
+          "cat": "kernel",
+          "ts": 1285967342366.876,
+          "dur": 12.417,
+          "args": {
+            "External id": 8,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 64,
+            "registers per thread": 72,
+            "shared memory": 16384,
+            "blocks per SM": 3.605634,
+            "warps per SM": 28.84507,
+            "grid": [
+              32,
+              1,
+              16
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 50
+          }
+        }
+      ]
+    },
+    {
+      "range": "COST/combined_B",
+      "cpu_duration_us": 517.556,
+      "gpu_events": 7,
+      "gpu_time_sum_us": 1232.0920000000003,
+      "gpu_busy_union_us": 1232.092041015625,
+      "first_to_last_gpu_us": 1236.60498046875,
+      "gap_inside_gpu_span_us": 4.512939453125,
+      "kernels": [
+        {
+          "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+          "cat": "kernel",
+          "ts": 1285967342380.093,
+          "dur": 2.303,
+          "args": {
+            "External id": 26,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 98,
+            "registers per thread": 16,
+            "shared memory": 0,
+            "blocks per SM": 0.225352,
+            "warps per SM": 0.901408,
+            "grid": [
+              32,
+              1,
+              1
+            ],
+            "block": [
+              128,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 2
+          }
+        },
+        {
+          "name": "dspp_split_detail::prepare_kernel(dspp_flash_split::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1285967342383.036,
+          "dur": 25.792,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 106,
+            "registers per thread": 46,
+            "shared memory": 0,
+            "blocks per SM": 3.605634,
+            "warps per SM": 28.84507,
+            "grid": [
+              32,
+              1,
+              16
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        },
+        {
+          "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+          "cat": "kernel",
+          "ts": 1285967342409.661,
+          "dur": 7.007,
+          "args": {
+            "External id": 35,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 146,
+            "registers per thread": 16,
+            "shared memory": 0,
+            "blocks per SM": 28.84507,
+            "warps per SM": 115.38028,
+            "grid": [
+              4096,
+              1,
+              1
+            ],
+            "block": [
+              128,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 100
+          }
+        },
+        {
+          "name": "dspp_split_detail::dq_current_kernel(dspp_flash_split::Flash_bwd_params, int)",
+          "cat": "kernel",
+          "ts": 1285967342417.404,
+          "dur": 1175.998,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 173,
+            "registers per thread": 241,
+            "shared memory": 81920,
+            "blocks per SM": 10.816901,
+            "warps per SM": 86.53521,
+            "grid": [
+              96,
+              1,
+              16
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "dspp_split_detail::convert_dq_kernel(dspp_flash_split::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1285967343594.202,
+          "dur": 7.712,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 176,
+            "registers per thread": 40,
+            "shared memory": 16384,
+            "blocks per SM": 3.605634,
+            "warps per SM": 28.84507,
+            "grid": [
+              32,
+              1,
+              16
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        },
+        {
+          "name": "Memcpy DtoD (Device -> Device)",
+          "cat": "gpu_memcpy",
+          "ts": 1285967343602.65,
+          "dur": 6.688,
+          "args": {
+            "External id": 41,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 179,
+            "bytes": 8388608,
+            "memory bandwidth (GB/s)": 1254.2775119617224
+          }
+        },
+        {
+          "name": "Memcpy DtoD (Device -> Device)",
+          "cat": "gpu_memcpy",
+          "ts": 1285967343610.106,
+          "dur": 6.592,
+          "args": {
+            "External id": 44,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 184,
+            "bytes": 8388608,
+            "memory bandwidth (GB/s)": 1272.5436893203882
+          }
+        }
+      ]
+    },
+    {
+      "range": "COST/combined_native_B",
+      "cpu_duration_us": 161.465,
+      "gpu_events": 7,
+      "gpu_time_sum_us": 1225.851,
+      "gpu_busy_union_us": 1225.850830078125,
+      "first_to_last_gpu_us": 1230.33203125,
+      "gap_inside_gpu_span_us": 4.481201171875,
+      "kernels": [
+        {
+          "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+          "cat": "kernel",
+          "ts": 1285967343617.402,
+          "dur": 0.928,
+          "args": {
+            "External id": 49,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 202,
+            "registers per thread": 16,
+            "shared memory": 0,
+            "blocks per SM": 0.225352,
+            "warps per SM": 0.901408,
+            "grid": [
+              32,
+              1,
+              1
+            ],
+            "block": [
+              128,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 2
+          }
+        },
+        {
+          "name": "dspp_split_detail::prepare_kernel(dspp_flash_split::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1285967343619.098,
+          "dur": 24.991,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 210,
+            "registers per thread": 46,
+            "shared memory": 0,
+            "blocks per SM": 3.605634,
+            "warps per SM": 28.84507,
+            "grid": [
+              32,
+              1,
+              16
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        },
+        {
+          "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+          "cat": "kernel",
+          "ts": 1285967343644.793,
+          "dur": 6.848,
+          "args": {
+            "External id": 58,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 247,
+            "registers per thread": 16,
+            "shared memory": 0,
+            "blocks per SM": 28.84507,
+            "warps per SM": 115.38028,
+            "grid": [
+              4096,
+              1,
+              1
+            ],
+            "block": [
+              128,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 100
+          }
+        },
+        {
+          "name": "dspp_split_detail::dq_current_kernel(dspp_flash_split::Flash_bwd_params, int)",
+          "cat": "kernel",
+          "ts": 1285967343652.409,
+          "dur": 1171.87,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 270,
+            "registers per thread": 241,
+            "shared memory": 81920,
+            "blocks per SM": 10.816901,
+            "warps per SM": 86.53521,
+            "grid": [
+              96,
+              1,
+              16
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "dspp_split_detail::convert_dq_kernel(dspp_flash_split::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1285967344825.015,
+          "dur": 7.711,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 273,
+            "registers per thread": 40,
+            "shared memory": 16384,
+            "blocks per SM": 3.605634,
+            "warps per SM": 28.84507,
+            "grid": [
+              32,
+              1,
+              16
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        },
+        {
+          "name": "Memcpy DtoD (Device -> Device)",
+          "cat": "gpu_memcpy",
+          "ts": 1285967344833.526,
+          "dur": 6.88,
+          "args": {
+            "External id": 64,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 276,
+            "bytes": 8388608,
+            "memory bandwidth (GB/s)": 1219.2744186046511
+          }
+        },
+        {
+          "name": "Memcpy DtoD (Device -> Device)",
+          "cat": "gpu_memcpy",
+          "ts": 1285967344841.111,
+          "dur": 6.623,
+          "args": {
+            "External id": 67,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 281,
+            "bytes": 8388608,
+            "memory bandwidth (GB/s)": 1266.58734712366
+          }
+        }
+      ]
+    },
+    {
+      "range": "COST/H",
+      "cpu_duration_us": 133.642,
+      "gpu_events": 3,
+      "gpu_time_sum_us": 1023.326,
+      "gpu_busy_union_us": 1023.325927734375,
+      "first_to_last_gpu_us": 1024.76611328125,
+      "gap_inside_gpu_span_us": 1.440185546875,
+      "kernels": [
+        {
+          "name": "void dspp_split_detail::split_kernel<false>(dspp_flash_split::Flash_bwd_params, int)",
+          "cat": "kernel",
+          "ts": 1285967344848.534,
+          "dur": 1002.494,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 320,
+            "registers per thread": 224,
+            "shared memory": 81920,
+            "blocks per SM": 7.211267,
+            "warps per SM": 57.69014,
+            "grid": [
+              64,
+              1,
+              16
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "Memcpy DtoD (Device -> Device)",
+          "cat": "gpu_memcpy",
+          "ts": 1285967345851.732,
+          "dur": 10.976,
+          "args": {
+            "External id": 77,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 323,
+            "bytes": 16777216,
+            "memory bandwidth (GB/s)": 1528.536443148688
+          }
+        },
+        {
+          "name": "Memcpy DtoD (Device -> Device)",
+          "cat": "gpu_memcpy",
+          "ts": 1285967345863.444,
+          "dur": 9.856,
+          "args": {
+            "External id": 80,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 328,
+            "bytes": 16777216,
+            "memory bandwidth (GB/s)": 1702.2337662337663
+          }
+        }
+      ]
+    }
+  ]
+}

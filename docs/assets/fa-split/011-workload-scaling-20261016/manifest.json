@@ -1,0 +1,646 @@
+{
+  "created_utc": "2026-10-16T09:51:28.355943+00:00",
+  "git_head": "abd39e566b49e06dce32df5f218fa7c1ead7dddd",
+  "environment": {
+    "image": "nvcr.io/nvidia/pytorch:26.01-py3",
+    "gpu": "3 x NVIDIA L40 (SM89)",
+    "host_driver": "550.120",
+    "torch": "2.10.0a0+a36e1d39eb.nv26.01.42222806",
+    "cuda_toolkit": "13.1",
+    "flash_attn": "2.7.4.post1",
+    "python": "/workspace/src/venvs/megatron/bin/python (3.12)",
+    "container_user": "1001:1001",
+    "mount": "/home/cuiym:/workspace",
+    "extension_cache_key": "51ac35cd4a46e186"
+  },
+  "scope": "Actual PP3/VPP2 complete B/H scaling with width and longest sequence. No production algorithm changes; no end-to-end speedup claim.",
+  "source_files": {
+    "docs/dspp-history-dkv-split-implementation-plan.md": {
+      "bytes": 98272,
+      "sha256": "5210941e9e45a8a314fec284b0739ddf1455cbc6db360c8134ec257581c747c2"
+    },
+    "examples/measure_dspp_clean_tasks.sh": {
+      "bytes": 1844,
+      "sha256": "e910edec03cc1ccf135b831f9fbfdb6479e38f6853dbb9ef3952ab03327d037b"
+    },
+    "examples/measure_dspp_combined_tasks.sh": {
+      "bytes": 2026,
+      "sha256": "7b58af17a90721066524856834d6d3a52e93e9ae3300e0866dcebb18d1fb6dff"
+    },
+    "examples/measure_dspp_history_after_dx.sh": {
+      "bytes": 1444,
+      "sha256": "d54b628ac8b563e46dbb988d55a2958d455f37375cc3b9b54fde47d6c7b3d027"
+    },
+    "examples/run_dspp_b23_l40.sh": {
+      "bytes": 8938,
+      "sha256": "1aaf10723a91b1599440fe1f459547362bbda0be72c46d7dac43d2849bd352a5"
+    },
+    "examples/validate_dspp_split_training.sh": {
+      "bytes": 2960,
+      "sha256": "fe9d677581be346bca831147fff21fc0fe37502adf4dbacd9e8d8dcd81a5011b"
+    },
+    "megatron/arguments.py": {
+      "bytes": 111313,
+      "sha256": "f5d32d856821357648e0fe68634d220649b7fb8a031906a0767912a54066f4fe"
+    },
+    "megatron/core/kv_cache/dspp_packed_attention.py": {
+      "bytes": 29147,
+      "sha256": "8789e68453bceeef3ce689b5e15e45f4a71756979177842dd72c0f5a4979d875"
+    },
+    "megatron/core/kv_cache/fa_split.py": {
+      "bytes": 9896,
+      "sha256": "762422f97a80532376378a0c9d054e17e15b0ad9c2fa46d73911a9df0a6780f7"
+    },
+    "megatron/core/kv_cache/fa_split_build.py": {
+      "bytes": 4656,
+      "sha256": "6c65289406b2d447930ec4bfa8b829fca7988e1b3deaad96d3ee860c2189de03"
+    },
+    "megatron/core/kv_cache/fa_split_src/LICENSE.cutlass": {
+      "bytes": 1547,
+      "sha256": "6fc6ad419e4d26571a14c7c4d26b65345865c20dd8686ddcf5e8673f54d3d233"
+    },
+    "megatron/core/kv_cache/fa_split_src/LICENSE.flash-attention": {
+      "bytes": 1558,
+      "sha256": "8c9ccb96c065e706135b6cbad279b721da6156e51f3a5f27c6b3329af9416d73"
+    },
+    "megatron/core/kv_cache/fa_split_src/THIRD_PARTY.md": {
+      "bytes": 2242,
+      "sha256": "e0298387948f587ee48330d291b34022a6b7ab4d2b6e23dbc9a3b747253598ea"
+    },
+    "megatron/core/kv_cache/fa_split_src/backward.cu": {
+      "bytes": 14194,
+      "sha256": "63a3c390099a23b75ac82d614cffbba2b10a28aa0f8f671b41df63d021cca953"
+    },
+    "megatron/core/kv_cache/fa_split_src/bindings.cpp": {
+      "bytes": 1488,
+      "sha256": "564c3aa76e48d7c9f014c60bf4064669159768963aa80b31fa28ec7a0384125b"
+    },
+    "megatron/core/kv_cache/fa_split_src/flash_bwd_split.patch": {
+      "bytes": 4546,
+      "sha256": "cf305e245ecde91a2f54659b2df254bf02a706445ebcb94ce7622f54ea23109f"
+    },
+    "megatron/core/kv_cache/fa_split_src/upstream.json": {
+      "bytes": 351,
+      "sha256": "163c55a7526f5f78f8d1924021e163e4cb7c58daf505c64d74e463cb6778057e"
+    },
+    "megatron/core/pipeline_parallel/dspp_timeline.py": {
+      "bytes": 19293,
+      "sha256": "0da8f40344ed860ca7b529fae6ee6d44c275deb817aef7b61ee7f08288097724"
+    },
+    "megatron/core/pipeline_parallel/schedules.py": {
+      "bytes": 196277,
+      "sha256": "ca61880a34dea59c208ef28d3ab1f83f57b2f581b35bc78df9dc8481c1079319"
+    },
+    "megatron/core/utils.py": {
+      "bytes": 13313,
+      "sha256": "288977b84558394506b8892dbbd22fc3540269a736d1a0639c9dab6e21ef910d"
+    },
+    "megatron/initialize.py": {
+      "bytes": 22431,
+      "sha256": "2b964d6547ff64ae38cbd5b5d5baa30526f0d5c97ce2639de5b3d90af320deee"
+    },
+    "megatron/model/transformer.py": {
+      "bytes": 101119,
+      "sha256": "d8a8bdaf7e02d97a653239516f3acbbc83392a5c43c5af4f8980d1364dfc6eb9"
+    },
+    "megatron/profile_utils.py": {
+      "bytes": 8154,
+      "sha256": "1d2c3a5319d643f0ff20f4e639465936fb861d1ad291df7af809a5b632acd3d3"
+    },
+    "tests/unit_tests/dspp/test_clean_task_timing.py": {
+      "bytes": 4807,
+      "sha256": "3ed25ad28094d3ae89c670a7c36fc1b2a8a87e6a1d46bb2ad4f428bafb5b11ad"
+    },
+    "tests/unit_tests/dspp/test_fa_combined_current.py": {
+      "bytes": 6042,
+      "sha256": "92b70706c4c5ba4584a06368d5f16fef0746efc88781591cbd137075be36591c"
+    },
+    "tests/unit_tests/dspp/test_fa_split.py": {
+      "bytes": 10246,
+      "sha256": "beecb34fb5001b9e987b3e4cdfc81ec1019815d2ae25947c419d6e03179910ae"
+    },
+    "tests/unit_tests/dspp/test_fa_split_regions.py": {
+      "bytes": 13848,
+      "sha256": "6a16a302910729e0162106217c27cc409ec737b68d244d0d84be0026e93dafe8"
+    },
+    "tests/unit_tests/dspp/test_history_after_dx.py": {
+      "bytes": 8091,
+      "sha256": "6acd07429ff69791c52bc1e0e2490f262cea8fc214cac605b9fb1a99512a7592"
+    },
+    "tests/unit_tests/dspp/test_kv_state.py": {
+      "bytes": 3401,
+      "sha256": "b5fa0662cd1feb89c3144a2f30304f912f58b1fa5b71883569ffd1b39582833e"
+    },
+    "tests/unit_tests/dspp/test_ordering_and_metrics.py": {
+      "bytes": 7796,
+      "sha256": "d3ded5ef67da29ddad3e663e3b7866bb9dc5b94c304c0c8af8f21a851bc54ef8"
+    },
+    "tests/unit_tests/dspp/test_packed_attention.py": {
+      "bytes": 17593,
+      "sha256": "2bfd2d1072661ae9a513ca792f057f525630389ff2357d1fc29b01a90af0e8cd"
+    },
+    "tests/unit_tests/dspp/test_packed_split.py": {
+      "bytes": 15228,
+      "sha256": "23219874635616fa86d4e32b991bfa79a75f17f981c02204a94ef293bd188d21"
+    },
+    "tests/unit_tests/dspp/test_training_runtime.py": {
+      "bytes": 10425,
+      "sha256": "4514042ef5747f1564367dcb8cc85e12d97615371e4ff445a0ffb70e59242a91"
+    },
+    "tools/audit_dspp_task_timing.py": {
+      "bytes": 3138,
+      "sha256": "03355fbe822258a777b57a0b62e79f5d0ee36c0119725cd58aa0da49a5837cb8"
+    },
+    "tools/build_dspp_fa_split.py": {
+      "bytes": 815,
+      "sha256": "4c53dc5e1c0b1f33350c0901d506ea29373785a0991b540a7360a0616e68e515"
+    },
+    "tools/build_dspp_synthetic_dataset.py": {
+      "bytes": 5326,
+      "sha256": "968d5582fe88c69370a235946fd0e7e728c16b6e9a11744587436ce981de4e23"
+    },
+    "tools/diagnose_dspp_attention_cost.py": {
+      "bytes": 7989,
+      "sha256": "8b7c6c270f8b54152ee2f08438316d8bf617b2c115beff2d57efd656365fd1d3"
+    },
+    "tools/diagnose_dspp_training_cost.py": {
+      "bytes": 2874,
+      "sha256": "af50a26b4ba00591686ce1e2a143ad12e61d6cd642fc13771bfd2648ec8a28ab"
+    },
+    "tools/summarize_dspp_clean_tasks.py": {
+      "bytes": 2410,
+      "sha256": "b5ce3ad63a77b3a5298fd0f1fde2a53a7f325de2cf612c34852b200ca8ca260b"
+    },
+    "tools/summarize_dspp_cost_diagnosis.py": {
+      "bytes": 3258,
+      "sha256": "c9e0606f894d1a5f56c49726eb44136f961f95bd42e0b77ab1e2b2cf120b02b5"
+    },
+    "tools/summarize_dspp_history_tasks.py": {
+      "bytes": 4635,
+      "sha256": "0f29eacbf08c7c77fcd292959bd486a0b300b0d722e85ad00805275b74ad7143"
+    },
+    "tools/validate_dspp_split_training.py": {
+      "bytes": 7078,
+      "sha256": "b62971380914f4993158208539cfbe4065af7430c994fe1ac2de8d8679b6d4f0"
+    }
+  },
+  "source_files_unchanged_from_010": [
+    "examples/measure_dspp_clean_tasks.sh",
+    "examples/measure_dspp_history_after_dx.sh",
+    "examples/run_dspp_b23_l40.sh",
+    "examples/validate_dspp_split_training.sh",
+    "megatron/arguments.py",
+    "megatron/core/kv_cache/dspp_packed_attention.py",
+    "megatron/core/kv_cache/fa_split.py",
+    "megatron/core/kv_cache/fa_split_build.py",
+    "megatron/core/kv_cache/fa_split_src/LICENSE.cutlass",
+    "megatron/core/kv_cache/fa_split_src/LICENSE.flash-attention",
+    "megatron/core/kv_cache/fa_split_src/THIRD_PARTY.md",
+    "megatron/core/kv_cache/fa_split_src/backward.cu",
+    "megatron/core/kv_cache/fa_split_src/bindings.cpp",
+    "megatron/core/kv_cache/fa_split_src/flash_bwd_split.patch",
+    "megatron/core/kv_cache/fa_split_src/upstream.json",
+    "megatron/core/pipeline_parallel/dspp_timeline.py",
+    "megatron/core/pipeline_parallel/schedules.py",
+    "megatron/core/utils.py",
+    "megatron/initialize.py",
+    "megatron/model/transformer.py",
+    "megatron/profile_utils.py",
+    "tests/unit_tests/dspp/test_clean_task_timing.py",
+    "tests/unit_tests/dspp/test_fa_split.py",
+    "tests/unit_tests/dspp/test_fa_split_regions.py",
+    "tests/unit_tests/dspp/test_history_after_dx.py",
+    "tests/unit_tests/dspp/test_kv_state.py",
+    "tests/unit_tests/dspp/test_ordering_and_metrics.py",
+    "tests/unit_tests/dspp/test_packed_attention.py",
+    "tests/unit_tests/dspp/test_packed_split.py",
+    "tests/unit_tests/dspp/test_training_runtime.py",
+    "tools/audit_dspp_task_timing.py",
+    "tools/build_dspp_fa_split.py",
+    "tools/build_dspp_synthetic_dataset.py",
+    "tools/diagnose_dspp_attention_cost.py",
+    "tools/diagnose_dspp_training_cost.py",
+    "tools/summarize_dspp_clean_tasks.py",
+    "tools/summarize_dspp_cost_diagnosis.py",
+    "tools/summarize_dspp_history_tasks.py",
+    "tools/validate_dspp_split_training.py"
+  ],
+  "external_inputs": {
+    "/home/cuiym/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data.json": {
+      "bytes": 343,
+      "sha256": "7ba3bb62288c9e2036b16c33c35f6f244fc0958f4ccf7fa3922d4e06084f5dcd"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data.bin": {
+      "bytes": 1540992,
+      "sha256": "235e6d7721d15a9f4222b2339c1392965f1cf6bc659a4471b38fc6be3edc0d1b"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data.idx": {
+      "bytes": 2602,
+      "sha256": "f77dca272855e39145d1bfdb489d7e1c458926483677720dea7cd302422e1e73"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/workload-scaling-20261016/long-data.json": {
+      "bytes": 345,
+      "sha256": "f7fbb1f0bf98140891e19be72ef4190ccbf4327eb316e15623df97285a7fdacf"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/workload-scaling-20261016/long-data.bin": {
+      "bytes": 2589568,
+      "sha256": "dbea6a46793e9f6009c8aa3a443397ff1beb8e32f98212378426336767baaa3f"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/workload-scaling-20261016/long-data.idx": {
+      "bytes": 2602,
+      "sha256": "a48dd1f9bb41c2b218d2a346fbbc7c6e0ddb9a4c7ecc802d48ea884fbb67cd2f"
+    }
+  },
+  "evidence_files": {
+    "clean-timing-measure-final-20261016-data.json": {
+      "bytes": 343,
+      "sha256": "7ba3bb62288c9e2036b16c33c35f6f244fc0958f4ccf7fa3922d4e06084f5dcd"
+    },
+    "configurations.json": {
+      "bytes": 3751,
+      "sha256": "6e23219514c6def151c7d7026b93b821961a3d3dca5adcc3cf4ab11991762f7f"
+    },
+    "data-build.log": {
+      "bytes": 1413,
+      "sha256": "ab741f87adde9d3975bcce9d76dc4eebfe13795303b586e280ba2e786cc5b30a"
+    },
+    "finalize_archive.py": {
+      "bytes": 2795,
+      "sha256": "48710119868f90ed651a49630bd4029fe55cdb2984c5c845603f0bcff08a6195"
+    },
+    "matrix-launch.log": {
+      "bytes": 2266,
+      "sha256": "e964fa751892b4589ae2357e84247d78ff742c4a51ecf14b64f650d36ff69905"
+    },
+    "measure-launcher.sh": {
+      "bytes": 2026,
+      "sha256": "7b58af17a90721066524856834d6d3a52e93e9ae3300e0866dcebb18d1fb6dff"
+    },
+    "repeat_wide_long.py": {
+      "bytes": 1094,
+      "sha256": "c68dd6f08f081395b6dbcbf6feecee4dd7892eb42ddfc6788c377bdbd8391c74"
+    },
+    "run_matrix.py": {
+      "bytes": 2258,
+      "sha256": "e2bead3585f07a293476b5f65a81f878ebe0e19c3f41cc7b9160c9e3bf8a9ec8"
+    },
+    "shape-correctness.log": {
+      "bytes": 5504,
+      "sha256": "9878d13cd891dfae808330f95c14d7a9e873b79988d2fc7040ad837a6a963005"
+    },
+    "small-long/after_dx/timeline/iteration_000003.svg": {
+      "bytes": 33122,
+      "sha256": "3805e4a290f8065b8bb728e2114b0b5d5943d6ed4eca34cc74cb99b15033d677"
+    },
+    "small-long/after_dx/timeline/iteration_000003_microbatches.md": {
+      "bytes": 4094,
+      "sha256": "3c321846a0ada700a184904af9bb7f9f7794629657bbfdd6758dffed85c23d06"
+    },
+    "small-long/after_dx/timeline/iteration_000003_rank_0.json": {
+      "bytes": 38271,
+      "sha256": "3f95a470e3d25087714bfee9cf082ef609e0fc43ecb0aabb52de1f7fa2199fee"
+    },
+    "small-long/after_dx/timeline/iteration_000003_rank_1.json": {
+      "bytes": 38283,
+      "sha256": "2bbfa8bb4c9536ee6dc9ea8373569fbb3517df726a1410fadbedd98cc7686c71"
+    },
+    "small-long/after_dx/timeline/iteration_000003_rank_2.json": {
+      "bytes": 38312,
+      "sha256": "07fc4a613aba557d326a8a3fbed21d5f4d6b6efed2dea26a7108aab3efa62613"
+    },
+    "small-long/after_dx/timeline/iteration_000003_summary.json": {
+      "bytes": 2614,
+      "sha256": "ab2e9b873f64334ef4e35a7962d806ba9bd8caafb7377a617f749bbd99573330"
+    },
+    "small-long/after_dx/train.log": {
+      "bytes": 35919,
+      "sha256": "4d844e6f93dffd842bd11f2bd3b65785f661d6065e3adee8fdced8a44d4f601e"
+    },
+    "small-long/fused/timeline/iteration_000003.svg": {
+      "bytes": 22420,
+      "sha256": "3057a74db6d0f938e17dfd3dba7dff4ac59aef444eb3baf3c1eb9344e7400c7f"
+    },
+    "small-long/fused/timeline/iteration_000003_microbatches.md": {
+      "bytes": 4094,
+      "sha256": "3c321846a0ada700a184904af9bb7f9f7794629657bbfdd6758dffed85c23d06"
+    },
+    "small-long/fused/timeline/iteration_000003_rank_0.json": {
+      "bytes": 23846,
+      "sha256": "65ac13e1175933dd28e423f99abe6ba0461ea0a924548d9865b82716b9effaa5"
+    },
+    "small-long/fused/timeline/iteration_000003_rank_1.json": {
+      "bytes": 23850,
+      "sha256": "889e1a03226d5055d5b004b777918d9e4ccb762fcb862b5ab7e90b121aede675"
+    },
+    "small-long/fused/timeline/iteration_000003_rank_2.json": {
+      "bytes": 23843,
+      "sha256": "cdbf3abdf4ad359cdcb2c7a4f6624d5800bb5a0d37c09dfa865f7bdf3d755ed7"
+    },
+    "small-long/fused/timeline/iteration_000003_summary.json": {
+      "bytes": 1896,
+      "sha256": "b0ea93a41068aa78d0b1589278bbcc115ec2724d8357b6d35a76b2fd8331cd70"
+    },
+    "small-long/fused/train.log": {
+      "bytes": 35919,
+      "sha256": "242bfa8f31fb07317e92ab2479da5791e0b3329e14fdd466ec74d76c2ab0d57b"
+    },
+    "small-long/task-times.json": {
+      "bytes": 74015,
+      "sha256": "d772b9ab3b1607c4246f560a683ae2271d25a9d9d75ba18497ae2580ac2d270b"
+    },
+    "small-long-launch.log": {
+      "bytes": 250,
+      "sha256": "5f21c43f44eddc608699c868337cea59ed2ef8ea0c058f2abdaaba758f659534"
+    },
+    "small-short/after_dx/timeline/iteration_000003.svg": {
+      "bytes": 20860,
+      "sha256": "0c19f50f69a75f44ab3d1bd8ca27824ad4db2f36ad2363828a1aa3b19705f5ca"
+    },
+    "small-short/after_dx/timeline/iteration_000003_microbatches.md": {
+      "bytes": 2813,
+      "sha256": "22a013fa28f951ee1085d4325de18352fc983fba9e42fd3d071cd9a68b9a4fd4"
+    },
+    "small-short/after_dx/timeline/iteration_000003_rank_0.json": {
+      "bytes": 18724,
+      "sha256": "78737b30a098c7810c14a0a129939a829d055eb7f0b560eb184a78e751292087"
+    },
+    "small-short/after_dx/timeline/iteration_000003_rank_1.json": {
+      "bytes": 18717,
+      "sha256": "6f2a1482f480f36ac9c5300e69787bef69e28904153fbd46bd2f3bcf2597b00e"
+    },
+    "small-short/after_dx/timeline/iteration_000003_rank_2.json": {
+      "bytes": 18725,
+      "sha256": "cb51f66c3707c280013cb87db2b3e34149b08eabb0981fcef4a3b465c6240f35"
+    },
+    "small-short/after_dx/timeline/iteration_000003_summary.json": {
+      "bytes": 2631,
+      "sha256": "dcf6bd0226733ac45da907693e49630dc6bd90f8c1e77d1d3a89b18987b716a1"
+    },
+    "small-short/after_dx/train.log": {
+      "bytes": 35919,
+      "sha256": "76d44edc8e86646576fbea58cf22ca7536d4f9aa87f850f36d6559b71bcc1258"
+    },
+    "small-short/fused/timeline/iteration_000003.svg": {
+      "bytes": 17116,
+      "sha256": "57bf69eced5b19e9b0f7901f04c27fb35af5ed520b85934d0daf63a3ec2df05c"
+    },
+    "small-short/fused/timeline/iteration_000003_microbatches.md": {
+      "bytes": 2813,
+      "sha256": "22a013fa28f951ee1085d4325de18352fc983fba9e42fd3d071cd9a68b9a4fd4"
+    },
+    "small-short/fused/timeline/iteration_000003_rank_0.json": {
+      "bytes": 13933,
+      "sha256": "9cd669e746308621a517524400eb2cb8e56a5a5d4b83155818c38464e7336f0c"
+    },
+    "small-short/fused/timeline/iteration_000003_rank_1.json": {
+      "bytes": 13921,
+      "sha256": "e2b3b4434c5628dbd00741ed102b68377ef5c55b1bb81bb3f72efede3b1a318c"
+    },
+    "small-short/fused/timeline/iteration_000003_rank_2.json": {
+      "bytes": 13914,
+      "sha256": "b4c3366fbbfada58fd6c5928cb64b93508a4f045e8146a5617f46449cf9794d5"
+    },
+    "small-short/fused/timeline/iteration_000003_summary.json": {
+      "bytes": 1905,
+      "sha256": "921e863d16a6ec0f2d371a792dcbeaa6d365a04e1a9f53f313d1c049c8dc822a"
+    },
+    "small-short/fused/train.log": {
+      "bytes": 35918,
+      "sha256": "2edd58a4a87edec405aa1e6c54ce04719eb12f9a7ebf6343420d77040b08b9ba"
+    },
+    "small-short/task-times.json": {
+      "bytes": 42268,
+      "sha256": "753b015cde91e60889b24a249010b4088768706a188adfcb29fe05860efb712f"
+    },
+    "small-short-launch.log": {
+      "bytes": 250,
+      "sha256": "04c42c0b13c7df59c0b91d807302ec50334a2c9fde56a042686341a9b5655795"
+    },
+    "source-snapshot.tar.gz": {
+      "bytes": 187649,
+      "sha256": "faed5e873b568a3368525600eadf88910a958bc05702a081dd00fdd48ef708a4"
+    },
+    "summarize_scaling.py": {
+      "bytes": 4024,
+      "sha256": "9a765d8d62948184e58500f466da0db5ff8d73f0bf4d85248d5b3cdca6d76ef1"
+    },
+    "summary-output.txt": {
+      "bytes": 2770,
+      "sha256": "657ee75bfcaebfea8132494d136aba4613f2a1173c084c8c50efffae374b7bf8"
+    },
+    "summary.json": {
+      "bytes": 1412071,
+      "sha256": "3a92d87c1ff72e99a23c51d261e743050f95a5e92d0a4c41b30e4a8bb794e19a"
+    },
+    "wide-long/after_dx/timeline/iteration_000003.svg": {
+      "bytes": 33030,
+      "sha256": "786def73fcc9896a18b0d78292b518560f49b5a0321948a7b6b7c81a57cd1693"
+    },
+    "wide-long/after_dx/timeline/iteration_000003_microbatches.md": {
+      "bytes": 4094,
+      "sha256": "3c321846a0ada700a184904af9bb7f9f7794629657bbfdd6758dffed85c23d06"
+    },
+    "wide-long/after_dx/timeline/iteration_000003_rank_0.json": {
+      "bytes": 38273,
+      "sha256": "d6b6ad7ffa6404a2aba21ef8cfdf2c87ddd431380616fc80e23197efda54d702"
+    },
+    "wide-long/after_dx/timeline/iteration_000003_rank_1.json": {
+      "bytes": 38296,
+      "sha256": "cb105355480d1a4162639eb48e7dbc23652dfa7f438706a0b72ef39b6ae56b42"
+    },
+    "wide-long/after_dx/timeline/iteration_000003_rank_2.json": {
+      "bytes": 38282,
+      "sha256": "eadb4837fdd911ad6ffc0db731597a37d176969b44f2b3169f57cff1626a9b70"
+    },
+    "wide-long/after_dx/timeline/iteration_000003_summary.json": {
+      "bytes": 2622,
+      "sha256": "a6d345685f347134b4baad1cf610703436ca805756681e771dd08182e7cc94b2"
+    },
+    "wide-long/after_dx/train.log": {
+      "bytes": 35923,
+      "sha256": "2be81fa56a0efb5a4209b142a85e1e7f47213e7d97c1d00bb0a1011541160454"
+    },
+    "wide-long/fused/timeline/iteration_000003.svg": {
+      "bytes": 24070,
+      "sha256": "064e2bc6961013ca758215446a5c1f4a4293fc3d475ebc1374267980c7524f23"
+    },
+    "wide-long/fused/timeline/iteration_000003_microbatches.md": {
+      "bytes": 4094,
+      "sha256": "3c321846a0ada700a184904af9bb7f9f7794629657bbfdd6758dffed85c23d06"
+    },
+    "wide-long/fused/timeline/iteration_000003_rank_0.json": {
+      "bytes": 23836,
+      "sha256": "4f9551f0ad21dd8f22cfd1b40716987d758bf5a803deccc191d7cd563291b218"
+    },
+    "wide-long/fused/timeline/iteration_000003_rank_1.json": {
+      "bytes": 23847,
+      "sha256": "00050e7f4decde7c468954d9923d9576a7121dd41709539b910936cc195cf99c"
+    },
+    "wide-long/fused/timeline/iteration_000003_rank_2.json": {
+      "bytes": 23846,
+      "sha256": "858a479adc70655eb867c1be8be0743c3f88590474df374bceea634784cebe07"
+    },
+    "wide-long/fused/timeline/iteration_000003_summary.json": {
+      "bytes": 1894,
+      "sha256": "71b8f9e8f5317960166ebaedbcb459986006fbbfe3187f2e342d0fea7ba27a6f"
+    },
+    "wide-long/fused/train.log": {
+      "bytes": 35923,
+      "sha256": "728d316e7b1f0d6f9d9da394c7c3f4692fd5998b78ed403172bfbb0e5166a039"
+    },
+    "wide-long/task-times.json": {
+      "bytes": 73996,
+      "sha256": "fa995ce68bfd7d58799a9b2b21b6f2fe02abf690d6251f242fe7fed75999affb"
+    },
+    "wide-long-launch.log": {
+      "bytes": 249,
+      "sha256": "5dcd2950c48a0a6483af89080e7ecbd3622cfd8aa4cc7fea0d5a575ca01d499c"
+    },
+    "wide-long-repeat/after_dx/timeline/iteration_000003.svg": {
+      "bytes": 33388,
+      "sha256": "1e26a37e76ba5cca0d1dcac02fb9226cf9d7294fdf4740e687b422564190a278"
+    },
+    "wide-long-repeat/after_dx/timeline/iteration_000003_microbatches.md": {
+      "bytes": 4094,
+      "sha256": "3c321846a0ada700a184904af9bb7f9f7794629657bbfdd6758dffed85c23d06"
+    },
+    "wide-long-repeat/after_dx/timeline/iteration_000003_rank_0.json": {
+      "bytes": 38291,
+      "sha256": "d9a68fd1584a1232fb100cb851f7253ba906785cdc574e33f3e8fc5c66c04aa7"
+    },
+    "wide-long-repeat/after_dx/timeline/iteration_000003_rank_1.json": {
+      "bytes": 38292,
+      "sha256": "e8619846e728df7127d0f8850a65898b48a268b054b8b2bacf1fb30f2e00ebc2"
+    },
+    "wide-long-repeat/after_dx/timeline/iteration_000003_rank_2.json": {
+      "bytes": 38274,
+      "sha256": "fc17b08b35ef6693e1108fee63fc0514a7f4222af28f51f4256103f2af77f6b6"
+    },
+    "wide-long-repeat/after_dx/timeline/iteration_000003_summary.json": {
+      "bytes": 2616,
+      "sha256": "1969ac76bdec01d692c10ae3627e96cb5fe387d77ff019667ef6611052a794be"
+    },
+    "wide-long-repeat/after_dx/train.log": {
+      "bytes": 35931,
+      "sha256": "cff13fd83976a67018f13fefd7df7a09fede4c4e13297fccc2e4183bec174c8f"
+    },
+    "wide-long-repeat/fused/timeline/iteration_000003.svg": {
+      "bytes": 23432,
+      "sha256": "e32346f6987012353243fe6bb628d425d858b63a4bc248993bc99bf54905a543"
+    },
+    "wide-long-repeat/fused/timeline/iteration_000003_microbatches.md": {
+      "bytes": 4094,
+      "sha256": "3c321846a0ada700a184904af9bb7f9f7794629657bbfdd6758dffed85c23d06"
+    },
+    "wide-long-repeat/fused/timeline/iteration_000003_rank_0.json": {
+      "bytes": 23838,
+      "sha256": "d55e744225672800d09bef6be7981550fa0815538085d53f37314d3a1e4b010c"
+    },
+    "wide-long-repeat/fused/timeline/iteration_000003_rank_1.json": {
+      "bytes": 23858,
+      "sha256": "76c71c1f7cea649bfa47563b8115b109d73bf763dcd2d62ae5a6f02f00dd8643"
+    },
+    "wide-long-repeat/fused/timeline/iteration_000003_rank_2.json": {
+      "bytes": 23860,
+      "sha256": "9adf76c2488d3a9f2956fb5693e1073a6d57c7dd8130bd5a5347b304b9968784"
+    },
+    "wide-long-repeat/fused/timeline/iteration_000003_summary.json": {
+      "bytes": 1906,
+      "sha256": "e8f1ddce1467fadf79bac80adb9a443c44321b330efd104bf5190c6f4a9d9cbf"
+    },
+    "wide-long-repeat/fused/train.log": {
+      "bytes": 35931,
+      "sha256": "67daed97e19d43630aae23d7cdf0ddad4844993c36f304645b7f05b1093cb62e"
+    },
+    "wide-long-repeat/task-times.json": {
+      "bytes": 74029,
+      "sha256": "99986f0a59e92602a05385f4e76484ba83c4524595625a2f8cdbbdcadc1d43c0"
+    },
+    "wide-long-repeat-launch.log": {
+      "bytes": 256,
+      "sha256": "7bbac42bd4a4338885e300969d9058ace9d3fcd21ea7b36d420483e504be23ad"
+    },
+    "wide-short/after_dx/timeline/iteration_000003.svg": {
+      "bytes": 20768,
+      "sha256": "d84ffb46e278fabfb80557f8e2d01e17a64f4a3f2435a28446529dd7ba707fc9"
+    },
+    "wide-short/after_dx/timeline/iteration_000003_microbatches.md": {
+      "bytes": 2813,
+      "sha256": "22a013fa28f951ee1085d4325de18352fc983fba9e42fd3d071cd9a68b9a4fd4"
+    },
+    "wide-short/after_dx/timeline/iteration_000003_rank_0.json": {
+      "bytes": 18727,
+      "sha256": "d23b4010dc7d8337e631875282def850a5b91bc7dc1ab686c84b598bbfe30516"
+    },
+    "wide-short/after_dx/timeline/iteration_000003_rank_1.json": {
+      "bytes": 18728,
+      "sha256": "cf51924dc3e06b27f423432bf7438fff19931d741e635cfa28e129ff9bdf4981"
+    },
+    "wide-short/after_dx/timeline/iteration_000003_rank_2.json": {
+      "bytes": 18733,
+      "sha256": "e18452de98615ad626e2c026ac2531bf7f9b8ecd2820f3e8cfcd5b441dbcba43"
+    },
+    "wide-short/after_dx/timeline/iteration_000003_summary.json": {
+      "bytes": 2648,
+      "sha256": "2b7ccf922ae74c906d5e58014ba984e0c60d98e74ffccb47fec45e201189f29a"
+    },
+    "wide-short/after_dx/train.log": {
+      "bytes": 35924,
+      "sha256": "caa25128a90a3394ade54468d503df2a568c434041f4058783245d4ecdf245be"
+    },
+    "wide-short/fused/timeline/iteration_000003.svg": {
+      "bytes": 17032,
+      "sha256": "4b1f016ca0f23d74e45f29101f2ff4f4d38ade50a2b3a895fb74df0d746a511d"
+    },
+    "wide-short/fused/timeline/iteration_000003_microbatches.md": {
+      "bytes": 2813,
+      "sha256": "22a013fa28f951ee1085d4325de18352fc983fba9e42fd3d071cd9a68b9a4fd4"
+    },
+    "wide-short/fused/timeline/iteration_000003_rank_0.json": {
+      "bytes": 13929,
+      "sha256": "dd6c5da079d620f060232424f71c44f24d6e70ff52ef30d052b851587b82964b"
+    },
+    "wide-short/fused/timeline/iteration_000003_rank_1.json": {
+      "bytes": 13915,
+      "sha256": "c7c9a42c410640bfae01e26240ed0132535893e9e135fb0c27d4eaebaf25bc90"
+    },
+    "wide-short/fused/timeline/iteration_000003_rank_2.json": {
+      "bytes": 13919,
+      "sha256": "ef5935a9937b6fbf67686735cebd38565eeea0bf495be1e37dbf8e856f12b119"
+    },
+    "wide-short/fused/timeline/iteration_000003_summary.json": {
+      "bytes": 1910,
+      "sha256": "0a0b68f1760687d2157310560383e2a4e66cf4fa95b1ec387a35a26a334743aa"
+    },
+    "wide-short/fused/train.log": {
+      "bytes": 35923,
+      "sha256": "b81cad612dfc4c5e543c2293e2ecd22f4f0ee74da4a557c5c50f6549e22eb3ed"
+    },
+    "wide-short/task-times.json": {
+      "bytes": 42273,
+      "sha256": "13abe1d5059234953bc51e770989df6ab01ca4f4ae40da3d2d24c28fb619ad4b"
+    },
+    "wide-short-launch.log": {
+      "bytes": 249,
+      "sha256": "515645eb3e44c1cc1ecd3e57595e47b93c11c484fad331ad375c05864cb33149"
+    },
+    "workload-scaling-20261016-data.json": {
+      "bytes": 345,
+      "sha256": "f7fbb1f0bf98140891e19be72ef4190ccbf4327eb316e15623df97285a7fdacf"
+    }
+  },
+  "commands": [
+    "python3 /home/cuiym/src/Megatron-LM-kwai/docs/assets/fa-split/011-workload-scaling-20261016/run_matrix.py",
+    "python3 /home/cuiym/src/Megatron-LM-kwai/docs/assets/fa-split/011-workload-scaling-20261016/repeat_wide_long.py",
+    "python3 /home/cuiym/src/Megatron-LM-kwai/docs/assets/fa-split/011-workload-scaling-20261016/summarize_scaling.py",
+    "docker exec dspp-workload-scaling /workspace/src/venvs/megatron/bin/python -m pytest -q -s tests/unit_tests/dspp/test_fa_combined_current.py -k combined_long"
+  ],
+  "validation": [
+    "Six independent attention numerical comparisons, including wide GQA and long history; dQ/current/history gradients all checked.",
+    "Only complete B/H boundary events in formal training; profiler and correctness tests separate.",
+    "One pair/config; only wide-long repeated in reverse due sign conflict and variation. Samples in a run are not independent runs.",
+    "All matched layouts and B/H ordering checks pass. Per-pair loss matches at log precision, not a substitute for full gradient validation.",
+    "All stage/layout samples retained; task work summed across ranks is not iteration time.",
+    "No git add/commit/push; archives001\u2013010 preserved."
+  ]
+}

@@ -1495,7 +1495,11 @@ def forward_backward_dspp_no_pipelining(*,
                 flush=True,
             )
 
-        state = DsppSequenceKVState(validate_runtime=debug_runtime)
+        state = DsppSequenceKVState(
+            validate_runtime=debug_runtime,
+            split_attention_backward=getattr(get_args(), 'dspp_split_attention_backward', False),
+            history_dkv_after_dx=getattr(get_args(), 'dspp_history_dkv_after_dx', False),
+        )
         outputs = []
         for physical in training_batch.physical_microbatches:
             state.set_microbatch(physical.meta)
@@ -1530,10 +1534,15 @@ def forward_backward_dspp_no_pipelining(*,
         if grad_scaler is not None:
             loss = grad_scaler(loss)
         output_grads = torch.autograd.grad(loss, outputs)
-        for output, output_grad in reversed(
-            list(zip(outputs, output_grads, strict=True))
+        for physical, output, output_grad in reversed(
+            list(zip(training_batch.physical_microbatches, outputs, output_grads, strict=True))
         ):
+            if state.history_dkv_after_dx:
+                state.begin_backward_task(physical.meta.microbatch_id)
             backward_func(None, output, output_grad)
+            if state.history_dkv_after_dx:
+                state.mark_dx_ready(physical.meta.microbatch_id)
+                state.run_history_task(physical.meta.microbatch_id)
         state.finish_iteration()
 
     _finish_dspp_activation_observation(
@@ -1547,7 +1556,8 @@ class _DsppVTaskBatch:
     """Per-logical-batch activation state for one V-pipeline model chunk."""
 
     def __init__(self, training_batch, forward_func, backward_func,
-                 grad_scaler, total_valid_tokens, is_loss_stage, chunk):
+                 grad_scaler, total_valid_tokens, is_loss_stage, chunk,
+                 split_attention_backward=False, history_dkv_after_dx=False):
         self.training_batch = training_batch
         self.forward_func = forward_func
         self.backward_func = backward_func
@@ -1555,7 +1565,10 @@ class _DsppVTaskBatch:
         self.total_valid_tokens = total_valid_tokens
         self.is_loss_stage = is_loss_stage
         self.chunk = chunk
-        self.kv_state = DsppSequenceKVState()
+        self.kv_state = DsppSequenceKVState(
+            split_attention_backward=split_attention_backward,
+            history_dkv_after_dx=history_dkv_after_dx,
+        )
         self.inputs = {}
         self.outputs = {}
         self.output_grads = {}
@@ -1587,6 +1600,10 @@ class _DsppVTaskBatch:
         return None if self.is_loss_stage else output_tensor
 
     def backward(self, split, output_tensor_grad):
+        if self.kv_state.history_dkv_after_dx:
+            self.kv_state.begin_backward_task(
+                self.training_batch.physical_microbatches[split].meta.microbatch_id
+            )
         if self.is_loss_stage:
             output_tensor_grad = self.output_grads.pop(split)
         input_tensor = self.inputs.pop(split)
@@ -1596,7 +1613,16 @@ class _DsppVTaskBatch:
                 input_tensor, output_tensor, output_tensor_grad
             )
             WeightGradStore.flush(chunk=self.chunk)
+        if self.kv_state.history_dkv_after_dx:
+            self.kv_state.mark_dx_ready(
+                self.training_batch.physical_microbatches[split].meta.microbatch_id
+            )
         return input_tensor_grad
+
+    def history(self, split):
+        return self.kv_state.run_history_task(
+            self.training_batch.physical_microbatches[split].meta.microbatch_id
+        )
 
     def weight(self, progress_tracker=None, progress_parent=None):
         WeightGradStore.pop(
@@ -1748,6 +1774,8 @@ def pipelining_with_dspp_stage_local_v(*,
                 total_valid_tokens=total_valid_tokens,
                 is_loss_stage=(chunk == 1 and stage == 0),
                 chunk=chunk,
+                split_attention_backward=getattr(args, 'dspp_split_attention_backward', False),
+                history_dkv_after_dx=getattr(args, 'dspp_history_dkv_after_dx', False),
             )
 
     slot_to_task = {
@@ -2304,6 +2332,21 @@ def pipelining_with_dspp_stage_local_v(*,
                     submit_send(stage + 1, node, input_grad)
             elif stage > 0:
                 submit_send(stage - 1, node, input_grad)
+            # The complete stage dx is now published to the existing local/P2P
+            # boundary. H is a separate task, immediately next on this stream;
+            # no F/B/W task may consume historical gradients before it finishes.
+            if task_batch.kv_state.history_dkv_after_dx:
+                if task_batch.kv_state.pending_history_count:
+                    history_kind = f'H{node.chunk}'
+                    history_token = progress.begin_compute(history_kind, node, task_id)
+                    if timeline.recording:
+                        with timeline.task(history_kind, task_id, physical_meta, chunk=node.chunk):
+                            task_batch.history(physical_id)
+                    else:
+                        task_batch.history(physical_id)
+                    progress.end_compute(history_token)
+                else:
+                    task_batch.history(physical_id)
         elif node.kind == 'W':
             progress_token = progress.begin_compute(
                 f'W{node.chunk}', node, task_id

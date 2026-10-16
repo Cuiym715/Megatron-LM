@@ -1,0 +1,42 @@
+{
+  "created_at": "2026-10-16T11:44:56.574196+00:00",
+  "git_head": "abd39e566b49e06dce32df5f218fa7c1ead7dddd",
+  "scope": "Documentation reorganization only. No training, production changes, staging, commit or push.",
+  "old_document": {
+    "bytes": 108643,
+    "lines": 960,
+    "sha256": "f25185bf8114f9b18986e7ecf2c73511d04aa5602d79b46efc3a896f93846eae"
+  },
+  "new_document": {
+    "path": "docs/dspp-history-dkv-split-implementation-plan.md",
+    "bytes": 22131,
+    "lines": 200,
+    "sha256": "c94521541dcc85dd31dcda32bbdd76cfe98964702c6ddff26ecdcf73fd666e40"
+  },
+  "structure": [
+    "Current implementation and verified scope",
+    "Changed code and entry points",
+    "Difficulties, completed optimizations and evidence",
+    "Candidate next optimizations"
+  ],
+  "validation": [
+    "48 Markdown links checked; local targets exist.",
+    "Exactly four top-level content sections.",
+    "Representative timing table matches archive012 JSON.",
+    "All recorded production/test/tool/example hashes unchanged.",
+    "git diff --check passed."
+  ],
+  "provenance": "Old document preserved byte-for-byte. Its relative links use the original docs/ location as their base. Archives001–013 untouched.",
+  "evidence_files": {
+    "implementation-plan-before.md": {
+      "bytes": 108643,
+      "lines": 960,
+      "sha256": "f25185bf8114f9b18986e7ecf2c73511d04aa5602d79b46efc3a896f93846eae"
+    },
+    "source-hashes-before.json": {
+      "bytes": 56123,
+      "lines": 500,
+      "sha256": "0dee865ec6d70fceed0fda0e1ddf3a5bd5d4ebc40cd3d06b1dc05d97e71d538c"
+    }
+  }
+}

@@ -1,0 +1,810 @@
+{
+  "date": "2026-10-16",
+  "timezone": "Asia/Shanghai",
+  "stage": "A",
+  "base_commit": "abd39e566",
+  "scope": "Correctness only: single-sequence BF16 MHA, equal Q/K lengths, head dimension 128, causal, dropout=0. No performance samples, GQA, region selection, production integration or deferral.",
+  "environment": {
+    "image": "nvcr.io/nvidia/pytorch:26.01-py3",
+    "gpu": "NVIDIA L40",
+    "compute_capability": "8.9",
+    "torch": "2.10.0a0+a36e1d39eb.nv26.01.42222806",
+    "cuda_toolkit": "13.1",
+    "flash_attention": "2.7.4.post1",
+    "python": "3.12",
+    "cxx11_abi": true
+  },
+  "upstream": {
+    "flash_attention_repository": "https://github.com/Dao-AILab/flash-attention.git",
+    "flash_attention_tag": "v2.7.4.post1",
+    "flash_attention_commit": "5231d95fe13733fb534c01895f7ea88c6a6c7793",
+    "cutlass_commit": "c506e16788cb08416a4a57e11a9067beeee29420",
+    "header_sha256": "aec308ba202be0699919e1e58dbb65b99bad36686f9453799b81049d91c126c3"
+  },
+  "validation": {
+    "unit_tests": {
+      "passed": 29,
+      "skipped": 0
+    },
+    "original_path_regression": {
+      "passed": 10,
+      "skipped": 0
+    },
+    "memcheck": {
+      "passed": 12,
+      "deselected": 17,
+      "errors": 0,
+      "filter": "kns=dspp_split_detail"
+    },
+    "racecheck": {
+      "passed": 1,
+      "deselected": 28,
+      "hazards": 0,
+      "filter": "kns=dspp_split_detail"
+    }
+  },
+  "acceptance": {
+    "nominal_vs_fused": {
+      "atol": 0.004,
+      "rtol": 0.01
+    },
+    "nominal_vs_fp64": {
+      "atol": 0.04,
+      "rtol": 0.04,
+      "relative_l2_max": 0.012
+    },
+    "math_zero_gradient": {
+      "abs_max": 1e-05,
+      "relative_l2": null
+    },
+    "stress_vs_fused": "exact equality",
+    "stress_vs_fp64_relative_l2_max": 0.012
+  },
+  "initial_failure": "The initial amplitude-2 seed-1234 case exceeded nominal FP64 elementwise tolerances. Independent original FA also failed them; split dQ/dK/dV equaled original FA exactly. Nominal tolerances were retained. Stress acceptance was separated into exact FA equality plus the unchanged relative-L2 bound and checked with two additional seeds. See implementation plan section 9.3 and initial-tests.log.",
+  "numerical_cases": [
+    {
+      "length": 1,
+      "heads": 1,
+      "head_dim": 128,
+      "scale": 0.08838834764831845,
+      "amplitude": 1.0,
+      "gradients": {
+        "dq": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 4.4517219066619873e-07,
+            "relative_l2": null
+          },
+          "fused_vs_fp64": {
+            "max_abs": 4.4517219066619873e-07,
+            "relative_l2": null
+          }
+        },
+        "dk": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 5.066394805908203e-07,
+            "relative_l2": null
+          },
+          "fused_vs_fp64": {
+            "max_abs": 5.066394805908203e-07,
+            "relative_l2": null
+          }
+        },
+        "dv": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          }
+        }
+      }
+    },
+    {
+      "length": 17,
+      "heads": 2,
+      "head_dim": 128,
+      "scale": 0.08838834764831845,
+      "amplitude": 1.0,
+      "gradients": {
+        "dq": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.007107013377651961,
+            "relative_l2": 0.0028172511907925053
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.007107013377651961,
+            "relative_l2": 0.0028172511907925053
+          }
+        },
+        "dk": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.006718988152035976,
+            "relative_l2": 0.0025730510475914675
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.006718988152035976,
+            "relative_l2": 0.0025730510475914675
+          }
+        },
+        "dv": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.010904007243559555,
+            "relative_l2": 0.0020992430821419735
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.010904007243559555,
+            "relative_l2": 0.0020992430821419735
+          }
+        }
+      }
+    },
+    {
+      "length": 63,
+      "heads": 4,
+      "head_dim": 128,
+      "scale": 0.08838834764831845,
+      "amplitude": 1.0,
+      "gradients": {
+        "dq": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.007809219090900488,
+            "relative_l2": 0.0027091203337366743
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.007809219090900488,
+            "relative_l2": 0.0027091203337366743
+          }
+        },
+        "dk": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.010324685426297053,
+            "relative_l2": 0.002671088743288868
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.010324685426297053,
+            "relative_l2": 0.002671088743288868
+          }
+        },
+        "dv": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.014050140023998736,
+            "relative_l2": 0.0022481802319145186
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.014050140023998736,
+            "relative_l2": 0.0022481802319145186
+          }
+        }
+      }
+    },
+    {
+      "length": 64,
+      "heads": 4,
+      "head_dim": 128,
+      "scale": 0.08838834764831845,
+      "amplitude": 1.0,
+      "gradients": {
+        "dq": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.007809219090900488,
+            "relative_l2": 0.0027093795180734197
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.007809219090900488,
+            "relative_l2": 0.0027093795180734197
+          }
+        },
+        "dk": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.010195875774114072,
+            "relative_l2": 0.00271165990160195
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.010195875774114072,
+            "relative_l2": 0.00271165990160195
+          }
+        },
+        "dv": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.012591584168315073,
+            "relative_l2": 0.002221466458394747
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.012591584168315073,
+            "relative_l2": 0.002221466458394747
+          }
+        }
+      }
+    },
+    {
+      "length": 65,
+      "heads": 4,
+      "head_dim": 128,
+      "scale": 0.08838834764831845,
+      "amplitude": 1.0,
+      "gradients": {
+        "dq": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.007809219090900488,
+            "relative_l2": 0.0027060292215727515
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.007809219090900488,
+            "relative_l2": 0.0027060292215727515
+          }
+        },
+        "dk": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.008533931957900975,
+            "relative_l2": 0.002684958588143236
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.008533931957900975,
+            "relative_l2": 0.002684958588143236
+          }
+        },
+        "dv": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.017439080090229986,
+            "relative_l2": 0.0022994380849665837
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.017439080090229986,
+            "relative_l2": 0.0022994380849665837
+          }
+        }
+      }
+    },
+    {
+      "length": 127,
+      "heads": 2,
+      "head_dim": 128,
+      "scale": 0.08838834764831845,
+      "amplitude": 1.0,
+      "gradients": {
+        "dq": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.007107013377651961,
+            "relative_l2": 0.0025507670494817887
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.007107013377651961,
+            "relative_l2": 0.0025507670494817887
+          }
+        },
+        "dk": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.0065349663395544155,
+            "relative_l2": 0.002459328225856191
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.0065349663395544155,
+            "relative_l2": 0.002459328225856191
+          }
+        },
+        "dv": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.013119236428072334,
+            "relative_l2": 0.0022267172687521946
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.013119236428072334,
+            "relative_l2": 0.0022267172687521946
+          }
+        }
+      }
+    },
+    {
+      "length": 128,
+      "heads": 4,
+      "head_dim": 128,
+      "scale": 0.08838834764831845,
+      "amplitude": 1.0,
+      "gradients": {
+        "dq": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.007809219090900488,
+            "relative_l2": 0.0026163639613498773
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.007809219090900488,
+            "relative_l2": 0.0026163639613498773
+          }
+        },
+        "dk": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.010412006343733182,
+            "relative_l2": 0.0026046949466988043
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.010412006343733182,
+            "relative_l2": 0.0026046949466988043
+          }
+        },
+        "dv": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.012098261321805026,
+            "relative_l2": 0.0022594564818781203
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.012098261321805026,
+            "relative_l2": 0.0022594564818781203
+          }
+        }
+      }
+    },
+    {
+      "length": 129,
+      "heads": 4,
+      "head_dim": 128,
+      "scale": 0.08838834764831845,
+      "amplitude": 1.0,
+      "gradients": {
+        "dq": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.007809219090900488,
+            "relative_l2": 0.0026186951518079424
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.007809219090900488,
+            "relative_l2": 0.0026186951518079424
+          }
+        },
+        "dk": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.008691551849898671,
+            "relative_l2": 0.0025879240601427065
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.008691551849898671,
+            "relative_l2": 0.0025879240601427065
+          }
+        },
+        "dv": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.013080749324145824,
+            "relative_l2": 0.002304509930743923
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.013080749324145824,
+            "relative_l2": 0.002304509930743923
+          }
+        }
+      }
+    },
+    {
+      "length": 257,
+      "heads": 16,
+      "head_dim": 128,
+      "scale": 0.08838834764831845,
+      "amplitude": 1.0,
+      "gradients": {
+        "dq": {
+          "split_vs_fused": {
+            "max_abs": 0.0009765625,
+            "relative_l2": 7.757664080527331e-06
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.008550286880024682,
+            "relative_l2": 0.002549859888736386
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.008550286880024682,
+            "relative_l2": 0.0025498635268125618
+          }
+        },
+        "dk": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.010058812029865027,
+            "relative_l2": 0.002544371023122196
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.010058812029865027,
+            "relative_l2": 0.002544371023122196
+          }
+        },
+        "dv": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.017298627402612787,
+            "relative_l2": 0.0022934134665890493
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.017298627402612787,
+            "relative_l2": 0.0022934134665890493
+          }
+        }
+      }
+    },
+    {
+      "length": 513,
+      "heads": 2,
+      "head_dim": 128,
+      "scale": 0.08838834764831845,
+      "amplitude": 1.0,
+      "gradients": {
+        "dq": {
+          "split_vs_fused": {
+            "max_abs": 0.0009765625,
+            "relative_l2": 1.9947105044872554e-05
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.00710701337765185,
+            "relative_l2": 0.002505990652417785
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.00710701337765185,
+            "relative_l2": 0.002505991532344678
+          }
+        },
+        "dk": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.009529934418452513,
+            "relative_l2": 0.002481120251348799
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.009529934418452513,
+            "relative_l2": 0.002481120251348799
+          }
+        },
+        "dv": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.011044520450671058,
+            "relative_l2": 0.0022511538888688653
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.011044520450671058,
+            "relative_l2": 0.0022511538888688653
+          }
+        }
+      }
+    },
+    {
+      "length": 129,
+      "heads": 2,
+      "head_dim": 128,
+      "scale": 0.037,
+      "amplitude": 1.0,
+      "gradients": {
+        "dq": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.0031705950629766777,
+            "relative_l2": 0.0024601949334323793
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.0031705950629766777,
+            "relative_l2": 0.0024601949334323793
+          }
+        },
+        "dk": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.002611855999165358,
+            "relative_l2": 0.0024866670646911644
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.002611855999165358,
+            "relative_l2": 0.0024866670646911644
+          }
+        },
+        "dv": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.008354434144065781,
+            "relative_l2": 0.0021916514649768593
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.008354434144065781,
+            "relative_l2": 0.0021916514649768593
+          }
+        }
+      }
+    },
+    {
+      "length": 65,
+      "heads": 2,
+      "amplitude": 2.0,
+      "seed": 1234,
+      "criterion": "exact original FA equality and FP64 relative L2 <= 0.012",
+      "gradients": {
+        "dq": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.085026748567131,
+            "relative_l2": 0.004157556246068294
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.085026748567131,
+            "relative_l2": 0.004157556246068294
+          },
+          "original_passes_nominal_elementwise_criterion": false
+        },
+        "dk": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.0968257556315546,
+            "relative_l2": 0.0041719202983620425
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.0968257556315546,
+            "relative_l2": 0.0041719202983620425
+          },
+          "original_passes_nominal_elementwise_criterion": false
+        },
+        "dv": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.03814548193309797,
+            "relative_l2": 0.002197460611090477
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.03814548193309797,
+            "relative_l2": 0.002197460611090477
+          },
+          "original_passes_nominal_elementwise_criterion": true
+        }
+      }
+    },
+    {
+      "length": 65,
+      "heads": 2,
+      "amplitude": 2.0,
+      "seed": 2026,
+      "criterion": "exact original FA equality and FP64 relative L2 <= 0.012",
+      "gradients": {
+        "dq": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.10150231150419553,
+            "relative_l2": 0.004333560542977468
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.10150231150419553,
+            "relative_l2": 0.004333560542977468
+          },
+          "original_passes_nominal_elementwise_criterion": false
+        },
+        "dk": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.09526239302240147,
+            "relative_l2": 0.004275503925688849
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.09526239302240147,
+            "relative_l2": 0.004275503925688849
+          },
+          "original_passes_nominal_elementwise_criterion": false
+        },
+        "dv": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.0418935559567295,
+            "relative_l2": 0.0021211141289602825
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.0418935559567295,
+            "relative_l2": 0.0021211141289602825
+          },
+          "original_passes_nominal_elementwise_criterion": true
+        }
+      }
+    },
+    {
+      "length": 65,
+      "heads": 2,
+      "amplitude": 2.0,
+      "seed": 17,
+      "criterion": "exact original FA equality and FP64 relative L2 <= 0.012",
+      "gradients": {
+        "dq": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.12432429900124475,
+            "relative_l2": 0.004785648482343719
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.12432429900124475,
+            "relative_l2": 0.004785648482343719
+          },
+          "original_passes_nominal_elementwise_criterion": false
+        },
+        "dk": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.11100919257777164,
+            "relative_l2": 0.0046749715285872295
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.11100919257777164,
+            "relative_l2": 0.0046749715285872295
+          },
+          "original_passes_nominal_elementwise_criterion": false
+        },
+        "dv": {
+          "split_vs_fused": {
+            "max_abs": 0.0,
+            "relative_l2": 0.0
+          },
+          "split_vs_fp64": {
+            "max_abs": 0.03889892667850958,
+            "relative_l2": 0.002254365031659566
+          },
+          "fused_vs_fp64": {
+            "max_abs": 0.03889892667850958,
+            "relative_l2": 0.002254365031659566
+          },
+          "original_passes_nominal_elementwise_criterion": true
+        }
+      }
+    }
+  ],
+  "source_sha256": {
+    "megatron/core/kv_cache/fa_split.py": "6e4dbb0e971af45c3e8b1be1eba2febe8099ee65729d4e7bc35a6fe1197b7199",
+    "megatron/core/kv_cache/fa_split_build.py": "6c65289406b2d447930ec4bfa8b829fca7988e1b3deaad96d3ee860c2189de03",
+    "tools/build_dspp_fa_split.py": "4c53dc5e1c0b1f33350c0901d506ea29373785a0991b540a7360a0616e68e515",
+    "tests/unit_tests/dspp/test_fa_split.py": "89f6ed10d655c26a5125edd2c061c8db67dc083c4b3ae77a52a9b3880f93598f",
+    "megatron/core/kv_cache/fa_split_src/LICENSE.cutlass": "6fc6ad419e4d26571a14c7c4d26b65345865c20dd8686ddcf5e8673f54d3d233",
+    "megatron/core/kv_cache/fa_split_src/LICENSE.flash-attention": "8c9ccb96c065e706135b6cbad279b721da6156e51f3a5f27c6b3329af9416d73",
+    "megatron/core/kv_cache/fa_split_src/THIRD_PARTY.md": "065b8d222b3029ca7ff909c13e21be567ac06f5915025ee5de09cbbbae702ddf",
+    "megatron/core/kv_cache/fa_split_src/backward.cu": "0871515400981f941b0a39422abd5477b7024e798236bb96c03dfb1da864ff57",
+    "megatron/core/kv_cache/fa_split_src/bindings.cpp": "bcaea7a374d8277d8c277f11b00af46aaef42bdeb91b2d2faf33173bb78bd985",
+    "megatron/core/kv_cache/fa_split_src/flash_bwd_split.patch": "cf305e245ecde91a2f54659b2df254bf02a706445ebcb94ce7622f54ea23109f",
+    "megatron/core/kv_cache/fa_split_src/upstream.json": "163c55a7526f5f78f8d1924021e163e4cb7c58daf505c64d74e463cb6778057e"
+  },
+  "log_sha256": {
+    "initial-tests.log": "57a2c52313a610576fd8a448e9076dfa268f1de57d52e162bf84b70e5d7525df",
+    "unit-tests.log": "8bcc9e19a7885fec450ba513f33ea7d2f6ac83569048cf7e5d2110f5cccb3241",
+    "regression.log": "e2f9c0487fc051286c9b75cc58cecba2943e7da88e1cb85798024c673b644b18",
+    "memcheck.log": "71023cdf7b1f9bb2af49d3fe14cb6bbde9836fb25733c187520946f8b1e75624",
+    "racecheck.log": "8918f8a22e91f211cc4763daffdfade6677b2f9374f8cabff13d08d631082491",
+    "build.log": "5b378e18fdee12743d5c40aafc6cc9d148afa2113421284866350bc7e493c36b"
+  }
+}

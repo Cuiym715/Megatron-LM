@@ -1,0 +1,210 @@
+diff --git a/examples/run_dspp_b23_l40.sh b/examples/run_dspp_b23_l40.sh
+index b4dd675d9..4e620a79a 100755
+--- a/examples/run_dspp_b23_l40.sh
++++ b/examples/run_dspp_b23_l40.sh
+@@ -104,6 +104,12 @@ if [[ -n "$DSPP_GLOBAL_FIXED_TRACE" ]]; then
+ fi
+ 
+ EXTRA_ARGS=()
++if [[ "${DSPP_SPLIT_ATTENTION_BACKWARD:-0}" == 1 ]]; then
++  EXTRA_ARGS+=(--dspp-split-attention-backward)
++fi
++if [[ -n "${NUM_QUERY_GROUPS:-}" ]]; then
++  EXTRA_ARGS+=(--group-query-attention --num-query-groups "$NUM_QUERY_GROUPS")
++fi
+ if [[ -n "$DSPP_ORDER_PROFILE" ]]; then
+   EXTRA_ARGS+=(--dspp-order-profile "$DSPP_ORDER_PROFILE")
+ fi
+diff --git a/megatron/arguments.py b/megatron/arguments.py
+index 987e073e7..d8b27327a 100644
+--- a/megatron/arguments.py
++++ b/megatron/arguments.py
+@@ -192,6 +192,14 @@ def validate_args(args, defaults={}):
+     else:
+         args.virtual_pipeline_model_parallel_size = None
+ 
++    if args.dspp_split_attention_backward:
++        assert args.dspp, '--dspp-split-attention-backward requires --dspp'
++        assert args.bf16 and not args.fp16, 'DSPP split attention backward requires BF16'
++        split_head_dim = args.kv_channels or args.hidden_size // args.num_attention_heads
++        assert split_head_dim == 128, 'DSPP split attention backward requires head dimension 128'
++        assert args.transformer_impl == 'local', 'DSPP split attention backward requires local transformer'
++        assert not args.use_alibi, 'DSPP split attention backward does not support ALiBi'
++
+     if args.dspp:
+         assert not args.variable_seq_slicing, \
+             '--dspp and --variable-seq-slicing select different runtimes; enable only --dspp'
+@@ -1395,6 +1403,10 @@ def _add_distributed_args(parser):
+     group.add_argument('--dspp', action='store_true',
+                        help='Enable the DSPP variable-length packed training runtime. '
+                        'Supports the single-GPU B1 path and PP=3/VPP=2 B2/B3 path.')
++    group.add_argument('--dspp-split-attention-backward', action='store_true',
++                       help='Experimental FA2 dQ/current-dKV/history-dKV split, all executed '
++                       'immediately in packed backward. Requires BF16/head-dim 128; '
++                       'does not defer history or alter pipeline scheduling.')
+     group.add_argument('--dspp-microbatch-order', type=str,
+                        default='warmup-short-steady-long',
+                        choices=['input', 'warmup-short-steady-long',
+diff --git a/megatron/core/kv_cache/dspp_packed_attention.py b/megatron/core/kv_cache/dspp_packed_attention.py
+index 13a0d07c5..69a7d9e10 100644
+--- a/megatron/core/kv_cache/dspp_packed_attention.py
++++ b/megatron/core/kv_cache/dspp_packed_attention.py
+@@ -55,13 +55,17 @@ class _ItemLayout:
+ class DsppSequenceKVState:
+     """Iteration-scoped per-layer, per-logical-sequence K/V state."""
+ 
+-    def __init__(self, *, validate_runtime: bool = False) -> None:
++    def __init__(self, *, validate_runtime: bool = False,
++                 split_attention_backward: bool = False) -> None:
+         self._entries: Dict[Tuple[int, int], _SequenceLayerEntry] = {}
+         self._current_meta: Optional[DsppMicrobatchMeta] = None
+         self._prepared_cu_seqlens: Dict[
+             Tuple[int, torch.device], Tuple[torch.Tensor, torch.Tensor]
+         ] = {}
+         self.validate_runtime = bool(validate_runtime)
++        # Opt-in, synchronous split computation. KV routing/lifetime are shared
++        # with the original fused path; this is not deferred gradient execution.
++        self.split_attention_backward = bool(split_attention_backward)
+ 
+     def __bool__(self) -> bool:
+         # An empty state is still an active cache for the first segment.
+@@ -385,6 +389,13 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
+             raise ValueError(
+                 "query and K/V sequence, batch, and head dimensions must match"
+             )
++        ctx.split_attention_backward = state.split_attention_backward
++        if ctx.split_attention_backward:
++            # Reject unsupported configurations before mutating retained KV state.
++            if query.dtype != torch.bfloat16 or query.size(-1) != 128:
++                raise ValueError("DSPP split attention backward requires BF16 and head dimension 128")
++            if current_key.size(2) <= 0 or query.size(2) % current_key.size(2):
++                raise ValueError("DSPP split attention backward requires Hq divisible by Hkv")
+         valid_tokens = meta.valid_token_count
+         query_valid = query[:valid_tokens, 0].contiguous()
+         current_key_valid = current_key[:valid_tokens, 0].contiguous()
+@@ -480,34 +491,54 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
+                 output_grad_valid, (0, query.size(-1) - output_grad_valid.size(-1))
+             )
+         output_grad_valid = output_grad_valid.contiguous()
+-        query_grad = torch.empty_like(query)
+-        key_grad = torch.empty_like(key)
+-        value_grad = torch.empty_like(value)
+-        _wrapped_flash_attn_varlen_backward(
+-            output_grad_valid,
+-            query,
+-            key,
+-            value,
+-            output,
+-            softmax_lse,
+-            query_grad,
+-            key_grad,
+-            value_grad,
+-            cu_q,
+-            cu_k,
+-            ctx.meta.max_seqlen_q,
+-            ctx.meta.max_seqlen_k,
+-            0.0,
+-            ctx.scale,
+-            True,
+-            -1,
+-            -1,
+-            0.0,
+-            None,
+-            False,
+-            rng_state,
+-            False,
+-        )
++        if ctx.split_attention_backward:
++            from .fa_split import prepare_backward, backward_dq, backward_dkv
++
++            # Frozen forward metadata: never consult the state's currently
++            # selected microbatch during backward. Host tuples avoid a CUDA
++            # metadata round trip for the per-sequence prototype dispatcher.
++            split_state = prepare_backward(
++                query, key, value, output, output_grad_valid, softmax_lse,
++                softmax_scale=ctx.scale,
++                cu_seqlens_q=ctx.meta.cu_seqlens_q,
++                cu_seqlens_k=ctx.meta.cu_seqlens_k,
++            )
++            query_grad = backward_dq(split_state)
++            key_grad, value_grad = backward_dkv(split_state, "current")
++            history_key_grad, history_value_grad = backward_dkv(split_state, "history")
++            # Each region is zero outside its selected rows. Assemble once,
++            # then route once, preserving existing accumulation and RoPE order.
++            key_grad.add_(history_key_grad)
++            value_grad.add_(history_value_grad)
++        else:
++            query_grad = torch.empty_like(query)
++            key_grad = torch.empty_like(key)
++            value_grad = torch.empty_like(value)
++            _wrapped_flash_attn_varlen_backward(
++                output_grad_valid,
++                query,
++                key,
++                value,
++                output,
++                softmax_lse,
++                query_grad,
++                key_grad,
++                value_grad,
++                cu_q,
++                cu_k,
++                ctx.meta.max_seqlen_q,
++                ctx.meta.max_seqlen_k,
++                0.0,
++                ctx.scale,
++                True,
++                -1,
++                -1,
++                0.0,
++                None,
++                False,
++                rng_state,
++                False,
++            )
+         query_grad = query_grad[..., : ctx.original_head_dim]
+         key_grad = key_grad[..., : ctx.original_head_dim]
+         value_grad = value_grad[..., : ctx.original_head_dim]
+diff --git a/megatron/core/pipeline_parallel/schedules.py b/megatron/core/pipeline_parallel/schedules.py
+index 50af9a376..a9a808475 100644
+--- a/megatron/core/pipeline_parallel/schedules.py
++++ b/megatron/core/pipeline_parallel/schedules.py
+@@ -1495,7 +1495,10 @@ def forward_backward_dspp_no_pipelining(*,
+                 flush=True,
+             )
+ 
+-        state = DsppSequenceKVState(validate_runtime=debug_runtime)
++        state = DsppSequenceKVState(
++            validate_runtime=debug_runtime,
++            split_attention_backward=getattr(get_args(), 'dspp_split_attention_backward', False),
++        )
+         outputs = []
+         for physical in training_batch.physical_microbatches:
+             state.set_microbatch(physical.meta)
+@@ -1547,7 +1550,8 @@ class _DsppVTaskBatch:
+     """Per-logical-batch activation state for one V-pipeline model chunk."""
+ 
+     def __init__(self, training_batch, forward_func, backward_func,
+-                 grad_scaler, total_valid_tokens, is_loss_stage, chunk):
++                 grad_scaler, total_valid_tokens, is_loss_stage, chunk,
++                 split_attention_backward=False):
+         self.training_batch = training_batch
+         self.forward_func = forward_func
+         self.backward_func = backward_func
+@@ -1555,7 +1559,7 @@ class _DsppVTaskBatch:
+         self.total_valid_tokens = total_valid_tokens
+         self.is_loss_stage = is_loss_stage
+         self.chunk = chunk
+-        self.kv_state = DsppSequenceKVState()
++        self.kv_state = DsppSequenceKVState(split_attention_backward=split_attention_backward)
+         self.inputs = {}
+         self.outputs = {}
+         self.output_grads = {}
+@@ -1748,6 +1752,7 @@ def pipelining_with_dspp_stage_local_v(*,
+                 total_valid_tokens=total_valid_tokens,
+                 is_loss_stage=(chunk == 1 and stage == 0),
+                 chunk=chunk,
++                split_attention_backward=getattr(args, 'dspp_split_attention_backward', False),
+             )
+ 
+     slot_to_task = {

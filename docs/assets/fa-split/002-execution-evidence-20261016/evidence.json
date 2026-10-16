@@ -1,0 +1,379 @@
+{
+  "scope": "Actual GPU kernel launches from isolated attention; not stage F/B/W, deferred history dKV, or a speed benchmark.",
+  "config": {
+    "length": 2048,
+    "heads": 16,
+    "head_dim": 128,
+    "dtype": "BF16",
+    "causal": true,
+    "dropout": 0,
+    "seed": 1234
+  },
+  "environment": {
+    "gpu": "NVIDIA L40",
+    "torch": "2.10.0a0+a36e1d39eb.nv26.01.42222806",
+    "cuda": "13.1",
+    "flash_attention": "2.7.4.post1"
+  },
+  "raw_trace_sha256": "25d47b7818385963da791381b02cd549cc1676364f6e02ed3b6d54cde57f5847",
+  "source_sha256": {
+    "megatron/core/kv_cache/fa_split.py": "6e4dbb0e971af45c3e8b1be1eba2febe8099ee65729d4e7bc35a6fe1197b7199",
+    "megatron/core/kv_cache/fa_split_build.py": "6c65289406b2d447930ec4bfa8b829fca7988e1b3deaad96d3ee860c2189de03",
+    "megatron/core/kv_cache/fa_split_src/LICENSE.cutlass": "6fc6ad419e4d26571a14c7c4d26b65345865c20dd8686ddcf5e8673f54d3d233",
+    "megatron/core/kv_cache/fa_split_src/LICENSE.flash-attention": "8c9ccb96c065e706135b6cbad279b721da6156e51f3a5f27c6b3329af9416d73",
+    "megatron/core/kv_cache/fa_split_src/THIRD_PARTY.md": "065b8d222b3029ca7ff909c13e21be567ac06f5915025ee5de09cbbbae702ddf",
+    "megatron/core/kv_cache/fa_split_src/backward.cu": "0871515400981f941b0a39422abd5477b7024e798236bb96c03dfb1da864ff57",
+    "megatron/core/kv_cache/fa_split_src/bindings.cpp": "bcaea7a374d8277d8c277f11b00af46aaef42bdeb91b2d2faf33173bb78bd985",
+    "megatron/core/kv_cache/fa_split_src/flash_bwd_split.patch": "cf305e245ecde91a2f54659b2df254bf02a706445ebcb94ce7622f54ea23109f",
+    "megatron/core/kv_cache/fa_split_src/upstream.json": "163c55a7526f5f78f8d1924021e163e4cb7c58daf505c64d74e463cb6778057e",
+    "tools/trace_dspp_fa_split.py": "d9727813280e432f93c3709e123974886a16448a5f57ad01c9598c13f3e685d6"
+  },
+  "launch_checks": {
+    "original": {
+      "dq_main": 0,
+      "dkv_main": 0,
+      "prepare": 0,
+      "dq_convert": 0,
+      "original_fused_main": 1
+    },
+    "dq_then_dkv": {
+      "dq_main": 1,
+      "dkv_main": 1,
+      "prepare": 1,
+      "dq_convert": 1,
+      "original_fused_main": 0
+    },
+    "dkv_then_dq": {
+      "dq_main": 1,
+      "dkv_main": 1,
+      "prepare": 1,
+      "dq_convert": 1,
+      "original_fused_main": 0
+    },
+    "dq_only": {
+      "dq_main": 1,
+      "dkv_main": 0,
+      "prepare": 1,
+      "dq_convert": 1,
+      "original_fused_main": 0
+    },
+    "dkv_only": {
+      "dq_main": 0,
+      "dkv_main": 1,
+      "prepare": 1,
+      "dq_convert": 0,
+      "original_fused_main": 0
+    }
+  },
+  "accuracy_vs_original": {
+    "dq_then_dkv": {
+      "dq": {
+        "max_abs": 0.00048828125,
+        "relative_l2": 9.723407856654376e-06
+      },
+      "dk": {
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "dv": {
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      }
+    },
+    "dkv_then_dq": {
+      "dk": {
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "dv": {
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "dq": {
+        "max_abs": 0.00048828125,
+        "relative_l2": 1.1447837096056901e-05
+      }
+    },
+    "dq_only": {
+      "dq": {
+        "max_abs": 0.00048828125,
+        "relative_l2": 1.0073544217448216e-05
+      }
+    },
+    "dkv_only": {
+      "dk": {
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "dv": {
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      }
+    }
+  },
+  "timeline": {
+    "original": [
+      {
+        "phase": "F_attn",
+        "name": "void flash::flash_fwd_kernel<Flash_fwd_kernel_traits<128, 64, 64, 4, false, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 4, cutlass::bfloat16_t> >, false, true, false, false, true, true, false, false>(flash::Flash_fwd_params)",
+        "category": "kernel",
+        "start_us": 0.0,
+        "duration_us": 163.615,
+        "stream": 7,
+        "correlation": 41
+      },
+      {
+        "phase": "fused_B_attn",
+        "name": "void flash::flash_bwd_dot_do_o_kernel<true, Flash_bwd_kernel_traits<128, 64, 64, 8, 4, 2, 2, true, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 8, cutlass::bfloat16_t> > >(flash::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 267.837890625,
+        "duration_us": 10.528,
+        "stream": 7,
+        "correlation": 89
+      },
+      {
+        "phase": "fused_B_attn",
+        "name": "void flash::flash_bwd_dq_dk_dv_loop_seqk_parallel_kernel<Flash_bwd_kernel_traits<128, 64, 64, 8, 4, 2, 2, true, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 8, cutlass::bfloat16_t> >, false, true, false, false, true, true, false>(flash::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 279.51806640625,
+        "duration_us": 358.911,
+        "stream": 7,
+        "correlation": 93
+      },
+      {
+        "phase": "fused_B_attn",
+        "name": "void flash::flash_bwd_convert_dq_kernel<Flash_bwd_kernel_traits<128, 64, 64, 8, 4, 2, 2, true, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 8, cutlass::bfloat16_t> > >(flash::Flash_bwd_params, int)",
+        "category": "kernel",
+        "start_us": 639.22900390625,
+        "duration_us": 7.999,
+        "stream": 7,
+        "correlation": 96
+      }
+    ],
+    "dq_then_dkv": [
+      {
+        "phase": "F_attn",
+        "name": "void flash::flash_fwd_kernel<Flash_fwd_kernel_traits<128, 64, 64, 4, false, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 4, cutlass::bfloat16_t> >, false, true, false, false, true, true, false, false>(flash::Flash_fwd_params)",
+        "category": "kernel",
+        "start_us": 0.0,
+        "duration_us": 167.679,
+        "stream": 7,
+        "correlation": 144
+      },
+      {
+        "phase": "prepare",
+        "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+        "category": "kernel",
+        "start_us": 168.35107421875,
+        "duration_us": 0.96,
+        "stream": 7,
+        "correlation": 160
+      },
+      {
+        "phase": "prepare",
+        "name": "dspp_split_detail::prepare_kernel(dspp_flash_split::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 170.14306640625,
+        "duration_us": 5.056,
+        "stream": 7,
+        "correlation": 168
+      },
+      {
+        "phase": "dQ",
+        "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+        "category": "kernel",
+        "start_us": 377.31005859375,
+        "duration_us": 7.776,
+        "stream": 7,
+        "correlation": 197
+      },
+      {
+        "phase": "dQ",
+        "name": "void dspp_split_detail::split_kernel<true>(dspp_flash_split::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 393.91796875,
+        "duration_us": 263.007,
+        "stream": 7,
+        "correlation": 206
+      },
+      {
+        "phase": "dQ",
+        "name": "dspp_split_detail::convert_dq_kernel(dspp_flash_split::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 657.6611328125,
+        "duration_us": 6.944,
+        "stream": 7,
+        "correlation": 209
+      },
+      {
+        "phase": "dKV",
+        "name": "void dspp_split_detail::split_kernel<false>(dspp_flash_split::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 665.405029296875,
+        "duration_us": 300.959,
+        "stream": 7,
+        "correlation": 232
+      }
+    ],
+    "dkv_then_dq": [
+      {
+        "phase": "F_attn",
+        "name": "void flash::flash_fwd_kernel<Flash_fwd_kernel_traits<128, 64, 64, 4, false, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 4, cutlass::bfloat16_t> >, false, true, false, false, true, true, false, false>(flash::Flash_fwd_params)",
+        "category": "kernel",
+        "start_us": 0.0,
+        "duration_us": 169.248,
+        "stream": 7,
+        "correlation": 280
+      },
+      {
+        "phase": "prepare",
+        "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+        "category": "kernel",
+        "start_us": 170.015869140625,
+        "duration_us": 0.96,
+        "stream": 7,
+        "correlation": 296
+      },
+      {
+        "phase": "prepare",
+        "name": "dspp_split_detail::prepare_kernel(dspp_flash_split::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 171.615966796875,
+        "duration_us": 5.024,
+        "stream": 7,
+        "correlation": 304
+      },
+      {
+        "phase": "dKV",
+        "name": "void dspp_split_detail::split_kernel<false>(dspp_flash_split::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 312.958984375,
+        "duration_us": 300.799,
+        "stream": 7,
+        "correlation": 332
+      },
+      {
+        "phase": "dQ",
+        "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+        "category": "kernel",
+        "start_us": 614.4619140625,
+        "duration_us": 7.168,
+        "stream": 7,
+        "correlation": 360
+      },
+      {
+        "phase": "dQ",
+        "name": "void dspp_split_detail::split_kernel<true>(dspp_flash_split::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 622.39794921875,
+        "duration_us": 264.703,
+        "stream": 7,
+        "correlation": 369
+      },
+      {
+        "phase": "dQ",
+        "name": "dspp_split_detail::convert_dq_kernel(dspp_flash_split::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 887.868896484375,
+        "duration_us": 6.912,
+        "stream": 7,
+        "correlation": 372
+      }
+    ],
+    "dq_only": [
+      {
+        "phase": "F_attn",
+        "name": "void flash::flash_fwd_kernel<Flash_fwd_kernel_traits<128, 64, 64, 4, false, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 4, cutlass::bfloat16_t> >, false, true, false, false, true, true, false, false>(flash::Flash_fwd_params)",
+        "category": "kernel",
+        "start_us": 0.0,
+        "duration_us": 168.927,
+        "stream": 7,
+        "correlation": 420
+      },
+      {
+        "phase": "prepare",
+        "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+        "category": "kernel",
+        "start_us": 169.6630859375,
+        "duration_us": 0.96,
+        "stream": 7,
+        "correlation": 436
+      },
+      {
+        "phase": "prepare",
+        "name": "dspp_split_detail::prepare_kernel(dspp_flash_split::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 171.455078125,
+        "duration_us": 5.024,
+        "stream": 7,
+        "correlation": 444
+      },
+      {
+        "phase": "dQ",
+        "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+        "category": "kernel",
+        "start_us": 315.135009765625,
+        "duration_us": 7.008,
+        "stream": 7,
+        "correlation": 473
+      },
+      {
+        "phase": "dQ",
+        "name": "void dspp_split_detail::split_kernel<true>(dspp_flash_split::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 327.0390625,
+        "duration_us": 264.286,
+        "stream": 7,
+        "correlation": 482
+      },
+      {
+        "phase": "dQ",
+        "name": "dspp_split_detail::convert_dq_kernel(dspp_flash_split::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 592.06103515625,
+        "duration_us": 6.912,
+        "stream": 7,
+        "correlation": 485
+      }
+    ],
+    "dkv_only": [
+      {
+        "phase": "F_attn",
+        "name": "void flash::flash_fwd_kernel<Flash_fwd_kernel_traits<128, 64, 64, 4, false, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 4, cutlass::bfloat16_t> >, false, true, false, false, true, true, false, false>(flash::Flash_fwd_params)",
+        "category": "kernel",
+        "start_us": 0.0,
+        "duration_us": 163.871,
+        "stream": 7,
+        "correlation": 533
+      },
+      {
+        "phase": "prepare",
+        "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+        "category": "kernel",
+        "start_us": 164.6708984375,
+        "duration_us": 0.96,
+        "stream": 7,
+        "correlation": 549
+      },
+      {
+        "phase": "prepare",
+        "name": "dspp_split_detail::prepare_kernel(dspp_flash_split::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 166.39892578125,
+        "duration_us": 5.088,
+        "stream": 7,
+        "correlation": 557
+      },
+      {
+        "phase": "dKV",
+        "name": "void dspp_split_detail::split_kernel<false>(dspp_flash_split::Flash_bwd_params)",
+        "category": "kernel",
+        "start_us": 203.90185546875,
+        "duration_us": 301.599,
+        "stream": 7,
+        "correlation": 581
+      }
+    ]
+  },
+  "timing_note": "Profiler perturbs host/GPU timing. Start is normalized to the first GPU event of each case. Gaps are observed gaps, not available scheduling slack. No speedup claim."
+}

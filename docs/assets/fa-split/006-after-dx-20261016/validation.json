@@ -1,0 +1,5778 @@
+{
+  "scope": "Recomputation-based B then publish complete dx then immediate H. No intervening compute tasks.",
+  "unit_tests": 149,
+  "unit_skipped": 0,
+  "unit_max_all_tensor_error_vs_fused_or_immediate": {
+    "max_abs": 3.0517578125e-05,
+    "relative_l2": 3.6227786327070315e-05
+  },
+  "unit_max_dx_before_H_error": {
+    "max_abs": 0,
+    "relative_l2": 0
+  },
+  "unit_records": [
+    {
+      "depth": 1,
+      "hk": 4,
+      "lengths": [
+        145,
+        70,
+        17,
+        3
+      ],
+      "tasks": [
+        {
+          "physical": 4,
+          "history_layers": 1,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 3,
+          "history_layers": 1,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 2,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 1,
+          "history_layers": 1,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 0,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        }
+      ],
+      "comparisons": [
+        {
+          "iteration": 0,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 0,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "depth": 1,
+      "hk": 2,
+      "lengths": [
+        145,
+        70,
+        17,
+        3
+      ],
+      "tasks": [
+        {
+          "physical": 4,
+          "history_layers": 1,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 3,
+          "history_layers": 1,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 2,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 1,
+          "history_layers": 1,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 0,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        }
+      ],
+      "comparisons": [
+        {
+          "iteration": 0,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 0,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "depth": 1,
+      "hk": 1,
+      "lengths": [
+        145,
+        70,
+        17,
+        3
+      ],
+      "tasks": [
+        {
+          "physical": 4,
+          "history_layers": 1,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 3,
+          "history_layers": 1,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 2,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 1,
+          "history_layers": 1,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 0,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        }
+      ],
+      "comparisons": [
+        {
+          "iteration": 0,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 0,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "depth": 3,
+      "hk": 4,
+      "lengths": [
+        145,
+        70,
+        17,
+        3
+      ],
+      "tasks": [
+        {
+          "physical": 4,
+          "history_layers": 3,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 3,
+          "history_layers": 3,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 2,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 1,
+          "history_layers": 3,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 0,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        }
+      ],
+      "comparisons": [
+        {
+          "iteration": 0,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 0,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "depth": 3,
+      "hk": 2,
+      "lengths": [
+        145,
+        70,
+        17,
+        3
+      ],
+      "tasks": [
+        {
+          "physical": 4,
+          "history_layers": 3,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 3,
+          "history_layers": 3,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 2,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 1,
+          "history_layers": 3,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 0,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        }
+      ],
+      "comparisons": [
+        {
+          "iteration": 0,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 0,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "depth": 3,
+      "hk": 1,
+      "lengths": [
+        145,
+        70,
+        17,
+        3
+      ],
+      "tasks": [
+        {
+          "physical": 4,
+          "history_layers": 3,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 3,
+          "history_layers": 3,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 2,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 1,
+          "history_layers": 3,
+          "dx_unchanged_by_history": true
+        },
+        {
+          "physical": 0,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        }
+      ],
+      "comparisons": [
+        {
+          "iteration": 0,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 0,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 3.0517578125e-05,
+              "relative_l2": 3.6227786327070315e-05
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "depth": 1,
+      "hk": 4,
+      "lengths": [
+        17,
+        3
+      ],
+      "tasks": [
+        {
+          "physical": 0,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        }
+      ],
+      "comparisons": [
+        {
+          "iteration": 0,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 0,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "depth": 1,
+      "hk": 2,
+      "lengths": [
+        17,
+        3
+      ],
+      "tasks": [
+        {
+          "physical": 0,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        }
+      ],
+      "comparisons": [
+        {
+          "iteration": 0,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 0,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "depth": 1,
+      "hk": 1,
+      "lengths": [
+        17,
+        3
+      ],
+      "tasks": [
+        {
+          "physical": 0,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        }
+      ],
+      "comparisons": [
+        {
+          "iteration": 0,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 0,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "depth": 3,
+      "hk": 4,
+      "lengths": [
+        17,
+        3
+      ],
+      "tasks": [
+        {
+          "physical": 0,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        }
+      ],
+      "comparisons": [
+        {
+          "iteration": 0,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 0,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "depth": 3,
+      "hk": 2,
+      "lengths": [
+        17,
+        3
+      ],
+      "tasks": [
+        {
+          "physical": 0,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        }
+      ],
+      "comparisons": [
+        {
+          "iteration": 0,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 0,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "depth": 3,
+      "hk": 1,
+      "lengths": [
+        17,
+        3
+      ],
+      "tasks": [
+        {
+          "physical": 0,
+          "history_layers": 0,
+          "dx_unchanged_by_history": true
+        }
+      ],
+      "comparisons": [
+        {
+          "iteration": 0,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 0,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "fused",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "reference": "immediate",
+          "checks": {
+            "output": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "stage_dx_before_H": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "0.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "1.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln1.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.ln2.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.q.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.k.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.v.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.o.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.up.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.weight": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "2.down.bias": {
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "pp_summary": {
+    "MHA": {
+      "hq": 4,
+      "hkv": 4,
+      "rank_iteration_records": 9,
+      "history_tasks": 114,
+      "history_layers": 114,
+      "drained_states": 36,
+      "gradient_tensor_comparisons": 117,
+      "dx_tensor_comparisons": 165,
+      "errors": {
+        "gradient_checks": {
+          "first_iteration": {
+            "max_abs": 1.2922100722789764e-08,
+            "relative_l2": 1.1214242411279783e-07
+          },
+          "all_iterations": {
+            "max_abs": 0.0006103590130805969,
+            "relative_l2": 0.00505567377964221
+          }
+        },
+        "stage_dx_checks": {
+          "first_iteration": {
+            "max_abs": 0,
+            "relative_l2": 0
+          },
+          "all_iterations": {
+            "max_abs": 3.0517578125e-05,
+            "relative_l2": 0.005143214337199263
+          }
+        }
+      }
+    },
+    "GQA": {
+      "hq": 4,
+      "hkv": 2,
+      "rank_iteration_records": 9,
+      "history_tasks": 114,
+      "history_layers": 114,
+      "drained_states": 36,
+      "gradient_tensor_comparisons": 117,
+      "dx_tensor_comparisons": 165,
+      "errors": {
+        "gradient_checks": {
+          "first_iteration": {
+            "max_abs": 3.41970007866621e-09,
+            "relative_l2": 1.704481594609445e-08
+          },
+          "all_iterations": {
+            "max_abs": 3.41970007866621e-09,
+            "relative_l2": 1.704481594609445e-08
+          }
+        },
+        "stage_dx_checks": {
+          "first_iteration": {
+            "max_abs": 0,
+            "relative_l2": 0
+          },
+          "all_iterations": {
+            "max_abs": 0,
+            "relative_l2": 0
+          }
+        }
+      }
+    },
+    "MQA": {
+      "hq": 4,
+      "hkv": 1,
+      "rank_iteration_records": 9,
+      "history_tasks": 114,
+      "history_layers": 114,
+      "drained_states": 36,
+      "gradient_tensor_comparisons": 117,
+      "dx_tensor_comparisons": 165,
+      "errors": {
+        "gradient_checks": {
+          "first_iteration": {
+            "max_abs": 0,
+            "relative_l2": 0
+          },
+          "all_iterations": {
+            "max_abs": 0,
+            "relative_l2": 0
+          }
+        },
+        "stage_dx_checks": {
+          "first_iteration": {
+            "max_abs": 0,
+            "relative_l2": 0
+          },
+          "all_iterations": {
+            "max_abs": 0,
+            "relative_l2": 0
+          }
+        }
+      }
+    }
+  },
+  "criteria": {
+    "atol": 0.004,
+    "rtol": 0.01,
+    "relative_l2_max": 0.02
+  },
+  "initial_test_failures": [
+    "History spy initially counted both varlen wrapper and recursive per-sequence calls as layers; corrected to count wrapper calls.",
+    "CLI negative test omitted required micro-batch-size and failed before target validation; corrected fixture.",
+    "Timeline legend omitted original descriptive sentence expected by regression; restored sentence with H description. No numerical threshold changes."
+  ],
+  "sanitizer": {
+    "tool": "Compute Sanitizer memcheck",
+    "tests": 12,
+    "deselected": 2,
+    "errors": 0,
+    "kernel_filter": "kns=dspp_split_detail"
+  },
+  "task_measurement_boundary_checks": {
+    "B_count": 60,
+    "H_count": 24,
+    "all_H_immediately_follow_matching_B": true,
+    "no_H_for_no_history_B": true,
+    "all_mode_layouts_match": true
+  },
+  "measurement_configuration": {
+    "PP": 3,
+    "VPP": 2,
+    "TP": 1,
+    "CP": 1,
+    "DP": 1,
+    "layers": 6,
+    "hidden": 512,
+    "ffn": 1024,
+    "Hq": 4,
+    "Hkv": 2,
+    "dtype": "BF16",
+    "head_dim": 128,
+    "chunk": 2048,
+    "source_training_lengths": [
+      6144,
+      4097,
+      1537,
+      257
+    ],
+    "micro_batch": 4,
+    "global_batch": 8,
+    "warmup_iterations": 2,
+    "measured_iteration": 3
+  }
+}

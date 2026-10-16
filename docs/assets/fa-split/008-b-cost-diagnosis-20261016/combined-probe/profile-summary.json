@@ -1,0 +1,1211 @@
+{
+  "source": "docs/assets/fa-split/008-b-cost-diagnosis-20261016/combined-probe/execution.pt.trace.json",
+  "scope": "Intrusive profiler, not clean timing; nested ranges overlap. Task ownership uses temporal containment across autograd threads; operator ownership matches thread.",
+  "unassigned_event_count": 0,
+  "unassigned_names": {},
+  "ranges": [
+    {
+      "range": "COST/fused",
+      "cpu_duration_us": 3252.251,
+      "gpu_events": 5,
+      "gpu_time_sum_us": 404.80199999999996,
+      "gpu_busy_union_us": 404.802001953125,
+      "first_to_last_gpu_us": 426.75390625,
+      "gap_inside_gpu_span_us": 21.951904296875,
+      "kernels": [
+        {
+          "name": "void flash::flash_bwd_dot_do_o_kernel<true, Flash_bwd_kernel_traits<128, 64, 64, 8, 4, 2, 2, true, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 8, cutlass::bfloat16_t> > >(flash::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1284345179984.241,
+          "dur": 3.872,
+          "args": {
+            "External id": 8,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 63,
+            "registers per thread": 49,
+            "shared memory": 0,
+            "blocks per SM": 0.901408,
+            "warps per SM": 7.211267,
+            "grid": [
+              32,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 15
+          }
+        },
+        {
+          "name": "void flash::flash_bwd_dq_dk_dv_loop_seqk_parallel_kernel<Flash_bwd_kernel_traits<128, 64, 64, 8, 4, 2, 2, true, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 8, cutlass::bfloat16_t> >, false, true, false, false, false, true, false>(flash::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1284345180007.921,
+          "dur": 382.018,
+          "args": {
+            "External id": 8,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 67,
+            "registers per thread": 255,
+            "shared memory": 81920,
+            "blocks per SM": 2.704225,
+            "warps per SM": 21.633802,
+            "grid": [
+              96,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "void flash::flash_bwd_convert_dq_kernel<Flash_bwd_kernel_traits<128, 64, 64, 8, 4, 2, 2, true, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 8, cutlass::bfloat16_t> > >(flash::Flash_bwd_params, int)",
+          "cat": "kernel",
+          "ts": 1284345180390.643,
+          "dur": 3.168,
+          "args": {
+            "External id": 8,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 70,
+            "registers per thread": 72,
+            "shared memory": 16384,
+            "blocks per SM": 0.901408,
+            "warps per SM": 7.211267,
+            "grid": [
+              32,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 15
+          }
+        },
+        {
+          "name": "void at::native::reduce_kernel<128, 4, at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8> >(at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8>)",
+          "cat": "kernel",
+          "ts": 1284345180394.579,
+          "dur": 8.416,
+          "args": {
+            "External id": 15,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 78,
+            "registers per thread": 47,
+            "shared memory": 16,
+            "blocks per SM": 21.633802,
+            "warps per SM": 86.53521,
+            "grid": [
+              3072,
+              1,
+              1
+            ],
+            "block": [
+              64,
+              2,
+              1
+            ],
+            "est. achieved occupancy %": 83
+          }
+        },
+        {
+          "name": "void at::native::reduce_kernel<128, 4, at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8> >(at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8>)",
+          "cat": "kernel",
+          "ts": 1284345180403.667,
+          "dur": 7.328,
+          "args": {
+            "External id": 19,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 88,
+            "registers per thread": 47,
+            "shared memory": 16,
+            "blocks per SM": 21.633802,
+            "warps per SM": 86.53521,
+            "grid": [
+              3072,
+              1,
+              1
+            ],
+            "block": [
+              64,
+              2,
+              1
+            ],
+            "est. achieved occupancy %": 83
+          }
+        }
+      ]
+    },
+    {
+      "range": "COST/split_B",
+      "cpu_duration_us": 930.249,
+      "gpu_events": 8,
+      "gpu_time_sum_us": 424.09900000000005,
+      "gpu_busy_union_us": 424.098876953125,
+      "first_to_last_gpu_us": 628.291015625,
+      "gap_inside_gpu_span_us": 204.192138671875,
+      "kernels": [
+        {
+          "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+          "cat": "kernel",
+          "ts": 1284345180585.396,
+          "dur": 0.96,
+          "args": {
+            "External id": 36,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 124,
+            "registers per thread": 16,
+            "shared memory": 0,
+            "blocks per SM": 0.056338,
+            "warps per SM": 0.225352,
+            "grid": [
+              8,
+              1,
+              1
+            ],
+            "block": [
+              128,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "dspp_split_detail::prepare_kernel(dspp_flash_split::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1284345180605.524,
+          "dur": 2.624,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 132,
+            "registers per thread": 46,
+            "shared memory": 0,
+            "blocks per SM": 0.901408,
+            "warps per SM": 7.211267,
+            "grid": [
+              32,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 15
+          }
+        },
+        {
+          "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+          "cat": "kernel",
+          "ts": 1284345180748.309,
+          "dur": 2.272,
+          "args": {
+            "External id": 42,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 158,
+            "registers per thread": 16,
+            "shared memory": 0,
+            "blocks per SM": 7.211267,
+            "warps per SM": 28.84507,
+            "grid": [
+              1024,
+              1,
+              1
+            ],
+            "block": [
+              128,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        },
+        {
+          "name": "void dspp_split_detail::split_kernel<true>(dspp_flash_split::Flash_bwd_params, int)",
+          "cat": "kernel",
+          "ts": 1284345180768.181,
+          "dur": 282.369,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 167,
+            "registers per thread": 166,
+            "shared memory": 81920,
+            "blocks per SM": 2.704225,
+            "warps per SM": 21.633802,
+            "grid": [
+              96,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "dspp_split_detail::convert_dq_kernel(dspp_flash_split::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1284345181051.318,
+          "dur": 2.848,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 170,
+            "registers per thread": 40,
+            "shared memory": 16384,
+            "blocks per SM": 0.901408,
+            "warps per SM": 7.211267,
+            "grid": [
+              32,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 15
+          }
+        },
+        {
+          "name": "void dspp_split_detail::split_kernel<false>(dspp_flash_split::Flash_bwd_params, int)",
+          "cat": "kernel",
+          "ts": 1284345181079.158,
+          "dur": 124.705,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 211,
+            "registers per thread": 224,
+            "shared memory": 81920,
+            "blocks per SM": 0.901408,
+            "warps per SM": 7.211267,
+            "grid": [
+              32,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "void at::native::reduce_kernel<128, 4, at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8> >(at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8>)",
+          "cat": "kernel",
+          "ts": 1284345181204.598,
+          "dur": 4.257,
+          "args": {
+            "External id": 52,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 219,
+            "registers per thread": 47,
+            "shared memory": 16,
+            "blocks per SM": 7.211267,
+            "warps per SM": 28.84507,
+            "grid": [
+              1024,
+              1,
+              1
+            ],
+            "block": [
+              64,
+              2,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        },
+        {
+          "name": "void at::native::reduce_kernel<128, 4, at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8> >(at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8>)",
+          "cat": "kernel",
+          "ts": 1284345181209.623,
+          "dur": 4.064,
+          "args": {
+            "External id": 57,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 229,
+            "registers per thread": 47,
+            "shared memory": 16,
+            "blocks per SM": 7.211267,
+            "warps per SM": 28.84507,
+            "grid": [
+              1024,
+              1,
+              1
+            ],
+            "block": [
+              64,
+              2,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        }
+      ]
+    },
+    {
+      "range": "COST/native_B",
+      "cpu_duration_us": 295.792,
+      "gpu_events": 8,
+      "gpu_time_sum_us": 419.457,
+      "gpu_busy_union_us": 419.456787109375,
+      "first_to_last_gpu_us": 486.530029296875,
+      "gap_inside_gpu_span_us": 67.0732421875,
+      "kernels": [
+        {
+          "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+          "cat": "kernel",
+          "ts": 1284345181384.28,
+          "dur": 0.928,
+          "args": {
+            "External id": 63,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 247,
+            "registers per thread": 16,
+            "shared memory": 0,
+            "blocks per SM": 0.056338,
+            "warps per SM": 0.225352,
+            "grid": [
+              8,
+              1,
+              1
+            ],
+            "block": [
+              128,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "dspp_split_detail::prepare_kernel(dspp_flash_split::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1284345181398.68,
+          "dur": 2.623,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 255,
+            "registers per thread": 46,
+            "shared memory": 0,
+            "blocks per SM": 0.901408,
+            "warps per SM": 7.211267,
+            "grid": [
+              32,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 15
+          }
+        },
+        {
+          "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+          "cat": "kernel",
+          "ts": 1284345181435.256,
+          "dur": 2.272,
+          "args": {
+            "External id": 69,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 278,
+            "registers per thread": 16,
+            "shared memory": 0,
+            "blocks per SM": 7.211267,
+            "warps per SM": 28.84507,
+            "grid": [
+              1024,
+              1,
+              1
+            ],
+            "block": [
+              128,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        },
+        {
+          "name": "void dspp_split_detail::split_kernel<true>(dspp_flash_split::Flash_bwd_params, int)",
+          "cat": "kernel",
+          "ts": 1284345181454.136,
+          "dur": 279.937,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 287,
+            "registers per thread": 166,
+            "shared memory": 81920,
+            "blocks per SM": 2.704225,
+            "warps per SM": 21.633802,
+            "grid": [
+              96,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "dspp_split_detail::convert_dq_kernel(dspp_flash_split::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1284345181734.873,
+          "dur": 2.816,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 290,
+            "registers per thread": 40,
+            "shared memory": 16384,
+            "blocks per SM": 0.901408,
+            "warps per SM": 7.211267,
+            "grid": [
+              32,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 15
+          }
+        },
+        {
+          "name": "void dspp_split_detail::split_kernel<false>(dspp_flash_split::Flash_bwd_params, int)",
+          "cat": "kernel",
+          "ts": 1284345181738.457,
+          "dur": 122.785,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 326,
+            "registers per thread": 224,
+            "shared memory": 81920,
+            "blocks per SM": 0.901408,
+            "warps per SM": 7.211267,
+            "grid": [
+              32,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "void at::native::reduce_kernel<128, 4, at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8> >(at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8>)",
+          "cat": "kernel",
+          "ts": 1284345181862.01,
+          "dur": 4.16,
+          "args": {
+            "External id": 79,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 334,
+            "registers per thread": 47,
+            "shared memory": 16,
+            "blocks per SM": 7.211267,
+            "warps per SM": 28.84507,
+            "grid": [
+              1024,
+              1,
+              1
+            ],
+            "block": [
+              64,
+              2,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        },
+        {
+          "name": "void at::native::reduce_kernel<128, 4, at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8> >(at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8>)",
+          "cat": "kernel",
+          "ts": 1284345181866.874,
+          "dur": 3.936,
+          "args": {
+            "External id": 84,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 344,
+            "registers per thread": 47,
+            "shared memory": 16,
+            "blocks per SM": 7.211267,
+            "warps per SM": 28.84507,
+            "grid": [
+              1024,
+              1,
+              1
+            ],
+            "block": [
+              64,
+              2,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        }
+      ]
+    },
+    {
+      "range": "COST/prepare",
+      "cpu_duration_us": 263.344,
+      "gpu_events": 2,
+      "gpu_time_sum_us": 3.52,
+      "gpu_busy_union_us": 3.52001953125,
+      "first_to_last_gpu_us": 4.320068359375,
+      "gap_inside_gpu_span_us": 0.800048828125,
+      "kernels": [
+        {
+          "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+          "cat": "kernel",
+          "ts": 1284345181871.514,
+          "dur": 0.928,
+          "args": {
+            "External id": 101,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 380,
+            "registers per thread": 16,
+            "shared memory": 0,
+            "blocks per SM": 0.056338,
+            "warps per SM": 0.225352,
+            "grid": [
+              8,
+              1,
+              1
+            ],
+            "block": [
+              128,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "dspp_split_detail::prepare_kernel(dspp_flash_split::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1284345181873.242,
+          "dur": 2.592,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 388,
+            "registers per thread": 46,
+            "shared memory": 0,
+            "blocks per SM": 0.901408,
+            "warps per SM": 7.211267,
+            "grid": [
+              32,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 15
+          }
+        }
+      ]
+    },
+    {
+      "range": "COST/dq",
+      "cpu_duration_us": 131.503,
+      "gpu_events": 3,
+      "gpu_time_sum_us": 286.848,
+      "gpu_busy_union_us": 286.847900390625,
+      "first_to_last_gpu_us": 304.512939453125,
+      "gap_inside_gpu_span_us": 17.6650390625,
+      "kernels": [
+        {
+          "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+          "cat": "kernel",
+          "ts": 1284345181974.811,
+          "dur": 2.271,
+          "args": {
+            "External id": 108,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 414,
+            "registers per thread": 16,
+            "shared memory": 0,
+            "blocks per SM": 7.211267,
+            "warps per SM": 28.84507,
+            "grid": [
+              1024,
+              1,
+              1
+            ],
+            "block": [
+              128,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        },
+        {
+          "name": "void dspp_split_detail::split_kernel<true>(dspp_flash_split::Flash_bwd_params, int)",
+          "cat": "kernel",
+          "ts": 1284345181993.979,
+          "dur": 281.761,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 423,
+            "registers per thread": 166,
+            "shared memory": 81920,
+            "blocks per SM": 2.704225,
+            "warps per SM": 21.633802,
+            "grid": [
+              96,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "dspp_split_detail::convert_dq_kernel(dspp_flash_split::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1284345182276.508,
+          "dur": 2.816,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 426,
+            "registers per thread": 40,
+            "shared memory": 16384,
+            "blocks per SM": 0.901408,
+            "warps per SM": 7.211267,
+            "grid": [
+              32,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 15
+          }
+        }
+      ]
+    },
+    {
+      "range": "COST/current",
+      "cpu_duration_us": 187.767,
+      "gpu_events": 3,
+      "gpu_time_sum_us": 131.105,
+      "gpu_busy_union_us": 131.10498046875,
+      "first_to_last_gpu_us": 132.448974609375,
+      "gap_inside_gpu_span_us": 1.343994140625,
+      "kernels": [
+        {
+          "name": "void dspp_split_detail::split_kernel<false>(dspp_flash_split::Flash_bwd_params, int)",
+          "cat": "kernel",
+          "ts": 1284345182280.124,
+          "dur": 123.105,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 463,
+            "registers per thread": 224,
+            "shared memory": 81920,
+            "blocks per SM": 0.901408,
+            "warps per SM": 7.211267,
+            "grid": [
+              32,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "void at::native::reduce_kernel<128, 4, at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8> >(at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8>)",
+          "cat": "kernel",
+          "ts": 1284345182403.901,
+          "dur": 4.16,
+          "args": {
+            "External id": 119,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 471,
+            "registers per thread": 47,
+            "shared memory": 16,
+            "blocks per SM": 7.211267,
+            "warps per SM": 28.84507,
+            "grid": [
+              1024,
+              1,
+              1
+            ],
+            "block": [
+              64,
+              2,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        },
+        {
+          "name": "void at::native::reduce_kernel<128, 4, at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8> >(at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8>)",
+          "cat": "kernel",
+          "ts": 1284345182408.733,
+          "dur": 3.84,
+          "args": {
+            "External id": 124,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 481,
+            "registers per thread": 47,
+            "shared memory": 16,
+            "blocks per SM": 7.211267,
+            "warps per SM": 28.84507,
+            "grid": [
+              1024,
+              1,
+              1
+            ],
+            "block": [
+              64,
+              2,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        }
+      ]
+    },
+    {
+      "range": "COST/H",
+      "cpu_duration_us": 200.51,
+      "gpu_events": 3,
+      "gpu_time_sum_us": 257.377,
+      "gpu_busy_union_us": 257.376708984375,
+      "first_to_last_gpu_us": 258.880859375,
+      "gap_inside_gpu_span_us": 1.504150390625,
+      "kernels": [
+        {
+          "name": "void dspp_split_detail::split_kernel<false>(dspp_flash_split::Flash_bwd_params, int)",
+          "cat": "kernel",
+          "ts": 1284345182413.277,
+          "dur": 246.401,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 520,
+            "registers per thread": 224,
+            "shared memory": 81920,
+            "blocks per SM": 1.802817,
+            "warps per SM": 14.422535,
+            "grid": [
+              64,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "void at::native::reduce_kernel<128, 4, at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8> >(at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8>)",
+          "cat": "kernel",
+          "ts": 1284345182660.51,
+          "dur": 5.536,
+          "args": {
+            "External id": 136,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 528,
+            "registers per thread": 47,
+            "shared memory": 16,
+            "blocks per SM": 14.422535,
+            "warps per SM": 57.69014,
+            "grid": [
+              2048,
+              1,
+              1
+            ],
+            "block": [
+              64,
+              2,
+              1
+            ],
+            "est. achieved occupancy %": 83
+          }
+        },
+        {
+          "name": "void at::native::reduce_kernel<128, 4, at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8> >(at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8>)",
+          "cat": "kernel",
+          "ts": 1284345182666.718,
+          "dur": 5.44,
+          "args": {
+            "External id": 141,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 538,
+            "registers per thread": 47,
+            "shared memory": 16,
+            "blocks per SM": 14.422535,
+            "warps per SM": 57.69014,
+            "grid": [
+              2048,
+              1,
+              1
+            ],
+            "block": [
+              64,
+              2,
+              1
+            ],
+            "est. achieved occupancy %": 83
+          }
+        }
+      ]
+    },
+    {
+      "range": "COST/combined_native_B",
+      "cpu_duration_us": 249.06,
+      "gpu_events": 7,
+      "gpu_time_sum_us": 378.68999999999994,
+      "gpu_busy_union_us": 378.68994140625,
+      "first_to_last_gpu_us": 382.785888671875,
+      "gap_inside_gpu_span_us": 4.095947265625,
+      "kernels": [
+        {
+          "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+          "cat": "kernel",
+          "ts": 1284345182672.894,
+          "dur": 0.928,
+          "args": {
+            "External id": 147,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 556,
+            "registers per thread": 16,
+            "shared memory": 0,
+            "blocks per SM": 0.056338,
+            "warps per SM": 0.225352,
+            "grid": [
+              8,
+              1,
+              1
+            ],
+            "block": [
+              128,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "dspp_split_detail::prepare_kernel(dspp_flash_split::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1284345182674.462,
+          "dur": 2.72,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 564,
+            "registers per thread": 46,
+            "shared memory": 0,
+            "blocks per SM": 0.901408,
+            "warps per SM": 7.211267,
+            "grid": [
+              32,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 15
+          }
+        },
+        {
+          "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul> >(int, at::native::FillFunctor<float>, std::array<char*, 1ul>)",
+          "cat": "kernel",
+          "ts": 1284345182677.822,
+          "dur": 2.24,
+          "args": {
+            "External id": 156,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 601,
+            "registers per thread": 16,
+            "shared memory": 0,
+            "blocks per SM": 7.211267,
+            "warps per SM": 28.84507,
+            "grid": [
+              1024,
+              1,
+              1
+            ],
+            "block": [
+              128,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        },
+        {
+          "name": "diagnostic_combined_kernel(dspp_flash_split::Flash_bwd_params, int)",
+          "cat": "kernel",
+          "ts": 1284345182680.798,
+          "dur": 361.826,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 624,
+            "registers per thread": 240,
+            "shared memory": 81920,
+            "blocks per SM": 2.704225,
+            "warps per SM": 21.633802,
+            "grid": [
+              96,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          }
+        },
+        {
+          "name": "dspp_split_detail::convert_dq_kernel(dspp_flash_split::Flash_bwd_params)",
+          "cat": "kernel",
+          "ts": 1284345183043.264,
+          "dur": 2.816,
+          "args": {
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 627,
+            "registers per thread": 40,
+            "shared memory": 16384,
+            "blocks per SM": 0.901408,
+            "warps per SM": 7.211267,
+            "grid": [
+              32,
+              1,
+              4
+            ],
+            "block": [
+              256,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 15
+          }
+        },
+        {
+          "name": "void at::native::reduce_kernel<128, 4, at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8> >(at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8>)",
+          "cat": "kernel",
+          "ts": 1284345183046.752,
+          "dur": 4.256,
+          "args": {
+            "External id": 163,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 635,
+            "registers per thread": 47,
+            "shared memory": 16,
+            "blocks per SM": 7.211267,
+            "warps per SM": 28.84507,
+            "grid": [
+              1024,
+              1,
+              1
+            ],
+            "block": [
+              64,
+              2,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        },
+        {
+          "name": "void at::native::reduce_kernel<128, 4, at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8> >(at::native::ReduceOp<c10::BFloat16, at::native::func_wrapper_t<c10::BFloat16, at::native::sum_functor<c10::BFloat16, float, c10::BFloat16>::operator()(at::TensorIterator&)::{lambda(float, float)#1}>, unsigned int, c10::BFloat16, 4, 8>)",
+          "cat": "kernel",
+          "ts": 1284345183051.776,
+          "dur": 3.904,
+          "args": {
+            "External id": 168,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 15,
+            "correlation": 645,
+            "registers per thread": 47,
+            "shared memory": 16,
+            "blocks per SM": 7.211267,
+            "warps per SM": 28.84507,
+            "grid": [
+              1024,
+              1,
+              1
+            ],
+            "block": [
+              64,
+              2,
+              1
+            ],
+            "est. achieved occupancy %": 60
+          }
+        }
+      ]
+    }
+  ]
+}

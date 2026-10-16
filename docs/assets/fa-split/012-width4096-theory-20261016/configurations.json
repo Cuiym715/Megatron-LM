@@ -1,0 +1,42 @@
+[
+  {
+    "name": "hidden4096-short",
+    "hidden": 4096,
+    "ffn": 8192,
+    "heads": 32,
+    "groups": 16,
+    "long": false,
+    "order": "fused after_dx",
+    "environment": {
+      "DSPP_COMBINED_MEASURE_ROOT": "/workspace/src/Megatron-LM-kwai/docs/assets/fa-split/012-width4096-theory-20261016/hidden4096-short",
+      "DSPP_COMBINED_DATA_PATH": "/workspace/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data",
+      "DSPP_COMBINED_HIDDEN_SIZE": "4096",
+      "DSPP_COMBINED_FFN_HIDDEN_SIZE": "8192",
+      "DSPP_COMBINED_Q_HEADS": "32",
+      "DSPP_COMBINED_QUERY_GROUPS": "16",
+      "DSPP_COMBINED_SEQ_LENGTH": "8192",
+      "DSPP_COMBINED_CHUNK_LENGTH": "2048",
+      "DSPP_COMBINED_MODE_ORDER": "fused after_dx"
+    }
+  },
+  {
+    "name": "hidden4096-long",
+    "hidden": 4096,
+    "ffn": 8192,
+    "heads": 32,
+    "groups": 16,
+    "long": true,
+    "order": "after_dx fused",
+    "environment": {
+      "DSPP_COMBINED_MEASURE_ROOT": "/workspace/src/Megatron-LM-kwai/docs/assets/fa-split/012-width4096-theory-20261016/hidden4096-long",
+      "DSPP_COMBINED_DATA_PATH": "/workspace/.cache/dspp-fa-split/workload-scaling-20261016/long-data",
+      "DSPP_COMBINED_HIDDEN_SIZE": "4096",
+      "DSPP_COMBINED_FFN_HIDDEN_SIZE": "8192",
+      "DSPP_COMBINED_Q_HEADS": "32",
+      "DSPP_COMBINED_QUERY_GROUPS": "16",
+      "DSPP_COMBINED_SEQ_LENGTH": "16384",
+      "DSPP_COMBINED_CHUNK_LENGTH": "2048",
+      "DSPP_COMBINED_MODE_ORDER": "after_dx fused"
+    }
+  }
+]

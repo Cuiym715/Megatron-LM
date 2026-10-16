@@ -1,0 +1,230 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="270" viewBox="0 0 2400 270">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="20" y="28" font-family="sans-serif" font-size="18">DSPP iteration 3: B/H intervals only</text>
+<rect x="130" y="42" width="16" height="12" fill="#6C8EBF" stroke="#444" stroke-width="0.35"/><text x="151" y="53" font-family="monospace" font-size="11">F0</text>
+<rect x="202" y="42" width="16" height="12" fill="#82B366" stroke="#444" stroke-width="0.35"/><text x="223" y="53" font-family="monospace" font-size="11">F1</text>
+<rect x="274" y="42" width="16" height="12" fill="#D79B00" stroke="#444" stroke-width="0.35"/><text x="295" y="53" font-family="monospace" font-size="11">B0</text>
+<rect x="346" y="42" width="16" height="12" fill="#B85450" stroke="#444" stroke-width="0.35"/><text x="367" y="53" font-family="monospace" font-size="11">B1</text>
+<rect x="418" y="42" width="16" height="12" fill="#9673A6" stroke="#444" stroke-width="0.35"/><text x="439" y="53" font-family="monospace" font-size="11">W0</text>
+<rect x="490" y="42" width="16" height="12" fill="#D6B656" stroke="#444" stroke-width="0.35"/><text x="511" y="53" font-family="monospace" font-size="11">W1</text>
+<rect x="562" y="42" width="16" height="12" fill="#00838F" stroke="#444" stroke-width="0.35"/><text x="583" y="53" font-family="monospace" font-size="11">H0</text>
+<rect x="634" y="42" width="16" height="12" fill="#C628AD" stroke="#444" stroke-width="0.35"/><text x="655" y="53" font-family="monospace" font-size="11">H1</text>
+<text x="714" y="53" font-family="sans-serif" font-size="11">One compute lane per stage; H = history dKV after stage dx; W shorter than 3 px is a visibility marker.</text>
+<text x="18" y="90" font-family="monospace" font-size="14">stage 0</text>
+<line x1="130" y1="98" x2="2375" y2="98" stroke="#dddddd"/>
+<text x="18" y="138" font-family="monospace" font-size="14">stage 1</text>
+<line x1="130" y1="146" x2="2375" y2="146" stroke="#dddddd"/>
+<text x="18" y="186" font-family="monospace" font-size="14">stage 2</text>
+<line x1="130" y1="194" x2="2375" y2="194" stroke="#dddddd"/>
+<rect x="672.83" y="74" width="20.94" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m0 B1 task=1:8 183.732-190.818 ms</title></rect>
+<text x="674.83" y="89" font-family="monospace" font-size="10" fill="white">m0 B1</text>
+<rect x="724.22" y="74" width="19.04" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m1 B1 task=0:8 201.126-207.569 ms</title></rect>
+<rect x="725.11" y="122" width="19.07" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m0 B1 task=1:8 201.427-207.882 ms</title></rect>
+<rect x="752.33" y="170" width="21.07" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m0 B1 task=1:8 210.640-217.771 ms</title></rect>
+<text x="754.33" y="185" font-family="monospace" font-size="10" fill="white">m0 B1</text>
+<rect x="775.00" y="122" width="19.19" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m1 B1 task=0:8 218.314-224.808 ms</title></rect>
+<rect x="790.67" y="170" width="21.12" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m0 B0 task=1:8 223.617-230.766 ms</title></rect>
+<text x="792.67" y="185" font-family="monospace" font-size="10" fill="white">m0 B0</text>
+<rect x="829.82" y="74" width="19.15" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m2 B1 task=1:7 236.871-243.352 ms</title></rect>
+<rect x="839.93" y="170" width="19.08" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m1 B1 task=0:8 240.293-246.753 ms</title></rect>
+<rect x="841.86" y="122" width="23.22" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m0 B0 task=1:8 240.944-248.803 ms</title></rect>
+<text x="843.86" y="137" font-family="monospace" font-size="10" fill="white">m0 B0</text>
+<rect x="883.87" y="170" width="19.11" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m1 B0 task=0:8 255.164-261.631 ms</title></rect>
+<rect x="901.46" y="74" width="21.27" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m0 B0 task=1:8 261.117-268.317 ms</title></rect>
+<text x="903.46" y="89" font-family="monospace" font-size="10" fill="white">m0 B0</text>
+<rect x="902.33" y="122" width="20.61" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m2 B1 task=1:7 261.413-268.389 ms</title></rect>
+<text x="904.33" y="137" font-family="monospace" font-size="10" fill="white">m2 B1</text>
+<rect x="956.20" y="170" width="19.35" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m2 B1 task=1:7 279.647-286.197 ms</title></rect>
+<rect x="958.50" y="122" width="18.83" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m1 B0 task=0:8 280.425-286.800 ms</title></rect>
+<rect x="959.26" y="74" width="22.78" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m3 B1 task=0:7 280.683-288.394 ms</title></rect>
+<text x="961.26" y="89" font-family="monospace" font-size="10" fill="white">m3 B1</text>
+<rect x="1001.49" y="170" width="19.14" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m2 B0 task=1:7 294.975-301.455 ms</title></rect>
+<rect x="1019.98" y="122" width="21.28" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m3 B1 task=0:7 301.234-308.437 ms</title></rect>
+<text x="1021.98" y="137" font-family="monospace" font-size="10" fill="white">m3 B1</text>
+<rect x="1020.29" y="74" width="20.43" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m1 B0 task=0:8 301.340-308.254 ms</title></rect>
+<text x="1022.29" y="89" font-family="monospace" font-size="10" fill="white">m1 B0</text>
+<rect x="1074.35" y="170" width="21.40" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m3 B1 task=0:7 319.636-326.877 ms</title></rect>
+<text x="1076.35" y="185" font-family="monospace" font-size="10" fill="white">m3 B1</text>
+<rect x="1076.80" y="74" width="19.89" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m10 B1 task=0:6 320.466-327.198 ms</title></rect>
+<rect x="1077.15" y="122" width="19.25" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m2 B0 task=1:7 320.584-327.099 ms</title></rect>
+<rect x="1097.93" y="74" width="3.28" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m10 H1 task=0:6 327.617-328.727 ms</title></rect>
+<rect x="1121.80" y="170" width="21.35" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m3 B0 task=0:7 335.696-342.924 ms</title></rect>
+<text x="1123.80" y="185" font-family="monospace" font-size="10" fill="white">m3 B0</text>
+<rect x="1129.26" y="122" width="21.89" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m10 B1 task=0:6 338.221-345.629 ms</title></rect>
+<text x="1131.26" y="137" font-family="monospace" font-size="10" fill="white">m10 B1</text>
+<rect x="1134.28" y="74" width="18.82" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m2 B0 task=1:7 339.921-346.291 ms</title></rect>
+<rect x="1152.05" y="122" width="3.03" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m10 H1 task=0:6 345.936-346.962 ms</title></rect>
+<rect x="1191.34" y="122" width="21.50" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m3 B0 task=0:7 359.235-366.513 ms</title></rect>
+<text x="1193.34" y="137" font-family="monospace" font-size="10" fill="white">m3 B0</text>
+<rect x="1191.72" y="170" width="17.66" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m10 B1 task=0:6 359.362-365.338 ms</title></rect>
+<rect x="1193.39" y="74" width="20.16" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m9 B1 task=0:5 359.928-366.751 ms</title></rect>
+<text x="1195.39" y="89" font-family="monospace" font-size="10" fill="white">m9 B1</text>
+<rect x="1209.59" y="170" width="2.99" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m10 H1 task=0:6 365.413-366.424 ms</title></rect>
+<rect x="1214.72" y="74" width="4.50" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m9 H1 task=0:5 367.147-368.670 ms</title></rect>
+<rect x="1235.99" y="170" width="18.30" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m10 B0 task=0:6 374.346-380.539 ms</title></rect>
+<rect x="1245.94" y="122" width="21.18" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m9 B1 task=0:5 377.716-384.886 ms</title></rect>
+<text x="1247.94" y="137" font-family="monospace" font-size="10" fill="white">m9 B1</text>
+<rect x="1252.20" y="74" width="21.56" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m3 B0 task=0:7 379.834-387.134 ms</title></rect>
+<text x="1254.20" y="89" font-family="monospace" font-size="10" fill="white">m3 B0</text>
+<rect x="1255.41" y="170" width="3.06" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m10 H0 task=0:6 380.922-381.958 ms</title></rect>
+<rect x="1268.04" y="122" width="4.86" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m9 H1 task=0:5 385.196-386.841 ms</title></rect>
+<rect x="1308.79" y="170" width="18.30" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m9 B1 task=0:5 398.988-405.182 ms</title></rect>
+<rect x="1309.04" y="122" width="18.60" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m10 B0 task=0:6 399.072-405.368 ms</title></rect>
+<rect x="1313.57" y="74" width="20.31" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m8 B1 task=0:4 400.607-407.482 ms</title></rect>
+<text x="1315.57" y="89" font-family="monospace" font-size="10" fill="white">m8 B1</text>
+<rect x="1327.31" y="170" width="3.19" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m9 H1 task=0:5 405.259-406.339 ms</title></rect>
+<rect x="1328.70" y="122" width="3.02" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m10 H0 task=0:6 405.726-406.747 ms</title></rect>
+<rect x="1334.93" y="74" width="2.85" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m8 H1 task=0:4 407.836-408.800 ms</title></rect>
+<rect x="1354.51" y="170" width="18.52" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m9 B0 task=0:5 414.462-420.730 ms</title></rect>
+<rect x="1374.24" y="170" width="3.25" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m9 H0 task=0:5 421.141-422.242 ms</title></rect>
+<rect x="1374.98" y="74" width="18.40" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m10 B0 task=0:6 421.392-427.621 ms</title></rect>
+<rect x="1375.09" y="122" width="19.73" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m8 B1 task=0:4 421.428-428.105 ms</title></rect>
+<rect x="1393.64" y="74" width="3.06" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m10 H0 task=0:6 427.709-428.746 ms</title></rect>
+<rect x="1395.94" y="122" width="2.99" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m8 H1 task=0:4 428.487-429.498 ms</title></rect>
+<rect x="1433.77" y="170" width="18.60" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m8 B1 task=0:4 441.290-447.585 ms</title></rect>
+<rect x="1434.17" y="122" width="18.28" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m9 B0 task=0:5 441.426-447.613 ms</title></rect>
+<rect x="1437.68" y="74" width="20.57" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m7 B1 task=0:3 442.616-449.578 ms</title></rect>
+<text x="1439.68" y="89" font-family="monospace" font-size="10" fill="white">m7 B1</text>
+<rect x="1452.64" y="170" width="3.03" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m8 H1 task=0:4 447.677-448.701 ms</title></rect>
+<rect x="1453.37" y="122" width="3.11" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m9 H0 task=0:5 447.926-448.980 ms</title></rect>
+<rect x="1459.31" y="74" width="2.64" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m7 H1 task=0:3 449.935-450.829 ms</title></rect>
+<rect x="1480.03" y="170" width="18.55" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m8 B0 task=0:4 456.950-463.227 ms</title></rect>
+<rect x="1496.87" y="122" width="19.53" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m7 B1 task=0:3 462.647-469.256 ms</title></rect>
+<rect x="1499.69" y="74" width="18.64" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m9 B0 task=0:5 463.603-469.913 ms</title></rect>
+<rect x="1499.78" y="170" width="2.98" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m8 H0 task=0:4 463.634-464.643 ms</title></rect>
+<rect x="1517.46" y="122" width="2.73" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m7 H1 task=0:3 469.617-470.542 ms</title></rect>
+<rect x="1518.58" y="74" width="3.26" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m9 H0 task=0:5 469.998-471.101 ms</title></rect>
+<rect x="1552.93" y="170" width="18.61" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m7 B1 task=0:3 481.623-487.922 ms</title></rect>
+<rect x="1555.47" y="122" width="18.13" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m8 B0 task=0:4 482.482-488.618 ms</title></rect>
+<rect x="1562.77" y="74" width="21.08" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m6 B1 task=0:2 484.954-492.089 ms</title></rect>
+<text x="1564.77" y="89" font-family="monospace" font-size="10" fill="white">m6 B1</text>
+<rect x="1571.88" y="170" width="2.66" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m7 H1 task=0:3 488.036-488.935 ms</title></rect>
+<rect x="1574.55" y="122" width="3.51" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m8 H0 task=0:4 488.942-490.128 ms</title></rect>
+<rect x="1584.97" y="74" width="2.38" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m6 H1 task=0:2 492.466-493.272 ms</title></rect>
+<rect x="1600.71" y="170" width="18.68" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m7 B0 task=0:3 497.794-504.115 ms</title></rect>
+<rect x="1620.50" y="170" width="2.73" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m7 H0 task=0:3 504.495-505.418 ms</title></rect>
+<rect x="1623.08" y="74" width="19.32" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m8 B0 task=0:4 505.366-511.906 ms</title></rect>
+<rect x="1627.20" y="122" width="18.67" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m6 B1 task=0:2 506.760-513.079 ms</title></rect>
+<rect x="1642.66" y="74" width="2.92" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m8 H0 task=0:4 511.994-512.981 ms</title></rect>
+<rect x="1646.94" y="122" width="2.45" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m6 H1 task=0:2 513.443-514.272 ms</title></rect>
+<rect x="1657.12" y="170" width="18.70" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m6 B1 task=0:2 516.888-523.216 ms</title></rect>
+<rect x="1676.09" y="170" width="2.45" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m6 H1 task=0:2 523.308-524.139 ms</title></rect>
+<rect x="1679.74" y="122" width="18.79" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m7 B0 task=0:3 524.544-530.904 ms</title></rect>
+<rect x="1681.41" y="74" width="20.82" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m5 B1 task=0:1 525.110-532.157 ms</title></rect>
+<text x="1683.41" y="89" font-family="monospace" font-size="10" fill="white">m5 B1</text>
+<rect x="1699.73" y="122" width="2.74" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m7 H0 task=0:3 531.310-532.238 ms</title></rect>
+<rect x="1703.27" y="74" width="2.07" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m5 H1 task=0:1 532.509-533.210 ms</title></rect>
+<rect x="1711.70" y="74" width="18.65" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m7 B0 task=0:3 535.362-541.676 ms</title></rect>
+<rect x="1728.72" y="170" width="18.45" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m6 B0 task=0:2 541.123-547.369 ms</title></rect>
+<rect x="1730.61" y="74" width="2.69" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m7 H0 task=0:3 541.762-542.671 ms</title></rect>
+<rect x="1733.87" y="122" width="18.84" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m5 B1 task=0:1 542.865-549.243 ms</title></rect>
+<rect x="1748.28" y="170" width="2.51" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m6 H0 task=0:2 547.744-548.593 ms</title></rect>
+<rect x="1753.65" y="122" width="2.07" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m5 H1 task=0:1 549.562-550.263 ms</title></rect>
+<rect x="1781.56" y="122" width="17.92" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m6 B0 task=0:2 559.008-565.072 ms</title></rect>
+<rect x="1794.58" y="74" width="20.65" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m4 B1 task=0:0 563.415-570.404 ms</title></rect>
+<text x="1796.58" y="89" font-family="monospace" font-size="10" fill="white">m4 B1</text>
+<rect x="1800.35" y="122" width="2.32" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m6 H0 task=0:2 565.369-566.155 ms</title></rect>
+<rect x="1805.82" y="170" width="18.52" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m5 B1 task=0:1 567.218-573.487 ms</title></rect>
+<rect x="1824.60" y="170" width="2.26" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m5 H1 task=0:1 573.577-574.341 ms</title></rect>
+<rect x="1827.25" y="170" width="18.45" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m5 B0 task=0:1 574.471-580.716 ms</title></rect>
+<rect x="1836.57" y="74" width="18.90" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m6 B0 task=0:2 577.627-584.023 ms</title></rect>
+<rect x="1836.94" y="122" width="19.43" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m4 B1 task=0:0 577.752-584.327 ms</title></rect>
+<rect x="1846.88" y="170" width="2.08" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m5 H0 task=0:1 581.117-581.821 ms</title></rect>
+<rect x="1855.73" y="74" width="2.32" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m6 H0 task=0:2 584.114-584.900 ms</title></rect>
+<rect x="1863.62" y="170" width="18.66" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m4 B1 task=0:0 586.783-593.098 ms</title></rect>
+<rect x="1863.88" y="122" width="18.59" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m5 B0 task=0:1 586.870-593.162 ms</title></rect>
+<rect x="1882.78" y="170" width="18.50" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m4 B0 task=0:0 593.268-599.531 ms</title></rect>
+<rect x="1883.52" y="122" width="2.21" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m5 H0 task=0:1 593.520-594.268 ms</title></rect>
+<rect x="1895.22" y="74" width="21.59" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m17 B1 task=1:6 597.478-604.787 ms</title></rect>
+<text x="1897.22" y="89" font-family="monospace" font-size="10" fill="white">m17 B1</text>
+<rect x="1917.93" y="74" width="2.95" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m17 H1 task=1:6 605.165-606.163 ms</title></rect>
+<rect x="1923.01" y="74" width="18.63" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m5 B0 task=0:1 606.884-613.190 ms</title></rect>
+<rect x="1924.15" y="122" width="18.15" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m17 B1 task=1:6 607.272-613.416 ms</title></rect>
+<rect x="1941.90" y="74" width="2.06" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m5 H0 task=0:1 613.279-613.977 ms</title></rect>
+<rect x="1943.38" y="122" width="3.02" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m17 H1 task=1:6 613.780-614.803 ms</title></rect>
+<rect x="1944.62" y="74" width="21.57" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m16 B1 task=1:5 614.199-621.500 ms</title></rect>
+<text x="1946.62" y="89" font-family="monospace" font-size="10" fill="white">m16 B1</text>
+<rect x="1948.75" y="122" width="18.60" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m4 B0 task=0:0 615.598-621.894 ms</title></rect>
+<rect x="1949.45" y="170" width="18.04" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m17 B1 task=1:6 615.834-621.940 ms</title></rect>
+<rect x="1967.26" y="74" width="5.08" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m16 H1 task=1:5 621.862-623.581 ms</title></rect>
+<rect x="1967.84" y="170" width="2.98" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m17 H1 task=1:6 622.060-623.068 ms</title></rect>
+<rect x="1970.83" y="170" width="17.73" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m17 B0 task=1:6 623.072-629.072 ms</title></rect>
+<rect x="1976.88" y="122" width="20.54" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m16 B1 task=1:5 625.117-632.069 ms</title></rect>
+<text x="1978.88" y="137" font-family="monospace" font-size="10" fill="white">m16 B1</text>
+<rect x="1977.04" y="74" width="18.79" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m4 B0 task=0:0 625.174-631.533 ms</title></rect>
+<rect x="1989.69" y="170" width="2.98" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m17 H0 task=1:6 629.454-630.462 ms</title></rect>
+<rect x="1996.31" y="74" width="21.73" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m15 B1 task=1:4 631.696-639.051 ms</title></rect>
+<text x="1998.31" y="89" font-family="monospace" font-size="10" fill="white">m15 B1</text>
+<rect x="1998.49" y="122" width="4.82" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m16 H1 task=1:5 632.432-634.064 ms</title></rect>
+<rect x="2007.63" y="122" width="18.89" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m17 B0 task=1:6 635.528-641.923 ms</title></rect>
+<rect x="2008.24" y="170" width="18.69" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m16 B1 task=1:5 635.734-642.060 ms</title></rect>
+<rect x="2019.09" y="74" width="2.88" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m15 H1 task=1:4 639.405-640.380 ms</title></rect>
+<rect x="2027.20" y="170" width="3.24" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m16 H1 task=1:5 642.152-643.248 ms</title></rect>
+<rect x="2027.64" y="122" width="2.99" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m17 H0 task=1:6 642.300-643.312 ms</title></rect>
+<rect x="2030.83" y="170" width="18.47" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m16 B0 task=1:5 643.380-649.632 ms</title></rect>
+<rect x="2035.30" y="74" width="18.41" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m17 B0 task=1:6 644.891-651.121 ms</title></rect>
+<rect x="2035.40" y="122" width="19.36" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m15 B1 task=1:4 644.927-651.481 ms</title></rect>
+<rect x="2050.50" y="170" width="3.36" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m16 H0 task=1:5 650.036-651.174 ms</title></rect>
+<rect x="2053.96" y="74" width="3.05" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m17 H0 task=1:6 651.210-652.243 ms</title></rect>
+<rect x="2055.91" y="122" width="3.61" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m15 H1 task=1:4 651.869-653.090 ms</title></rect>
+<rect x="2057.02" y="74" width="20.97" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m14 B1 task=1:3 652.245-659.344 ms</title></rect>
+<text x="2059.02" y="89" font-family="monospace" font-size="10" fill="white">m14 B1</text>
+<rect x="2064.03" y="122" width="18.41" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m16 B0 task=1:5 654.618-660.850 ms</title></rect>
+<rect x="2064.25" y="170" width="18.50" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m15 B1 task=1:4 654.691-660.953 ms</title></rect>
+<rect x="2079.05" y="74" width="2.61" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m14 H1 task=1:3 659.701-660.586 ms</title></rect>
+<rect x="2083.09" y="170" width="3.05" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m15 H1 task=1:4 661.069-662.100 ms</title></rect>
+<rect x="2083.33" y="122" width="3.75" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m16 H0 task=1:5 661.150-662.418 ms</title></rect>
+<rect x="2086.54" y="170" width="18.45" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m15 B0 task=1:4 662.234-668.478 ms</title></rect>
+<rect x="2091.94" y="74" width="18.71" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m16 B0 task=1:5 664.062-670.393 ms</title></rect>
+<rect x="2091.94" y="122" width="18.48" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m14 B1 task=1:3 664.065-670.321 ms</title></rect>
+<rect x="2106.09" y="170" width="2.98" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m15 H0 task=1:4 668.855-669.863 ms</title></rect>
+<rect x="2110.90" y="74" width="3.20" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m16 H0 task=1:5 670.482-671.565 ms</title></rect>
+<rect x="2111.50" y="122" width="3.42" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m14 H1 task=1:3 670.685-671.844 ms</title></rect>
+<rect x="2114.47" y="74" width="21.69" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m13 B1 task=1:2 671.691-679.031 ms</title></rect>
+<text x="2116.47" y="89" font-family="monospace" font-size="10" fill="white">m13 B1</text>
+<rect x="2119.38" y="170" width="18.65" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m14 B1 task=1:3 673.351-679.664 ms</title></rect>
+<rect x="2119.74" y="122" width="18.80" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m15 B0 task=1:4 673.474-679.838 ms</title></rect>
+<rect x="2137.21" y="74" width="2.36" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m13 H1 task=1:2 679.386-680.184 ms</title></rect>
+<rect x="2138.30" y="170" width="2.72" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m14 H1 task=1:3 679.754-680.674 ms</title></rect>
+<rect x="2139.89" y="122" width="3.72" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m15 H0 task=1:4 680.294-681.552 ms</title></rect>
+<rect x="2141.39" y="170" width="18.48" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m14 B0 task=1:3 680.803-687.058 ms</title></rect>
+<rect x="2148.00" y="122" width="18.23" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m13 B1 task=1:2 683.038-689.208 ms</title></rect>
+<rect x="2148.05" y="74" width="18.49" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m15 B0 task=1:4 683.056-689.315 ms</title></rect>
+<rect x="2161.00" y="170" width="2.72" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m14 H0 task=1:3 687.439-688.359 ms</title></rect>
+<rect x="2166.80" y="74" width="2.90" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m15 H0 task=1:4 689.402-690.384 ms</title></rect>
+<rect x="2167.14" y="122" width="2.29" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m13 H1 task=1:2 689.518-690.294 ms</title></rect>
+<rect x="2170.07" y="74" width="21.57" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m12 B1 task=1:1 690.508-697.808 ms</title></rect>
+<text x="2172.07" y="89" font-family="monospace" font-size="10" fill="white">m12 B1</text>
+<rect x="2174.08" y="170" width="18.71" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m13 B1 task=1:2 691.865-698.198 ms</title></rect>
+<rect x="2174.10" y="122" width="18.40" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m14 B0 task=1:3 691.874-698.101 ms</title></rect>
+<rect x="2192.76" y="74" width="2.81" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m12 H1 task=1:1 698.190-699.140 ms</title></rect>
+<rect x="2193.06" y="170" width="2.44" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m13 H1 task=1:2 698.291-699.117 ms</title></rect>
+<rect x="2193.93" y="122" width="3.26" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m14 H0 task=1:3 698.585-699.687 ms</title></rect>
+<rect x="2195.89" y="170" width="18.51" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m13 B0 task=1:2 699.247-705.511 ms</title></rect>
+<rect x="2202.23" y="74" width="18.65" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m14 B0 task=1:3 701.392-707.703 ms</title></rect>
+<rect x="2202.26" y="122" width="18.96" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m12 B1 task=1:1 701.403-707.820 ms</title></rect>
+<rect x="2215.51" y="170" width="2.43" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m13 H0 task=1:2 705.889-706.712 ms</title></rect>
+<rect x="2221.13" y="74" width="2.65" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m14 H0 task=1:3 707.791-708.687 ms</title></rect>
+<rect x="2222.36" y="122" width="2.13" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m12 H1 task=1:1 708.207-708.926 ms</title></rect>
+<rect x="2224.15" y="74" width="21.86" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m11 B1 task=1:0 708.813-716.212 ms</title></rect>
+<text x="2226.15" y="89" font-family="monospace" font-size="10" fill="white">m11 B1</text>
+<rect x="2229.69" y="170" width="18.75" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m12 B1 task=1:1 710.688-717.035 ms</title></rect>
+<rect x="2229.99" y="122" width="18.86" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m13 B0 task=1:2 710.788-717.173 ms</title></rect>
+<rect x="2248.71" y="170" width="2.12" height="22" fill="#C628AD" stroke="#444" stroke-width="0.35"><title>m12 H1 task=1:1 717.127-717.845 ms</title></rect>
+<rect x="2249.94" y="122" width="3.10" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m13 H0 task=1:2 717.543-718.592 ms</title></rect>
+<rect x="2251.50" y="170" width="18.50" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m12 B0 task=1:1 718.071-724.334 ms</title></rect>
+<rect x="2257.67" y="122" width="18.97" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m11 B1 task=1:0 720.159-726.578 ms</title></rect>
+<rect x="2262.73" y="74" width="19.50" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m13 B0 task=1:2 721.871-728.473 ms</title></rect>
+<rect x="2271.21" y="170" width="2.19" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m12 H0 task=1:1 724.742-725.485 ms</title></rect>
+<rect x="2282.49" y="74" width="2.41" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m13 H0 task=1:2 728.559-729.374 ms</title></rect>
+<rect x="2283.87" y="170" width="18.50" height="22" fill="#B85450" stroke="#444" stroke-width="0.35"><title>m11 B1 task=1:0 729.026-735.289 ms</title></rect>
+<rect x="2284.17" y="122" width="18.52" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m12 B0 task=1:1 729.129-735.397 ms</title></rect>
+<rect x="2302.84" y="170" width="18.63" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m11 B0 task=1:0 735.446-741.751 ms</title></rect>
+<rect x="2303.76" y="122" width="2.21" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m12 H0 task=1:1 735.758-736.507 ms</title></rect>
+<rect x="2311.37" y="74" width="18.79" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m12 B0 task=1:1 738.334-744.693 ms</title></rect>
+<rect x="2329.81" y="122" width="18.65" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m11 B0 task=1:0 744.576-750.890 ms</title></rect>
+<rect x="2330.41" y="74" width="2.12" height="22" fill="#00838F" stroke="#444" stroke-width="0.35"><title>m12 H0 task=1:1 744.779-745.497 ms</title></rect>
+<rect x="2356.17" y="74" width="18.83" height="22" fill="#D79B00" stroke="#444" stroke-width="0.35"><title>m11 B0 task=1:0 753.499-759.872 ms</title></rect>
+<text x="130" y="255" font-family="sans-serif" font-size="12">0 ms</text>
+<text x="2295" y="255" font-family="sans-serif" font-size="12">759.87 ms</text>
+</svg>

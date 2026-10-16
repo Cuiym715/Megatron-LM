@@ -1,0 +1,349 @@
+{
+  "scope": "MHA complete B/H comparison and separate attention-only head-count diagnostic; no iteration speedup claim.",
+  "source_hashes_verified": true,
+  "mha_config": {
+    "group_query_attention": false,
+    "effective_q_heads": 4,
+    "effective_kv_heads": 4,
+    "note": "num_query_groups=1 is an unused default when group_query_attention=False; transformer.py selects Hkv=Hq."
+  },
+  "device": {
+    "name": "NVIDIA L40",
+    "sm_count": 142,
+    "shared_memory_per_sm": 102400,
+    "registers_per_sm": 65536,
+    "max_threads_per_sm": 1536
+  },
+  "losses": {
+    "fused": [
+      "1.047940E+01",
+      "1.048152E+01",
+      "1.047927E+01"
+    ],
+    "after_dx": [
+      "1.047940E+01",
+      "1.048152E+01",
+      "1.047927E+01"
+    ]
+  },
+  "boundary_checks": {
+    "B_count": 60,
+    "H_count": 24,
+    "all_H_immediately_follow_matching_B": true,
+    "no_H_for_no_history_B": true,
+    "all_mode_layouts_match": true
+  },
+  "highlighted": {
+    "stage": 1,
+    "model_chunk": 0,
+    "layout_q_history": [
+      [
+        2048,
+        4096
+      ]
+    ],
+    "count": 2,
+    "median": {
+      "fused_B_ms": 5.764608144760132,
+      "after_dx_B_ms": 6.368767976760864,
+      "H_ms": 0.6476799845695496,
+      "B_plus_H_ms": 7.016447961330414,
+      "B_start_to_H_end_ms": 7.394317626953125
+    }
+  },
+  "highlighted_samples": [
+    {
+      "stage": 1,
+      "model_chunk": 0,
+      "logical": 0,
+      "physical": 2,
+      "layout_q_history": [
+        [
+          2048,
+          4096
+        ]
+      ],
+      "fused_B_ms": 5.650432109832764,
+      "after_dx_B_ms": 6.1921281814575195,
+      "H_ms": 0.6399999856948853,
+      "B_plus_H_ms": 6.832128167152405,
+      "B_start_to_H_end_ms": 7.220245361328125,
+      "dx_ready_ms": 348.89727783203125,
+      "H_start_ms": 349.2853698730469
+    },
+    {
+      "stage": 1,
+      "model_chunk": 0,
+      "logical": 1,
+      "physical": 2,
+      "layout_q_history": [
+        [
+          2048,
+          4096
+        ]
+      ],
+      "fused_B_ms": 5.8787841796875,
+      "after_dx_B_ms": 6.545407772064209,
+      "H_ms": 0.6553599834442139,
+      "B_plus_H_ms": 7.200767755508423,
+      "B_start_to_H_end_ms": 7.568389892578125,
+      "dx_ready_ms": 432.2314147949219,
+      "H_start_ms": 432.5990295410156
+    }
+  ],
+  "B_change_fraction": 0.10480501307793078,
+  "highlighted_ranges_ms": {
+    "fused_B_ms": [
+      5.650432109832764,
+      5.8787841796875
+    ],
+    "after_dx_B_ms": [
+      6.1921281814575195,
+      6.545407772064209
+    ],
+    "H_ms": [
+      0.6399999856948853,
+      0.6553599834442139
+    ]
+  },
+  "attention_scale": {
+    "4": {
+      "scope": "Attention-only, Q2048/K6144/Hq4/Hkv4/d128/BF16; NOT complete B.",
+      "method": "3 outer-boundary samples; profiler separate. Graph is an execution-cost diagnostic, not production training.",
+      "correctness_relative_l2": {
+        "combined_B": [
+          2.2039628674974665e-05,
+          0.0,
+          0.0
+        ],
+        "combined_native_B": [
+          2.4598899472039193e-05,
+          0.0,
+          0.0
+        ]
+      },
+      "eager": {
+        "fused": {
+          "median_us": 475.13601183891296,
+          "samples_us": [
+            489.50400948524475,
+            475.13601183891296,
+            462.8480076789856
+          ]
+        },
+        "combined_B": {
+          "median_us": 516.0959959030151,
+          "samples_us": [
+            531.4559936523438,
+            504.83202934265137,
+            516.0959959030151
+          ]
+        },
+        "combined_native_B": {
+          "median_us": 414.71999883651733,
+          "samples_us": [
+            414.71999883651733,
+            412.6720130443573,
+            417.7919924259186
+          ]
+        },
+        "H": {
+          "median_us": 288.7679934501648,
+          "samples_us": [
+            288.7679934501648,
+            287.7439856529236,
+            293.88800263404846
+          ]
+        }
+      },
+      "graph": {
+        "fused": {
+          "median_us": 394.23999190330505,
+          "samples_us": [
+            398.3359932899475,
+            394.23999190330505,
+            393.21601390838623
+          ]
+        },
+        "combined_B": {
+          "median_us": 384.0000033378601,
+          "samples_us": [
+            384.0000033378601,
+            382.9759955406189,
+            385.0240111351013
+          ]
+        },
+        "combined_native_B": {
+          "median_us": 384.0000033378601,
+          "samples_us": [
+            384.0000033378601,
+            382.9759955406189,
+            385.0240111351013
+          ]
+        },
+        "H": {
+          "median_us": 254.97600436210632,
+          "samples_us": [
+            257.02399015426636,
+            254.97600436210632,
+            254.97600436210632
+          ]
+        }
+      },
+      "relative_B_change": {
+        "eager": 0.08620686086406137,
+        "graph": -0.025973997503420443
+      },
+      "main_kernels": {
+        "COST/fused": [
+          {
+            "name": "void flash::flash_bwd_dq_dk_dv_loop_seqk_parallel_kernel<Flash_bwd_kernel_traits<128, 64, 64, 8, 4, 2, 2, true, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 8, cutlass::bfloat16_t> >, false, true, false, false, false, true, false>(flash::Flash_bwd_params)",
+            "duration_us": 386.24,
+            "grid": [
+              96,
+              1,
+              4
+            ],
+            "registers_per_thread": 255,
+            "shared_memory_bytes": 81920
+          }
+        ],
+        "COST/combined_B": [
+          {
+            "name": "dspp_split_detail::dq_current_kernel(dspp_flash_split::Flash_bwd_params, int)",
+            "duration_us": 368.48,
+            "grid": [
+              96,
+              1,
+              4
+            ],
+            "registers_per_thread": 241,
+            "shared_memory_bytes": 81920
+          }
+        ]
+      }
+    },
+    "16": {
+      "scope": "Attention-only, Q2048/K6144/Hq16/Hkv16/d128/BF16; NOT complete B.",
+      "method": "3 outer-boundary samples; profiler separate. Graph is an execution-cost diagnostic, not production training.",
+      "correctness_relative_l2": {
+        "combined_B": [
+          2.4539080186514184e-05,
+          0.0,
+          0.0
+        ],
+        "combined_native_B": [
+          2.296609090990387e-05,
+          0.0,
+          0.0
+        ]
+      },
+      "eager": {
+        "fused": {
+          "median_us": 1517.5679922103882,
+          "samples_us": [
+            1517.5679922103882,
+            1514.4959688186646,
+            1518.5920000076294
+          ]
+        },
+        "combined_B": {
+          "median_us": 1312.7679824829102,
+          "samples_us": [
+            1524.7360467910767,
+            1307.647943496704,
+            1312.7679824829102
+          ]
+        },
+        "combined_native_B": {
+          "median_us": 1221.6320037841797,
+          "samples_us": [
+            1221.6320037841797,
+            1212.4160528182983,
+            1223.680019378662
+          ]
+        },
+        "H": {
+          "median_us": 1042.4319505691528,
+          "samples_us": [
+            1044.4799661636353,
+            1039.3600463867188,
+            1042.4319505691528
+          ]
+        }
+      },
+      "graph": {
+        "fused": {
+          "median_us": 1500.1599788665771,
+          "samples_us": [
+            1499.135971069336,
+            1501.1839866638184,
+            1500.1599788665771
+          ]
+        },
+        "combined_B": {
+          "median_us": 1251.3279914855957,
+          "samples_us": [
+            1260.543942451477,
+            1251.3279914855957,
+            1229.8239469528198
+          ]
+        },
+        "combined_native_B": {
+          "median_us": 1228.8000583648682,
+          "samples_us": [
+            1229.8239469528198,
+            1228.8000583648682,
+            1228.8000583648682
+          ]
+        },
+        "H": {
+          "median_us": 1021.9520330429077,
+          "samples_us": [
+            1022.9760408401489,
+            1021.9520330429077,
+            1020.9280252456665
+          ]
+        }
+      },
+      "relative_B_change": {
+        "eager": -0.13495277363433322,
+        "graph": -0.16587030109214262
+      },
+      "main_kernels": {
+        "COST/fused": [
+          {
+            "name": "void flash::flash_bwd_dq_dk_dv_loop_seqk_parallel_kernel<Flash_bwd_kernel_traits<128, 64, 64, 8, 4, 2, 2, true, false, cutlass::bfloat16_t, Flash_kernel_traits<128, 64, 64, 8, cutlass::bfloat16_t> >, false, true, false, false, false, true, false>(flash::Flash_bwd_params)",
+            "duration_us": 1423.997,
+            "grid": [
+              96,
+              1,
+              16
+            ],
+            "registers_per_thread": 255,
+            "shared_memory_bytes": 81920
+          }
+        ],
+        "COST/combined_B": [
+          {
+            "name": "dspp_split_detail::dq_current_kernel(dspp_flash_split::Flash_bwd_params, int)",
+            "duration_us": 1175.998,
+            "grid": [
+              96,
+              1,
+              16
+            ],
+            "registers_per_thread": 241,
+            "shared_memory_bytes": 81920
+          }
+        ]
+      }
+    }
+  },
+  "limits": [
+    "MHA B/H has two corresponding samples per mode after two warmup iterations. Both pairs slower and ranges separated; no extra repeats.",
+    "Attention timings have three boundary samples each; profiler captured separately. Q2048/K6144 fixed; changing heads scales both workload and parallelism.",
+    "No achieved occupancy, tensor-core utilization or bandwidth counters collected. Low theoretical resident-warp limit is not GPU utilization.",
+    "GQA previous results and current MHA are distinct runs/models: compare fused vs split within each, not absolute times to claim GQA benefit."
+  ]
+}

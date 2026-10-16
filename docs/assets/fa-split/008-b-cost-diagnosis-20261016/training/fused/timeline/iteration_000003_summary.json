@@ -1,0 +1,78 @@
+{
+  "measurement": "CUDA-event compute-stream wall-time envelope. P2P API calls are outside task ranges; concurrent communication may still contend for GPU resources.",
+  "critical_span_ms": 391.9740905761719,
+  "stages": {
+    "0": {
+      "first_compute_ms": 188.89095433398438,
+      "last_compute_ms": 580.8650449101563,
+      "busy_ms": 131.05255126953125
+    },
+    "1": {
+      "first_compute_ms": 209.52252197265625,
+      "last_compute_ms": 572.0369262695312,
+      "busy_ms": 186.74765014648438
+    },
+    "2": {
+      "first_compute_ms": 219.13329955078126,
+      "last_compute_ms": 559.0512683007812,
+      "busy_ms": 116.35099792480469
+    }
+  },
+  "task_duration_ms": {
+    "B0": {
+      "median": 6.3061981201171875,
+      "p95": 10.32328643798828
+    },
+    "B1": {
+      "median": 6.6527557373046875,
+      "p95": 10.222131347656248
+    }
+  },
+  "task_duration_ms_by_stage": {
+    "0": {
+      "B0": {
+        "median": 6.3061981201171875,
+        "p95": 6.452520751953125
+      },
+      "B1": {
+        "median": 6.697257995605469,
+        "p95": 7.275729370117187
+      }
+    },
+    "1": {
+      "B0": {
+        "median": 10.071792602539062,
+        "p95": 10.488160705566406
+      },
+      "B1": {
+        "median": 9.836288452148438,
+        "p95": 10.474337768554687
+      }
+    },
+    "2": {
+      "B0": {
+        "median": 5.910453796386719,
+        "p95": 6.088859558105469
+      },
+      "B1": {
+        "median": 5.8594970703125,
+        "p95": 6.418037414550781
+      }
+    }
+  },
+  "memory_by_stage": {
+    "0": {
+      "peak_allocated_bytes": 1996420608,
+      "peak_reserved_bytes": 2233466880
+    },
+    "1": {
+      "peak_allocated_bytes": 537008640,
+      "peak_reserved_bytes": 553648128
+    },
+    "2": {
+      "peak_allocated_bytes": 528612352,
+      "peak_reserved_bytes": 553648128
+    }
+  },
+  "task_scope": "B/H only; missing F/W intervals are not pipeline bubbles"
+}

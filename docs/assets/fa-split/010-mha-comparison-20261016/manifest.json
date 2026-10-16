@@ -1,0 +1,328 @@
+{
+  "created_utc": "2026-10-16T09:35:06.329933+00:00",
+  "git_head": "abd39e566b49e06dce32df5f218fa7c1ead7dddd",
+  "environment": {
+    "image": "nvcr.io/nvidia/pytorch:26.01-py3",
+    "gpu": "3 x NVIDIA L40 (SM89)",
+    "host_driver": "550.120",
+    "torch": "2.10.0a0+a36e1d39eb.nv26.01.42222806",
+    "cuda_toolkit": "13.1",
+    "flash_attn": "2.7.4.post1",
+    "python": "/workspace/src/venvs/megatron/bin/python (3.12)",
+    "container_user": "1001:1001",
+    "mount": "/home/cuiym:/workspace",
+    "extension_cache_key": "51ac35cd4a46e186"
+  },
+  "scope": "MHA paired complete B/H timing; same production algorithm as 009, independent 4/16-head attention diagnostic. No speedup claim for complete B.",
+  "source_files": {
+    "docs/dspp-history-dkv-split-implementation-plan.md": {
+      "bytes": 89933,
+      "sha256": "4f06bb19b6e3d83b0087a8283932290fbc6596815937df6aadf90c2617cb74a5"
+    },
+    "examples/measure_dspp_clean_tasks.sh": {
+      "bytes": 1844,
+      "sha256": "e910edec03cc1ccf135b831f9fbfdb6479e38f6853dbb9ef3952ab03327d037b"
+    },
+    "examples/measure_dspp_combined_tasks.sh": {
+      "bytes": 1697,
+      "sha256": "f4036aaba0a25e284b9e705b2fd4023d83f6da9691c5fb7587a48cbf80037323"
+    },
+    "examples/measure_dspp_history_after_dx.sh": {
+      "bytes": 1444,
+      "sha256": "d54b628ac8b563e46dbb988d55a2958d455f37375cc3b9b54fde47d6c7b3d027"
+    },
+    "examples/run_dspp_b23_l40.sh": {
+      "bytes": 8938,
+      "sha256": "1aaf10723a91b1599440fe1f459547362bbda0be72c46d7dac43d2849bd352a5"
+    },
+    "examples/validate_dspp_split_training.sh": {
+      "bytes": 2960,
+      "sha256": "fe9d677581be346bca831147fff21fc0fe37502adf4dbacd9e8d8dcd81a5011b"
+    },
+    "megatron/arguments.py": {
+      "bytes": 111313,
+      "sha256": "f5d32d856821357648e0fe68634d220649b7fb8a031906a0767912a54066f4fe"
+    },
+    "megatron/core/kv_cache/dspp_packed_attention.py": {
+      "bytes": 29147,
+      "sha256": "8789e68453bceeef3ce689b5e15e45f4a71756979177842dd72c0f5a4979d875"
+    },
+    "megatron/core/kv_cache/fa_split.py": {
+      "bytes": 9896,
+      "sha256": "762422f97a80532376378a0c9d054e17e15b0ad9c2fa46d73911a9df0a6780f7"
+    },
+    "megatron/core/kv_cache/fa_split_build.py": {
+      "bytes": 4656,
+      "sha256": "6c65289406b2d447930ec4bfa8b829fca7988e1b3deaad96d3ee860c2189de03"
+    },
+    "megatron/core/kv_cache/fa_split_src/LICENSE.cutlass": {
+      "bytes": 1547,
+      "sha256": "6fc6ad419e4d26571a14c7c4d26b65345865c20dd8686ddcf5e8673f54d3d233"
+    },
+    "megatron/core/kv_cache/fa_split_src/LICENSE.flash-attention": {
+      "bytes": 1558,
+      "sha256": "8c9ccb96c065e706135b6cbad279b721da6156e51f3a5f27c6b3329af9416d73"
+    },
+    "megatron/core/kv_cache/fa_split_src/THIRD_PARTY.md": {
+      "bytes": 2242,
+      "sha256": "e0298387948f587ee48330d291b34022a6b7ab4d2b6e23dbc9a3b747253598ea"
+    },
+    "megatron/core/kv_cache/fa_split_src/backward.cu": {
+      "bytes": 14194,
+      "sha256": "63a3c390099a23b75ac82d614cffbba2b10a28aa0f8f671b41df63d021cca953"
+    },
+    "megatron/core/kv_cache/fa_split_src/bindings.cpp": {
+      "bytes": 1488,
+      "sha256": "564c3aa76e48d7c9f014c60bf4064669159768963aa80b31fa28ec7a0384125b"
+    },
+    "megatron/core/kv_cache/fa_split_src/flash_bwd_split.patch": {
+      "bytes": 4546,
+      "sha256": "cf305e245ecde91a2f54659b2df254bf02a706445ebcb94ce7622f54ea23109f"
+    },
+    "megatron/core/kv_cache/fa_split_src/upstream.json": {
+      "bytes": 351,
+      "sha256": "163c55a7526f5f78f8d1924021e163e4cb7c58daf505c64d74e463cb6778057e"
+    },
+    "megatron/core/pipeline_parallel/dspp_timeline.py": {
+      "bytes": 19293,
+      "sha256": "0da8f40344ed860ca7b529fae6ee6d44c275deb817aef7b61ee7f08288097724"
+    },
+    "megatron/core/pipeline_parallel/schedules.py": {
+      "bytes": 196277,
+      "sha256": "ca61880a34dea59c208ef28d3ab1f83f57b2f581b35bc78df9dc8481c1079319"
+    },
+    "megatron/core/utils.py": {
+      "bytes": 13313,
+      "sha256": "288977b84558394506b8892dbbd22fc3540269a736d1a0639c9dab6e21ef910d"
+    },
+    "megatron/initialize.py": {
+      "bytes": 22431,
+      "sha256": "2b964d6547ff64ae38cbd5b5d5baa30526f0d5c97ce2639de5b3d90af320deee"
+    },
+    "megatron/model/transformer.py": {
+      "bytes": 101119,
+      "sha256": "d8a8bdaf7e02d97a653239516f3acbbc83392a5c43c5af4f8980d1364dfc6eb9"
+    },
+    "megatron/profile_utils.py": {
+      "bytes": 8154,
+      "sha256": "1d2c3a5319d643f0ff20f4e639465936fb861d1ad291df7af809a5b632acd3d3"
+    },
+    "tests/unit_tests/dspp/test_clean_task_timing.py": {
+      "bytes": 4807,
+      "sha256": "3ed25ad28094d3ae89c670a7c36fc1b2a8a87e6a1d46bb2ad4f428bafb5b11ad"
+    },
+    "tests/unit_tests/dspp/test_fa_combined_current.py": {
+      "bytes": 5696,
+      "sha256": "e9ca092c0ceeccf75c04828187c835235ead699359601bccfe231abb3b60fdc2"
+    },
+    "tests/unit_tests/dspp/test_fa_split.py": {
+      "bytes": 10246,
+      "sha256": "beecb34fb5001b9e987b3e4cdfc81ec1019815d2ae25947c419d6e03179910ae"
+    },
+    "tests/unit_tests/dspp/test_fa_split_regions.py": {
+      "bytes": 13848,
+      "sha256": "6a16a302910729e0162106217c27cc409ec737b68d244d0d84be0026e93dafe8"
+    },
+    "tests/unit_tests/dspp/test_history_after_dx.py": {
+      "bytes": 8091,
+      "sha256": "6acd07429ff69791c52bc1e0e2490f262cea8fc214cac605b9fb1a99512a7592"
+    },
+    "tests/unit_tests/dspp/test_kv_state.py": {
+      "bytes": 3401,
+      "sha256": "b5fa0662cd1feb89c3144a2f30304f912f58b1fa5b71883569ffd1b39582833e"
+    },
+    "tests/unit_tests/dspp/test_ordering_and_metrics.py": {
+      "bytes": 7796,
+      "sha256": "d3ded5ef67da29ddad3e663e3b7866bb9dc5b94c304c0c8af8f21a851bc54ef8"
+    },
+    "tests/unit_tests/dspp/test_packed_attention.py": {
+      "bytes": 17593,
+      "sha256": "2bfd2d1072661ae9a513ca792f057f525630389ff2357d1fc29b01a90af0e8cd"
+    },
+    "tests/unit_tests/dspp/test_packed_split.py": {
+      "bytes": 15228,
+      "sha256": "23219874635616fa86d4e32b991bfa79a75f17f981c02204a94ef293bd188d21"
+    },
+    "tests/unit_tests/dspp/test_training_runtime.py": {
+      "bytes": 10425,
+      "sha256": "4514042ef5747f1564367dcb8cc85e12d97615371e4ff445a0ffb70e59242a91"
+    },
+    "tools/audit_dspp_task_timing.py": {
+      "bytes": 3138,
+      "sha256": "03355fbe822258a777b57a0b62e79f5d0ee36c0119725cd58aa0da49a5837cb8"
+    },
+    "tools/build_dspp_fa_split.py": {
+      "bytes": 815,
+      "sha256": "4c53dc5e1c0b1f33350c0901d506ea29373785a0991b540a7360a0616e68e515"
+    },
+    "tools/build_dspp_synthetic_dataset.py": {
+      "bytes": 5326,
+      "sha256": "968d5582fe88c69370a235946fd0e7e728c16b6e9a11744587436ce981de4e23"
+    },
+    "tools/diagnose_dspp_attention_cost.py": {
+      "bytes": 7989,
+      "sha256": "8b7c6c270f8b54152ee2f08438316d8bf617b2c115beff2d57efd656365fd1d3"
+    },
+    "tools/diagnose_dspp_training_cost.py": {
+      "bytes": 2874,
+      "sha256": "af50a26b4ba00591686ce1e2a143ad12e61d6cd642fc13771bfd2648ec8a28ab"
+    },
+    "tools/summarize_dspp_clean_tasks.py": {
+      "bytes": 2410,
+      "sha256": "b5ce3ad63a77b3a5298fd0f1fde2a53a7f325de2cf612c34852b200ca8ca260b"
+    },
+    "tools/summarize_dspp_cost_diagnosis.py": {
+      "bytes": 3258,
+      "sha256": "c9e0606f894d1a5f56c49726eb44136f961f95bd42e0b77ab1e2b2cf120b02b5"
+    },
+    "tools/summarize_dspp_history_tasks.py": {
+      "bytes": 4635,
+      "sha256": "0f29eacbf08c7c77fcd292959bd486a0b300b0d722e85ad00805275b74ad7143"
+    },
+    "tools/validate_dspp_split_training.py": {
+      "bytes": 7078,
+      "sha256": "b62971380914f4993158208539cfbe4065af7430c994fe1ac2de8d8679b6d4f0"
+    }
+  },
+  "source_hashes_verified": true,
+  "external_inputs": {
+    "/home/cuiym/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data.idx": {
+      "bytes": 2602,
+      "sha256": "f77dca272855e39145d1bfdb489d7e1c458926483677720dea7cd302422e1e73"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data.bin": {
+      "bytes": 1540992,
+      "sha256": "235e6d7721d15a9f4222b2339c1392965f1cf6bc659a4471b38fc6be3edc0d1b"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data.json": {
+      "bytes": 343,
+      "sha256": "7ba3bb62288c9e2036b16c33c35f6f244fc0958f4ccf7fa3922d4e06084f5dcd"
+    }
+  },
+  "commands": {
+    "measure": "DSPP_COMBINED_QUERY_GROUPS=4 DSPP_COMBINED_MEASURE_ROOT=<new-dir> DSPP_COMBINED_DATA_PATH=/workspace/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data bash examples/measure_dspp_combined_tasks.sh",
+    "attention4": "python tools/diagnose_dspp_attention_cost.py --production-current --q-heads 4 --kv-heads 4 --output <new-dir>",
+    "attention16": "python tools/diagnose_dspp_attention_cost.py --production-current --q-heads 16 --kv-heads 16 --output <new-dir>",
+    "summary": "python tools/summarize_dspp_cost_diagnosis.py <trace> --output <summary.json>"
+  },
+  "validation": [
+    "Training flag group_query_attention=False verified in both logs; transformer.py uses Hkv=Hq when false. num_query_groups printed default is unused.",
+    "Both selected MHA task pairs slower after split; ranges separated, no reverse repetition.",
+    "Losses match within each MHA pair at log precision; layout and H boundaries match.",
+    "Attention combined API and native variants pass original atol=.004, rtol=.01 comparison on each shape; current dK/dV bitwise match fused.",
+    "Attention has three samples per case, profiler separate; no assertions inside measured intervals.",
+    "No production kernel/schedule/timer changes; only launcher configurability, diagnostic tool and implementation plan updated.",
+    "No achieved hardware utilization counters collected. Graph vs eager is not a CPU-time decomposition.",
+    "No git add, commit or push. Prior archives unchanged."
+  ],
+  "evidence_files": {
+    "attention-h16/execution.pt.trace.json": {
+      "bytes": 54649,
+      "sha256": "b37b1b6bb24cc253de9fdec826c52ce9a5a4ea7bf749df49a0267acd4fa3c654"
+    },
+    "attention-h16/profile-summary.json": {
+      "bytes": 15599,
+      "sha256": "7acdffb9ebcc3e5dfba97dc54c617269c8823236cd20fbe54f1e8e1f6f70f5c1"
+    },
+    "attention-h16/timing.json": {
+      "bytes": 1852,
+      "sha256": "ba1c46dead1089da2c1ddca66b7b8919b471b534f82530c4c5aab52b3ac3eb7a"
+    },
+    "attention-h16-launch.log": {
+      "bytes": 3434,
+      "sha256": "f0800acb41942cc0556af4ac9b4e43cdcde2b74c1a5adfb866c0c981d660cf57"
+    },
+    "attention-h4/execution.pt.trace.json": {
+      "bytes": 51752,
+      "sha256": "863866cac31a0a16dd5f97cbb7ff937e2cbca5a1c6390583cebf142451a03aae"
+    },
+    "attention-h4/profile-summary.json": {
+      "bytes": 15576,
+      "sha256": "e7d39414fe5cda3a96c9d62df9d0e8a0aa2f79a2896b9112fbef8a92db9fcbe7"
+    },
+    "attention-h4/timing.json": {
+      "bytes": 1837,
+      "sha256": "cc1dfb2aa3176084e86933c0019702fc7c12c5435ef1436fadd83c0026adcd78"
+    },
+    "attention-h4-launch.log": {
+      "bytes": 3419,
+      "sha256": "6afafbf14aabd08490f15aba1790e077c84c4b53c7023b5758dea409ee7cee92"
+    },
+    "measure-launch.log": {
+      "bytes": 248,
+      "sha256": "92a535f1fbf980b77a8c2514eda4d63c7aad8ba6687f9b5895bc34ac4bdb2976"
+    },
+    "measurement/after_dx/timeline/iteration_000003.svg": {
+      "bytes": 20860,
+      "sha256": "65f416d1a0ce42dc30faf363c5bbdfc2537f733926db14334ac690674de35479"
+    },
+    "measurement/after_dx/timeline/iteration_000003_microbatches.md": {
+      "bytes": 2813,
+      "sha256": "22a013fa28f951ee1085d4325de18352fc983fba9e42fd3d071cd9a68b9a4fd4"
+    },
+    "measurement/after_dx/timeline/iteration_000003_rank_0.json": {
+      "bytes": 18729,
+      "sha256": "c45c496fd8aae7967754ed054b1f9fcb494d2b9cf5a3a735376540fad816f7bc"
+    },
+    "measurement/after_dx/timeline/iteration_000003_rank_1.json": {
+      "bytes": 18725,
+      "sha256": "4a43a64add8fc7f9aec82abcfaf012665c8ea53ff452a3eedf92ac856a153794"
+    },
+    "measurement/after_dx/timeline/iteration_000003_rank_2.json": {
+      "bytes": 18722,
+      "sha256": "c0dedc4e18b94b8e771f1f0e1a9991e8e085ed45fec83a3052c405d2ca152b10"
+    },
+    "measurement/after_dx/timeline/iteration_000003_summary.json": {
+      "bytes": 2640,
+      "sha256": "bcbf60d8c5e08b28bd0c71f3308a14621603aa4498536ecc0df7b1b4e6f71c49"
+    },
+    "measurement/after_dx/train.log": {
+      "bytes": 35918,
+      "sha256": "daed1a6fec6777466ce7cf5a12bf25492b39912c217d0cf8f7d9c248b8a29a4c"
+    },
+    "measurement/fused/timeline/iteration_000003.svg": {
+      "bytes": 17122,
+      "sha256": "9ffff1e1539c286d7c47b532f7ecc1106d20ea1dd160e0b34a25cbc125e263bb"
+    },
+    "measurement/fused/timeline/iteration_000003_microbatches.md": {
+      "bytes": 2813,
+      "sha256": "22a013fa28f951ee1085d4325de18352fc983fba9e42fd3d071cd9a68b9a4fd4"
+    },
+    "measurement/fused/timeline/iteration_000003_rank_0.json": {
+      "bytes": 13912,
+      "sha256": "188c8b58d50c0a1a3370b84a49cb06c46bfcfa2b6127c8b93a278db59daeeb99"
+    },
+    "measurement/fused/timeline/iteration_000003_rank_1.json": {
+      "bytes": 13920,
+      "sha256": "c2a066ffac9272f6480257632e7dbc96534a25d5e4115078e8551a5b40e9f156"
+    },
+    "measurement/fused/timeline/iteration_000003_rank_2.json": {
+      "bytes": 13926,
+      "sha256": "c9ed3a1ca9c803790225fbf2c43108a25bef2a8925a7c57b08169af5ecfccbd3"
+    },
+    "measurement/fused/timeline/iteration_000003_summary.json": {
+      "bytes": 1901,
+      "sha256": "acf121dfaba9ff44d24a3f32c61357cdaf0838cf0d068e63cfb4229f262702cd"
+    },
+    "measurement/fused/train.log": {
+      "bytes": 35917,
+      "sha256": "4b685a376f63a1e386400aebd86ca6b96281b75e9dd400a81d218c90381f6f0f"
+    },
+    "measurement/task-times.json": {
+      "bytes": 42275,
+      "sha256": "1fb4e1c8d76a300b215448b0029e6f327a030f53260ce66df804604e29814fc5"
+    },
+    "source-hashes.json": {
+      "bytes": 1648,
+      "sha256": "81539f02f89802bfb9e0aea52b8ac5d9ed4cbd0bb47a4d8ef47a9ac806e22baa"
+    },
+    "source-snapshot.tar.gz": {
+      "bytes": 184052,
+      "sha256": "8eea99b6f34d16ee30eb0788305abd30215272d302cf31a646bc69aeef5707e1"
+    },
+    "summary.json": {
+      "bytes": 9752,
+      "sha256": "2fe772510301ec13bc6ef69ee2b92219835fba49e579ef34b3b4d4023b026c14"
+    }
+  }
+}

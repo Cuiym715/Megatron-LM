@@ -1,0 +1,20 @@
+/usr/local/lib/python3.12/dist-packages/torch/library.py:357: UserWarning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: flash_attn::_flash_attn_backward(Tensor dout, Tensor q, Tensor k, Tensor v, Tensor out, Tensor softmax_lse, Tensor(a6!)? dq, Tensor(a7!)? dk, Tensor(a8!)? dv, float dropout_p, float softmax_scale, bool causal, SymInt window_size_left, SymInt window_size_right, float softcap, Tensor? alibi_slopes, bool deterministic, Tensor? rng_state=None) -> Tensor
+    registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926
+  dispatch key: ADInplaceOrView
+  previous kernel: no debug info
+       new kernel: registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926 (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/core/dispatch/OperatorEntry.cpp:208.)
+  self.m.impl(
+/workspace/src/Megatron-LM-kwai/megatron/core/utils.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import packaging
+Traceback (most recent call last):
+  File "/workspace/src/Megatron-LM-kwai/tools/diagnose_dspp_attention_cost.py", line 119, in <module>
+    main()
+  File "/workspace/src/Megatron-LM-kwai/tools/diagnose_dspp_attention_cost.py", line 94, in main
+    with torch.cuda.graph(g, stream=torch.cuda.current_stream()):
+  File "/usr/local/lib/python3.12/dist-packages/torch/cuda/graphs.py", line 259, in __enter__
+    self.cuda_graph.capture_begin(
+  File "/usr/local/lib/python3.12/dist-packages/torch/cuda/graphs.py", line 118, in capture_begin
+    super().capture_begin(pool=pool, capture_error_mode=capture_error_mode)
+RuntimeError: CUDA graphs must be captured on a non-default stream. (However, after capture, it's ok to replay them on the default stream.)

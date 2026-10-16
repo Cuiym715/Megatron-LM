@@ -1,0 +1,24 @@
+/usr/local/lib/python3.12/dist-packages/torch/library.py:357: UserWarning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: flash_attn::_flash_attn_backward(Tensor dout, Tensor q, Tensor k, Tensor v, Tensor out, Tensor softmax_lse, Tensor(a6!)? dq, Tensor(a7!)? dk, Tensor(a8!)? dv, float dropout_p, float softmax_scale, bool causal, SymInt window_size_left, SymInt window_size_right, float softcap, Tensor? alibi_slopes, bool deterministic, Tensor? rng_state=None) -> Tensor
+    registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926
+  dispatch key: ADInplaceOrView
+  previous kernel: no debug info
+       new kernel: registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926 (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/core/dispatch/OperatorEntry.cpp:208.)
+  self.m.impl(
+/workspace/src/Megatron-LM-kwai/megatron/core/utils.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import packaging
+TIMING MHA 1 {'fused': 471.55, 'dq_all': 690.18, 'regional': 695.3}
+TIMING MHA 2 {'fused': 1043.97, 'dq_all': 1580.54, 'regional': 1687.55}
+TIMING MHA 3 {'fused': 1643.01, 'dq_all': 2551.3, 'regional': 2680.32}
+TIMING GQA 1 {'fused': 493.06, 'dq_all': 698.37, 'regional': 700.93}
+TIMING GQA 2 {'fused': 1021.44, 'dq_all': 1523.18, 'regional': 1610.75}
+TIMING GQA 3 {'fused': 1625.09, 'dq_all': 2436.58, 'regional': 2569.22}
+TIMING MQA 1 {'fused': 488.45, 'dq_all': 694.27, 'regional': 695.81}
+TIMING MQA 2 {'fused': 1019.39, 'dq_all': 1518.59, 'regional': 1598.46}
+TIMING MQA 3 {'fused': 1603.58, 'dq_all': 2421.25, 'regional': 2540.03}
+/usr/local/lib/python3.12/dist-packages/torch/autograd/graph.py:865: UserWarning: Attempting to run cuBLAS, but there was no current CUDA context! Attempting to set the primary context... (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/cuda/CublasHandlePool.cpp:330.)
+  return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+/usr/local/lib/python3.12/dist-packages/torch/profiler/profiler.py:217: UserWarning: Warning: Profiler clears events at the end of each cycle.Only events from the current cycle will be reported.To keep events across cycles, set acc_events=True.
+  _warn_once(
+All timing/gradient/region launch checks passed.

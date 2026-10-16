@@ -1,0 +1,160 @@
+{
+  "unit_tests": 162,
+  "skipped": 0,
+  "sanitizer": {
+    "tests": 20,
+    "errors": 0,
+    "filter": "kns=dspp_split_detail"
+  },
+  "pp_summary": {
+    "4": {
+      "records": 9,
+      "stage_dx_tensors": 165,
+      "gradient_tensors": 117,
+      "history_tasks": 114,
+      "drained_states": 36,
+      "stage_dx_checks": {
+        "max_abs": 6.103515625e-05,
+        "relative_l2": 0.01229981407280664
+      },
+      "gradient_checks": {
+        "max_abs": 0.0023193806409835815,
+        "relative_l2": 0.012731521129116878
+      }
+    },
+    "2": {
+      "records": 9,
+      "stage_dx_tensors": 165,
+      "gradient_tensors": 117,
+      "history_tasks": 114,
+      "drained_states": 36,
+      "stage_dx_checks": {
+        "max_abs": 1.52587890625e-05,
+        "relative_l2": 0.005541207197342163
+      },
+      "gradient_checks": {
+        "max_abs": 0.00044625625014305115,
+        "relative_l2": 0.004746008483420442
+      }
+    },
+    "1": {
+      "records": 9,
+      "stage_dx_tensors": 165,
+      "gradient_tensors": 117,
+      "history_tasks": 114,
+      "drained_states": 36,
+      "stage_dx_checks": {
+        "max_abs": 0,
+        "relative_l2": 0
+      },
+      "gradient_checks": {
+        "max_abs": 9.458744898438454e-11,
+        "relative_l2": 4.1363879422554485e-10
+      }
+    }
+  },
+  "audit": [
+    {
+      "counts": {
+        "B": 20,
+        "H": 8
+      },
+      "violations": [],
+      "scope": "Python B/H-body audit; C++ metadata checks remain; not a timing result"
+    },
+    {
+      "counts": {
+        "B": 20,
+        "H": 8
+      },
+      "violations": [],
+      "scope": "Python B/H-body audit; C++ metadata checks remain; not a timing result"
+    },
+    {
+      "counts": {
+        "B": 20,
+        "H": 8
+      },
+      "violations": [],
+      "scope": "Python B/H-body audit; C++ metadata checks remain; not a timing result"
+    }
+  ],
+  "initial_measurement": "measurement/ is pilot material, not the final fixed-source result; packed LSE guard was refined during pilot. Use measurement-final/.",
+  "criterion": {
+    "atol": 0.004,
+    "rtol": 0.01,
+    "relative_l2_max": 0.02
+  },
+  "old_run_timer_audit": {
+    "timing_log_level": 0,
+    "debug_cuda_sync_level": 0,
+    "active_inner_backward_timer": false,
+    "nvtx_autograd_wrappers_present": true
+  },
+  "final_measurement_source_hashes_verified": true,
+  "highlighted_final_timing": {
+    "stage": 1,
+    "model_chunk": 0,
+    "layout_q_history": [
+      [
+        2048,
+        4096
+      ]
+    ],
+    "count_per_mode": 6,
+    "median_ms": {
+      "fused_B_ms": 5.839359998703003,
+      "immediate_B_ms": 6.487551927566528,
+      "after_dx_B_ms": 6.461951971054077,
+      "H_ms": 0.6538240015506744,
+      "B_plus_H_ms": 7.120383977890015
+    },
+    "min_max_ms": {
+      "fused_B_ms": [
+        5.223423957824707,
+        5.961728096008301
+      ],
+      "immediate_B_ms": [
+        5.858304023742676,
+        6.612991809844971
+      ],
+      "after_dx_B_ms": [
+        6.28326416015625,
+        6.567935943603516
+      ],
+      "H_ms": [
+        0.6287360191345215,
+        0.6594560146331787
+      ],
+      "B_plus_H_ms": [
+        6.933504164218903,
+        7.225343942642212
+      ]
+    },
+    "repeat_median_ms": {
+      "1": {
+        "fused_B_ms": 5.547008037567139,
+        "immediate_B_ms": 6.597631931304932,
+        "after_dx_B_ms": 6.337023973464966,
+        "H_ms": 0.6487039923667908,
+        "B_plus_H_ms": 6.985727965831757
+      },
+      "2": {
+        "fused_B_ms": 5.7973761558532715,
+        "immediate_B_ms": 6.270463943481445,
+        "after_dx_B_ms": 6.483968019485474,
+        "H_ms": 0.6440960168838501,
+        "B_plus_H_ms": 7.128064036369324
+      },
+      "3": {
+        "fused_B_ms": 5.839359998703003,
+        "immediate_B_ms": 6.202879905700684,
+        "after_dx_B_ms": 6.524927854537964,
+        "H_ms": 0.6574079990386963,
+        "B_plus_H_ms": 7.18233585357666
+      }
+    },
+    "after_dx_B_vs_fused_fraction": 0.1066198988398317
+  },
+  "final_measurement_notes": "Only B/H recorded. Source scheduler runs H immediately after B and dx publication; recorded-event adjacency alone does not independently observe excluded F/W tasks."
+}

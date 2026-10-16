@@ -1,0 +1,87 @@
+--- flash_bwd_kernel.h
++++ dspp_flash_bwd_kernel.h
+@@ -77,7 +77,7 @@
+ 
+ ////////////////////////////////////////////////////////////////////////////////////////////////////
+ 
+-template<typename Kernel_traits, bool Is_dropout, bool Is_causal, bool Is_local, bool Has_alibi, bool Is_even_MN, bool Is_even_K, bool Is_softcap, bool Is_first, bool Is_last, bool Seq_parallel=false, typename Params>
++template<typename Kernel_traits, bool Is_dropout, bool Is_causal, bool Is_local, bool Has_alibi, bool Is_even_MN, bool Is_even_K, bool Is_softcap, bool Is_first, bool Is_last, bool Seq_parallel=false, bool ComputeDq=true, bool ComputeDkv=true, typename Params>
+ inline __device__ void compute_dq_dk_dv_1colblock(const Params &params, const int bidb, const int bidh, const int n_block) {
+ 
+     using Element = typename Kernel_traits::Element;
+@@ -329,6 +329,7 @@
+     // And we might read OOB elements from gQ and gdO.
+     // This also covers the case where actual_seqlen_q == 0
+     if ((Is_local || !Is_even_MN) && m_block < m_block_min) {
++        if constexpr (!ComputeDkv) { return; }
+         const index_t row_offset_dk = binfo.k_offset(params.dk_batch_stride, params.dk_row_stride, bidb)
+           + n_block * kBlockN * params.dk_row_stride + bidh * params.dk_head_stride;
+         const index_t row_offset_dv = binfo.k_offset(params.dv_batch_stride, params.dv_row_stride, bidb)
+@@ -630,8 +631,10 @@
+         // FLASH_NAMESPACE::gemm_rs(acc_dv, tdVrPt, tdVrdO, tdVsdOt, tiled_mma_dkv, smem_thr_copy_QdOt);
+         // Tensor tdKrdSt = make_tensor(tdSrdS.data(), tdVrPt.layout());
+         // FLASH_NAMESPACE::gemm_rs(acc_dk, tdKrdSt, tdKrQt, tdKsQt, tiled_mma_dkv, smem_thr_copy_QdOt);
+-        FLASH_NAMESPACE::gemm(acc_dv, tdVrPt, tdVrdO, tdVsPt, tdVsdOt, tiled_mma_dkv,
+-                    smem_tiled_copy_PdSt, smem_tiled_copy_QdOt, smem_thr_copy_PdSt, smem_thr_copy_QdOt);
++        if constexpr (ComputeDkv) {
++            FLASH_NAMESPACE::gemm(acc_dv, tdVrPt, tdVrdO, tdVsPt, tdVsdOt, tiled_mma_dkv,
++                        smem_tiled_copy_PdSt, smem_tiled_copy_QdOt, smem_thr_copy_PdSt, smem_thr_copy_QdOt);
++        }
+         // if (cute::thread0() && n_block == 0 && m_block == 0) { print(tdVrPt); }
+         // if (cute::thread0()) { print(acc_dv); }
+ 
+@@ -650,8 +653,10 @@
+             }
+         }
+ 
+-        FLASH_NAMESPACE::gemm(acc_dq, tdQrdS, tdQrKt, tdQsdS, tdQsKt, tiled_mma_dq,
+-                    smem_tiled_copy_dS, smem_tiled_copy_Kt, smem_thr_copy_dS, smem_thr_copy_Kt);
++        if constexpr (ComputeDq) {
++            FLASH_NAMESPACE::gemm(acc_dq, tdQrdS, tdQrKt, tdQsdS, tdQsKt, tiled_mma_dq,
++                        smem_tiled_copy_dS, smem_tiled_copy_Kt, smem_thr_copy_dS, smem_thr_copy_Kt);
++        }
+         // if (cute::thread0()) { print(acc_dq); }
+ 
+         if (m_block > m_block_min) {
+@@ -661,6 +666,7 @@
+             gdPsum.data() = gdPsum.data() + (-int(kBlockM));
+         }
+ 
++        if constexpr (ComputeDq) {
+         if (!Is_last) {
+             // Reshape acc_dq from (4, 1, 2) to (4, 2, 1) to write to gdQaccum
+             Tensor acc_dq_reshaped = make_tensor(acc_dq.data(),
+@@ -684,8 +690,12 @@
+             cute::copy(smem_tiled_copy_dQ, taccdQrdQ, taccdQsdQ);
+         }
+ 
+-        FLASH_NAMESPACE::gemm(acc_dk, tdKrdSt, tdKrQt, tdKsdSt, tdKsQt, tiled_mma_dkv,
+-                    smem_tiled_copy_PdSt, smem_tiled_copy_QdOt, smem_thr_copy_PdSt, smem_thr_copy_QdOt);
++        }  // ComputeDq: no dQ accumulation or output in the dKV-only kernel.
++
++        if constexpr (ComputeDkv) {
++            FLASH_NAMESPACE::gemm(acc_dk, tdKrdSt, tdKrQt, tdKsdSt, tdKsQt, tiled_mma_dkv,
++                        smem_tiled_copy_PdSt, smem_tiled_copy_QdOt, smem_thr_copy_PdSt, smem_thr_copy_QdOt);
++        }
+         // if (cute::thread0()) { print(acc_dk); }
+         if (Double_buffer) {  // Double buffer for sQ
+             tdKsQt.data() = tdKsQt.data() + (m_block % 2 == 0 ? size(sQ) : -size(sQ));
+@@ -704,7 +714,7 @@
+                                                         Kernel_traits::kNThreads / (Kernel_traits::kGmemThreadsPerRow), params.p_dropout);
+         }
+ 
+-        if (Is_last) {
++        if (ComputeDq && Is_last) {
+             __syncthreads();
+             Tensor tdQrdQ = make_tensor<Element>(shape(tdQgdQ));
+             cute::copy(gmem_tiled_copy_dQ, tdQsdQ, tdQrdQ);
+@@ -721,7 +731,8 @@
+ 
+     }
+ 
+-    // Epilogue
++    // Epilogue: dQ-only never writes or allocates dK/dV.
++    if constexpr (!ComputeDkv) { return; }
+ 
+     if (Is_dropout) {
+         #pragma unroll

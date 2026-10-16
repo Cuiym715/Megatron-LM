@@ -59,6 +59,10 @@ def initialize_megatron(extra_args_provider=None, args_defaults={},
     # set global args, build tokenizer, and set adlr-autoresume,
     # tensorboard-writer, and timers.
     set_global_variables(args)
+    if args.dspp_task_timing_only:
+        # Disable annotation-only autograd nodes before any model forward.
+        from megatron import profile_utils
+        profile_utils.ANNOTATIONS_ENABLED = False
 
     # torch.distributed initialization
     def finish_mpu_init():

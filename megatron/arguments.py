@@ -192,6 +192,23 @@ def validate_args(args, defaults={}):
     else:
         args.virtual_pipeline_model_parallel_size = None
 
+    if args.dspp_task_timing_only:
+        assert args.dspp, '--dspp-task-timing-only requires --dspp'
+        assert args.timing_log_level == 0, 'task-only timing requires --timing-log-level 0'
+        assert args.kaimm_cuda_synchronize_level == 0, 'task-only timing excludes debug CUDA synchronization'
+        assert not args.kaimm_profile_analysis and not args.profile, 'task-only timing excludes internal profilers'
+        assert not args.dspp_torch_profiler_dir, 'task-only timing excludes torch profiler'
+        assert not os.environ.get('DSPP_GPU_PROGRESS_DIR'), 'task-only timing excludes GPU progress recording'
+    if args.dspp_history_dkv_after_dx:
+        assert args.dspp_split_attention_backward, '--dspp-history-dkv-after-dx requires --dspp-split-attention-backward'
+    if args.dspp_split_attention_backward:
+        assert args.dspp, '--dspp-split-attention-backward requires --dspp'
+        assert args.bf16 and not args.fp16, 'DSPP split attention backward requires BF16'
+        split_head_dim = args.kv_channels or args.hidden_size // args.num_attention_heads
+        assert split_head_dim == 128, 'DSPP split attention backward requires head dimension 128'
+        assert args.transformer_impl == 'local', 'DSPP split attention backward requires local transformer'
+        assert not args.use_alibi, 'DSPP split attention backward does not support ALiBi'
+
     if args.dspp:
         assert not args.variable_seq_slicing, \
             '--dspp and --variable-seq-slicing select different runtimes; enable only --dspp'
@@ -1395,6 +1412,16 @@ def _add_distributed_args(parser):
     group.add_argument('--dspp', action='store_true',
                        help='Enable the DSPP variable-length packed training runtime. '
                        'Supports the single-GPU B1 path and PP=3/VPP=2 B2/B3 path.')
+    group.add_argument('--dspp-split-attention-backward', action='store_true',
+                       help='Experimental FA2 dQ/current-dKV/history-dKV split. By default all '
+                       'execute inside packed backward; --dspp-history-dkv-after-dx moves '
+                       'history to a separate task after complete dx. Requires BF16/head-dim 128.')
+    group.add_argument('--dspp-history-dkv-after-dx', action='store_true',
+                       help='With split attention backward, publish complete stage dx first, '
+                       'then immediately run a separate history-dKV task. No intervening compute tasks.')
+    group.add_argument('--dspp-task-timing-only', action='store_true',
+                       help='Measure only B/H boundary CUDA events, with internal annotations and '
+                       'synchronizing timers disabled. Excludes profiler/progress diagnostics.')
     group.add_argument('--dspp-microbatch-order', type=str,
                        default='warmup-short-steady-long',
                        choices=['input', 'warmup-short-steady-long',

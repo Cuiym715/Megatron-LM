@@ -1,0 +1,103 @@
+[
+  {
+    "name": "small-short",
+    "hidden": 512,
+    "ffn": 1024,
+    "heads": 4,
+    "groups": 2,
+    "long": false,
+    "order": "fused after_dx",
+    "environment": {
+      "DSPP_COMBINED_MEASURE_ROOT": "/workspace/src/Megatron-LM-kwai/docs/assets/fa-split/011-workload-scaling-20261016/small-short",
+      "DSPP_COMBINED_DATA_PATH": "/workspace/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data",
+      "DSPP_COMBINED_HIDDEN_SIZE": "512",
+      "DSPP_COMBINED_FFN_HIDDEN_SIZE": "1024",
+      "DSPP_COMBINED_Q_HEADS": "4",
+      "DSPP_COMBINED_QUERY_GROUPS": "2",
+      "DSPP_COMBINED_SEQ_LENGTH": "8192",
+      "DSPP_COMBINED_CHUNK_LENGTH": "2048",
+      "DSPP_COMBINED_MODE_ORDER": "fused after_dx"
+    }
+  },
+  {
+    "name": "wide-short",
+    "hidden": 2048,
+    "ffn": 4096,
+    "heads": 16,
+    "groups": 8,
+    "long": false,
+    "order": "after_dx fused",
+    "environment": {
+      "DSPP_COMBINED_MEASURE_ROOT": "/workspace/src/Megatron-LM-kwai/docs/assets/fa-split/011-workload-scaling-20261016/wide-short",
+      "DSPP_COMBINED_DATA_PATH": "/workspace/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data",
+      "DSPP_COMBINED_HIDDEN_SIZE": "2048",
+      "DSPP_COMBINED_FFN_HIDDEN_SIZE": "4096",
+      "DSPP_COMBINED_Q_HEADS": "16",
+      "DSPP_COMBINED_QUERY_GROUPS": "8",
+      "DSPP_COMBINED_SEQ_LENGTH": "8192",
+      "DSPP_COMBINED_CHUNK_LENGTH": "2048",
+      "DSPP_COMBINED_MODE_ORDER": "after_dx fused"
+    }
+  },
+  {
+    "name": "small-long",
+    "hidden": 512,
+    "ffn": 1024,
+    "heads": 4,
+    "groups": 2,
+    "long": true,
+    "order": "after_dx fused",
+    "environment": {
+      "DSPP_COMBINED_MEASURE_ROOT": "/workspace/src/Megatron-LM-kwai/docs/assets/fa-split/011-workload-scaling-20261016/small-long",
+      "DSPP_COMBINED_DATA_PATH": "/workspace/.cache/dspp-fa-split/workload-scaling-20261016/long-data",
+      "DSPP_COMBINED_HIDDEN_SIZE": "512",
+      "DSPP_COMBINED_FFN_HIDDEN_SIZE": "1024",
+      "DSPP_COMBINED_Q_HEADS": "4",
+      "DSPP_COMBINED_QUERY_GROUPS": "2",
+      "DSPP_COMBINED_SEQ_LENGTH": "16384",
+      "DSPP_COMBINED_CHUNK_LENGTH": "2048",
+      "DSPP_COMBINED_MODE_ORDER": "after_dx fused"
+    }
+  },
+  {
+    "name": "wide-long",
+    "hidden": 2048,
+    "ffn": 4096,
+    "heads": 16,
+    "groups": 8,
+    "long": true,
+    "order": "fused after_dx",
+    "environment": {
+      "DSPP_COMBINED_MEASURE_ROOT": "/workspace/src/Megatron-LM-kwai/docs/assets/fa-split/011-workload-scaling-20261016/wide-long",
+      "DSPP_COMBINED_DATA_PATH": "/workspace/.cache/dspp-fa-split/workload-scaling-20261016/long-data",
+      "DSPP_COMBINED_HIDDEN_SIZE": "2048",
+      "DSPP_COMBINED_FFN_HIDDEN_SIZE": "4096",
+      "DSPP_COMBINED_Q_HEADS": "16",
+      "DSPP_COMBINED_QUERY_GROUPS": "8",
+      "DSPP_COMBINED_SEQ_LENGTH": "16384",
+      "DSPP_COMBINED_CHUNK_LENGTH": "2048",
+      "DSPP_COMBINED_MODE_ORDER": "fused after_dx"
+    }
+  },
+  {
+    "name": "wide-long-repeat",
+    "hidden": 2048,
+    "ffn": 4096,
+    "heads": 16,
+    "groups": 8,
+    "long": true,
+    "order": "after_dx fused",
+    "environment": {
+      "DSPP_COMBINED_MEASURE_ROOT": "/workspace/src/Megatron-LM-kwai/docs/assets/fa-split/011-workload-scaling-20261016/wide-long-repeat",
+      "DSPP_COMBINED_DATA_PATH": "/workspace/.cache/dspp-fa-split/workload-scaling-20261016/long-data",
+      "DSPP_COMBINED_HIDDEN_SIZE": "2048",
+      "DSPP_COMBINED_FFN_HIDDEN_SIZE": "4096",
+      "DSPP_COMBINED_Q_HEADS": "16",
+      "DSPP_COMBINED_QUERY_GROUPS": "8",
+      "DSPP_COMBINED_SEQ_LENGTH": "16384",
+      "DSPP_COMBINED_CHUNK_LENGTH": "2048",
+      "DSPP_COMBINED_MODE_ORDER": "after_dx fused"
+    },
+    "reason": "First run: history4096 paired signs differ; history12288 split B range 5.098\u20136.655 ms."
+  }
+]

@@ -28,6 +28,8 @@ _COLORS = {
     "B1": "#B85450",
     "W0": "#9673A6",
     "W1": "#D6B656",
+    "H0": "#00838F",
+    "H1": "#C628AD",
 }
 
 
@@ -145,7 +147,7 @@ def render_timeline_svg(records: Sequence[Mapping[str, Any]], title: str) -> str
         f'<text x="20" y="28" font-family="sans-serif" font-size="18">{html.escape(title)}</text>',
     ]
     legend_x = left
-    for kind in ("F0", "F1", "B0", "B1", "W0", "W1"):
+    for kind in ("F0", "F1", "B0", "B1", "W0", "W1", "H0", "H1"):
         parts.append(
             f'<rect x="{legend_x}" y="42" width="16" height="12" '
             f'fill="{_COLORS[kind]}" stroke="#444" stroke-width="0.35"/>'
@@ -154,7 +156,7 @@ def render_timeline_svg(records: Sequence[Mapping[str, Any]], title: str) -> str
         legend_x += 72
     parts.append(
         f'<text x="{legend_x + 8}" y="53" font-family="sans-serif" font-size="11">'
-        'One compute lane per stage; W shorter than 3 px is a visibility marker.</text>'
+        'One compute lane per stage; H = history dKV after stage dx; W shorter than 3 px is a visibility marker.</text>'
     )
     for stage in stages:
         y = rows[stage]
@@ -215,8 +217,14 @@ class DsppTimelineRecorder:
             torch_profile_dir and torch_profile_selected == current
         )
         self.recording = self.enabled or self.torch_profile_enabled
+        self.task_timing_only = bool(getattr(args, 'dspp_task_timing_only', False))
         self.stage = stage
         self.iteration = current
+        self.backward_mode = (
+            'after_dx' if getattr(args, 'dspp_history_dkv_after_dx', False)
+            else 'split_immediate' if getattr(args, 'dspp_split_attention_backward', False)
+            else 'fused'
+        )
         self.output_dir = Path(output_dir) if output_dir else None
         self.ordering = dict(ordering)
         self.microbatch_ids = {
@@ -227,7 +235,20 @@ class DsppTimelineRecorder:
         self.records: List[Dict[str, Any]] = []
         self.anchor = None
         self.anchor_cpu_ns = None
+        self._boundary_pairs = []
+        self._boundary_cursor = 0
+        self._boundary_records = []
         if self.enabled:
+            if self.task_timing_only:
+                # Two VPP B tasks and at most two H tasks per physical item.
+                # Materialize lazy CUDA event handles BEFORE the measured work.
+                for _ in range(4 * len(self.microbatch_ids)):
+                    pair = (torch.cuda.Event(enable_timing=True),
+                            torch.cuda.Event(enable_timing=True))
+                    for event in pair:
+                        event.record()
+                    self._boundary_pairs.append(pair)
+                torch.cuda.synchronize()
             dist.barrier()
             self.anchor = torch.cuda.Event(enable_timing=True)
             self.anchor.record()
@@ -242,6 +263,20 @@ class DsppTimelineRecorder:
         *,
         chunk: int,
     ):
+        if self.task_timing_only:
+            if not self.enabled or not kind.startswith(('B', 'H')):
+                yield
+                return
+            begin, end = self._boundary_pairs[self._boundary_cursor]
+            self._boundary_cursor += 1
+            begin.record()
+            try:
+                yield
+            finally:
+                end.record()
+            # No per-item metadata conversion, NVTX or JSON in the task loop.
+            self._boundary_records.append((kind, task_id, meta, chunk, begin, end))
+            return
         if not self.enabled and not self.torch_profile_enabled:
             yield
             return
@@ -294,6 +329,9 @@ class DsppTimelineRecorder:
 
     @contextlib.contextmanager
     def communication(self, label: str):
+        if self.task_timing_only:
+            yield
+            return
         if not self.enabled and not self.torch_profile_enabled:
             yield
             return
@@ -313,6 +351,19 @@ class DsppTimelineRecorder:
         if not self.enabled:
             return None
         torch.cuda.synchronize()
+        for kind, task_id, meta, chunk, begin, end in self._boundary_records:
+            self.records.append({
+                'kind': kind, 'stage': self.stage, 'chunk': chunk,
+                'sequence_chunk_size': meta.chunk_size,
+                'logical_microbatch': task_id[0], 'physical_microbatch': task_id[1],
+                'microbatch_id': self.microbatch_ids.get(task_id),
+                'signature': task_signature(meta), 'valid_tokens': meta.valid_token_count,
+                'items': [dict(sequence_id=i.sequence_id, segment_id=i.segment_id,
+                               segment_count=i.segment_count, token_offset=i.token_offset,
+                               token_length=i.token_length, sequence_length=i.sequence_length)
+                          for i in meta.items],
+                '_begin': begin, '_end': end,
+            })
         serializable = []
         for record in self.records:
             begin, end = record.pop("_begin"), record.pop("_end")
@@ -330,6 +381,8 @@ class DsppTimelineRecorder:
                     "rank": rank,
                     "stage": self.stage,
                     "anchor_cpu_ns": self.anchor_cpu_ns,
+                    "backward_mode": self.backward_mode,
+                    "task_timing_only": self.task_timing_only,
                     "peak_allocated_bytes": torch.cuda.max_memory_allocated(),
                     "peak_reserved_bytes": torch.cuda.max_memory_reserved(),
                     "ordering": self.ordering,
@@ -363,17 +416,24 @@ class DsppTimelineRecorder:
             all_records.sort(key=lambda item: (item["start_ms"], item["stage"]))
             stem = self.output_dir / f"iteration_{self.iteration:06d}"
             with stem.with_suffix(".svg").open("w", encoding="utf-8") as stream:
-                stream.write(render_timeline_svg(all_records, f"DSPP iteration {self.iteration}"))
+                scope = 'B/H intervals only' if self.task_timing_only else 'all compute tasks'
+                stream.write(render_timeline_svg(all_records, f"DSPP iteration {self.iteration}: {scope}"))
             with Path(f"{stem}_summary.json").open("w", encoding="utf-8") as stream:
                 summary = summarize_timeline(all_records)
                 summary["memory_by_stage"] = memory_by_stage
+                if self.task_timing_only:
+                    summary['task_scope'] = 'B/H only; missing F/W intervals are not pipeline bubbles'
+                    for stage_summary in summary['stages'].values():
+                        stage_summary.pop('bubble_ms', None)
+                        stage_summary.pop('compute_utilization', None)
                 json.dump(summary, stream, indent=2)
-            with Path(f"{stem}_costs.json").open("w", encoding="utf-8") as stream:
-                json.dump(
-                    {"source": "CUDA events", "costs": build_profile_costs(all_records)},
-                    stream,
-                    indent=2,
-                )
+            if not self.task_timing_only:
+                with Path(f"{stem}_costs.json").open("w", encoding="utf-8") as stream:
+                    json.dump(
+                        {"source": "CUDA events", "costs": build_profile_costs(all_records)},
+                        stream,
+                        indent=2,
+                    )
             if self.microbatch_report is not None:
                 with Path(f"{stem}_microbatches.md").open("w", encoding="utf-8") as stream:
                     stream.write(self.microbatch_report)

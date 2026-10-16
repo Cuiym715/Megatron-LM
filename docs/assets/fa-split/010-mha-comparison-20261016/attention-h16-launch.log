@@ -1,0 +1,97 @@
+/usr/local/lib/python3.12/dist-packages/torch/library.py:357: UserWarning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: flash_attn::_flash_attn_backward(Tensor dout, Tensor q, Tensor k, Tensor v, Tensor out, Tensor softmax_lse, Tensor(a6!)? dq, Tensor(a7!)? dk, Tensor(a8!)? dv, float dropout_p, float softmax_scale, bool causal, SymInt window_size_left, SymInt window_size_right, float softcap, Tensor? alibi_slopes, bool deterministic, Tensor? rng_state=None) -> Tensor
+    registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926
+  dispatch key: ADInplaceOrView
+  previous kernel: no debug info
+       new kernel: registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926 (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/core/dispatch/OperatorEntry.cpp:208.)
+  self.m.impl(
+/workspace/src/Megatron-LM-kwai/megatron/core/utils.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import packaging
+/usr/local/lib/python3.12/dist-packages/torch/profiler/profiler.py:217: UserWarning: Warning: Profiler clears events at the end of each cycle.Only events from the current cycle will be reported.To keep events across cycles, set acc_events=True.
+  _warn_once(
+{
+  "scope": "Attention-only, Q2048/K6144/Hq16/Hkv16/d128/BF16; NOT complete B.",
+  "method": "3 outer-boundary samples; profiler separate. Graph is an execution-cost diagnostic, not production training.",
+  "correctness_relative_l2": {
+    "combined_B": [
+      2.4539080186514184e-05,
+      0.0,
+      0.0
+    ],
+    "combined_native_B": [
+      2.296609090990387e-05,
+      0.0,
+      0.0
+    ]
+  },
+  "eager": {
+    "fused": {
+      "median_us": 1517.5679922103882,
+      "samples_us": [
+        1517.5679922103882,
+        1514.4959688186646,
+        1518.5920000076294
+      ]
+    },
+    "combined_B": {
+      "median_us": 1312.7679824829102,
+      "samples_us": [
+        1524.7360467910767,
+        1307.647943496704,
+        1312.7679824829102
+      ]
+    },
+    "combined_native_B": {
+      "median_us": 1221.6320037841797,
+      "samples_us": [
+        1221.6320037841797,
+        1212.4160528182983,
+        1223.680019378662
+      ]
+    },
+    "H": {
+      "median_us": 1042.4319505691528,
+      "samples_us": [
+        1044.4799661636353,
+        1039.3600463867188,
+        1042.4319505691528
+      ]
+    }
+  },
+  "graph": {
+    "fused": {
+      "median_us": 1500.1599788665771,
+      "samples_us": [
+        1499.135971069336,
+        1501.1839866638184,
+        1500.1599788665771
+      ]
+    },
+    "combined_B": {
+      "median_us": 1251.3279914855957,
+      "samples_us": [
+        1260.543942451477,
+        1251.3279914855957,
+        1229.8239469528198
+      ]
+    },
+    "combined_native_B": {
+      "median_us": 1228.8000583648682,
+      "samples_us": [
+        1229.8239469528198,
+        1228.8000583648682,
+        1228.8000583648682
+      ]
+    },
+    "H": {
+      "median_us": 1021.9520330429077,
+      "samples_us": [
+        1022.9760408401489,
+        1021.9520330429077,
+        1020.9280252456665
+      ]
+    }
+  }
+}
+

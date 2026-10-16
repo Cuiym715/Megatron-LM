@@ -1,0 +1,14 @@
+Starting small-short
+small-short {'B_count': 60, 'H_count': 24, 'all_H_immediately_follow_matching_B': True, 'no_H_for_no_history_B': True, 'all_mode_layouts_match': True}
+{"stage": 1, "model_chunk": 0, "layout_q_history": [[2048, 4096]], "count": 2, "median": {"fused_B_ms": 5.913599967956543, "after_dx_B_ms": 6.20083212852478, "H_ms": 0.6579199731349945, "B_plus_H_ms": 6.858752101659775, "B_start_to_H_end_ms": 7.2268829345703125}}
+Starting wide-short
+wide-short {'B_count': 60, 'H_count': 24, 'all_H_immediately_follow_matching_B': True, 'no_H_for_no_history_B': True, 'all_mode_layouts_match': True}
+{"stage": 1, "model_chunk": 0, "layout_q_history": [[2048, 4096]], "count": 2, "median": {"fused_B_ms": 6.09331202507019, "after_dx_B_ms": 5.843935966491699, "H_ms": 1.243615984916687, "B_plus_H_ms": 7.087551951408386, "B_start_to_H_end_ms": 7.3963165283203125}}
+Starting small-long
+small-long {'B_count': 108, 'H_count': 72, 'all_H_immediately_follow_matching_B': True, 'no_H_for_no_history_B': True, 'all_mode_layouts_match': True}
+{"stage": 1, "model_chunk": 0, "layout_q_history": [[2048, 12288]], "count": 2, "median": {"fused_B_ms": 5.902336120605469, "after_dx_B_ms": 6.345215797424316, "H_ms": 1.016319990158081, "B_plus_H_ms": 7.3615357875823975, "B_start_to_H_end_ms": 7.729156494140625}}
+{"stage": 1, "model_chunk": 0, "layout_q_history": [[2048, 4096]], "count": 2, "median": {"fused_B_ms": 5.961215972900391, "after_dx_B_ms": 6.224384069442749, "H_ms": 0.9175040125846863, "B_plus_H_ms": 7.141888082027435, "B_start_to_H_end_ms": 7.4757080078125}}
+Starting wide-long
+wide-long {'B_count': 108, 'H_count': 72, 'all_H_immediately_follow_matching_B': True, 'no_H_for_no_history_B': True, 'all_mode_layouts_match': True}
+{"stage": 1, "model_chunk": 0, "layout_q_history": [[2048, 12288]], "count": 2, "median": {"fused_B_ms": 7.278592109680176, "after_dx_B_ms": 5.8767359256744385, "H_ms": 2.9675519466400146, "B_plus_H_ms": 8.844287872314453, "B_start_to_H_end_ms": 8.846343994140625}}
+{"stage": 1, "model_chunk": 0, "layout_q_history": [[2048, 4096]], "count": 2, "median": {"fused_B_ms": 6.568447828292847, "after_dx_B_ms": 6.304768085479736, "H_ms": 1.3066240549087524, "B_plus_H_ms": 7.611392140388489, "B_start_to_H_end_ms": 7.966217041015625}}

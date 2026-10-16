@@ -1,0 +1,36 @@
+Running 2 items in this shard
+COMBINED_LONG_CHECK {"hq": 32, "hk": 16, "nk": 6144, "checks": {"dq": {"max_abs": 0.000244140625, "relative_l2": 2.468703024833392e-05}, "current_dk": {"max_abs": 0.0, "relative_l2": 0.0}, "current_dv": {"max_abs": 0.0, "relative_l2": 0.0}, "history_dk": {"max_abs": 0.0, "relative_l2": 0.0}, "history_dv": {"max_abs": 0.0, "relative_l2": 0.0}}}
+.COMBINED_LONG_CHECK {"hq": 32, "hk": 16, "nk": 14336, "checks": {"dq": {"max_abs": 0.000244140625, "relative_l2": 2.9046566257032267e-05}, "current_dk": {"max_abs": 0.0, "relative_l2": 0.0}, "current_dv": {"max_abs": 0.0, "relative_l2": 0.0}, "history_dk": {"max_abs": 0.0, "relative_l2": 0.0}, "history_dv": {"max_abs": 0.0, "relative_l2": 0.0}}}
+.
+=============================== warnings summary ===============================
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute
+
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute
+
+megatron/core/utils.py:5
+  /workspace/src/Megatron-LM-kwai/megatron/core/utils.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    from pkg_resources import packaging
+
+../../../usr/local/lib/python3.12/dist-packages/torch/jit/_script.py:1480: 11 warnings
+  /usr/local/lib/python3.12/dist-packages/torch/jit/_script.py:1480: DeprecationWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+../../../usr/local/lib/python3.12/dist-packages/torch/library.py:357
+  /usr/local/lib/python3.12/dist-packages/torch/library.py:357: UserWarning: Warning only once for all operators,  other operators may also be overridden.
+    Overriding a previously registered kernel for the same operator and the same dispatch key
+    operator: flash_attn::_flash_attn_backward(Tensor dout, Tensor q, Tensor k, Tensor v, Tensor out, Tensor softmax_lse, Tensor(a6!)? dq, Tensor(a7!)? dk, Tensor(a8!)? dv, float dropout_p, float softmax_scale, bool causal, SymInt window_size_left, SymInt window_size_right, float softcap, Tensor? alibi_slopes, bool deterministic, Tensor? rng_state=None) -> Tensor
+      registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926
+    dispatch key: ADInplaceOrView
+    previous kernel: no debug info
+         new kernel: registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926 (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/core/dispatch/OperatorEntry.cpp:208.)
+    self.m.impl(
+
+../../../usr/local/lib/python3.12/dist-packages/torch/jit/_script.py:362: 14 warnings
+  /usr/local/lib/python3.12/dist-packages/torch/jit/_script.py:362: DeprecationWarning: `torch.jit.script_method` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+2 passed, 41 deselected, 29 warnings in 6.10s
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute

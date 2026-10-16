@@ -1,0 +1,19 @@
+small-short loss_match True
+  history 4096 n 2 {'fused_B_ms': 5.913599967956543, 'after_dx_B_ms': 6.20083212852478, 'H_ms': 0.6579199731349945, 'B_plus_H_ms': 6.858752101659775, 'B_start_to_H_end_ms': 7.2268829345703125} B change% 4.857145598698498 faster 0
+  all-task B sums 364.84403228759766 399.920126914978
+wide-short loss_match True
+  history 4096 n 2 {'fused_B_ms': 6.09331202507019, 'after_dx_B_ms': 5.843935966491699, 'H_ms': 1.243615984916687, 'B_plus_H_ms': 7.087551951408386, 'B_start_to_H_end_ms': 7.3963165283203125} B change% -4.092619211891069 faster 2
+  all-task B sums 369.4847991466522 364.8848955631256
+small-long loss_match True
+  history 4096 n 2 {'fused_B_ms': 5.961215972900391, 'after_dx_B_ms': 6.224384069442749, 'H_ms': 0.9175040125846863, 'B_plus_H_ms': 7.141888082027435, 'B_start_to_H_end_ms': 7.4757080078125} B change% 4.414671398230108 faster 0
+  history 12288 n 2 {'fused_B_ms': 5.902336120605469, 'after_dx_B_ms': 6.345215797424316, 'H_ms': 1.016319990158081, 'B_plus_H_ms': 7.3615357875823975, 'B_start_to_H_end_ms': 7.729156494140625} B change% 7.503464183829234 faster 0
+  all-task B sums 695.2017922401428 708.8322558403015
+wide-long loss_match True
+  history 4096 n 2 {'fused_B_ms': 6.568447828292847, 'after_dx_B_ms': 6.304768085479736, 'H_ms': 1.3066240549087524, 'B_plus_H_ms': 7.611392140388489, 'B_start_to_H_end_ms': 7.966217041015625} B change% -4.0143386947117055 faster 1
+  history 12288 n 2 {'fused_B_ms': 7.278592109680176, 'after_dx_B_ms': 5.8767359256744385, 'H_ms': 2.9675519466400146, 'B_plus_H_ms': 8.844287872314453, 'B_start_to_H_end_ms': 8.846343994140625} B change% -19.259990982889896 faster 2
+  all-task B sums 704.7772171497345 674.9276173114777
+wide-long-repeat loss_match True
+  history 4096 n 2 {'fused_B_ms': 5.33350396156311, 'after_dx_B_ms': 6.127615928649902, 'H_ms': 1.3015039563179016, 'B_plus_H_ms': 7.429119884967804, 'B_start_to_H_end_ms': 7.75885009765625} B change% 14.88912303824479 faster 0
+  history 12288 n 2 {'fused_B_ms': 7.34771203994751, 'after_dx_B_ms': 5.7482240200042725, 'H_ms': 3.1319040060043335, 'B_plus_H_ms': 8.880128026008606, 'B_start_to_H_end_ms': 8.94207763671875} B change% -21.76851802639048 faster 2
+  all-task B sums 672.9031970500946 680.9733407497406
+Wide-long pooled selected {'4096': {'n': 4, 'median': {'fused_B_ms': 5.912575960159302, 'after_dx_B_ms': 6.1875200271606445, 'H_ms': 1.3066240549087524, 'B_plus_H_ms': 7.487488031387329, 'B_start_to_H_end_ms': 7.79266357421875}, 'B_change_percent': 4.6501570356811905}, '12288': {'n': 4, 'median': {'fused_B_ms': 7.278592109680176, 'after_dx_B_ms': 5.7482240200042725, 'H_ms': 3.100160002708435, 'B_plus_H_ms': 8.880128026008606, 'B_start_to_H_end_ms': 8.904693603515625}, 'B_change_percent': -21.025605867384545}}

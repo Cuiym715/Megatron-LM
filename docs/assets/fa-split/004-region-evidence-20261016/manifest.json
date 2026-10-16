@@ -1,0 +1,69 @@
+{
+  "created_at": "2026-10-16T15:02:54.031425+08:00",
+  "scope": "Isolated chunk attention, not stage B task or end-to-end training.",
+  "config": {
+    "chunk_size": 2048,
+    "q_heads": 16,
+    "head_dim": 128,
+    "dtype": "BF16",
+    "causal": true,
+    "dropout": 0,
+    "seed": 1234,
+    "repeats": 30,
+    "warmup": 10
+  },
+  "environment": {
+    "gpu": "NVIDIA L40",
+    "torch": "2.10.0a0+a36e1d39eb.nv26.01.42222806",
+    "cuda": "13.1",
+    "fa": "2.7.4.post1"
+  },
+  "timing_method": "CUDA events, unprofiled eager API, median and p10/p90 over repeats; forward and result combination excluded. Includes allocation-triggered device work, zeroing, conversion, GQA reduction, launch/submission gaps. Total measured directly, not sum of phase medians. Cases rotated each repeat.",
+  "additional_timing_note": "Per-phase CUDA event markers are included in total measurements and have instrumentation overhead. Forward and addition of region outputs are excluded. through_current is directly measured from total start to current dKV end, not stage dx readiness.",
+  "source_sha256": {
+    "megatron/core/kv_cache/fa_split.py": "789259765f04445923c7d9708a472e659ab6d14b85f70549eb89a27e5e1e513e",
+    "megatron/core/kv_cache/fa_split_build.py": "6c65289406b2d447930ec4bfa8b829fca7988e1b3deaad96d3ee860c2189de03",
+    "megatron/core/kv_cache/fa_split_src/LICENSE.cutlass": "6fc6ad419e4d26571a14c7c4d26b65345865c20dd8686ddcf5e8673f54d3d233",
+    "megatron/core/kv_cache/fa_split_src/LICENSE.flash-attention": "8c9ccb96c065e706135b6cbad279b721da6156e51f3a5f27c6b3329af9416d73",
+    "megatron/core/kv_cache/fa_split_src/THIRD_PARTY.md": "263b9c8b78c714603bf09b467cd76f6454b3627bd446d1528e10b39a3bec700f",
+    "megatron/core/kv_cache/fa_split_src/backward.cu": "a41546fc8232b5372f62dbb8fc83e33fd791ec048ce72c7a7115c9b36f38d9ab",
+    "megatron/core/kv_cache/fa_split_src/bindings.cpp": "355d089323a0b35120327f97275edfbf10a9195cd7230f158db7e58a0350293c",
+    "megatron/core/kv_cache/fa_split_src/flash_bwd_split.patch": "cf305e245ecde91a2f54659b2df254bf02a706445ebcb94ce7622f54ea23109f",
+    "megatron/core/kv_cache/fa_split_src/upstream.json": "163c55a7526f5f78f8d1924021e163e4cb7c58daf505c64d74e463cb6778057e",
+    "tools/measure_dspp_fa_regions.py": "61feaa510d4fa26f576881ed5a1d2afb207216502e234285e6409abe28c29f15"
+  },
+  "plot_script_sha256": "bc69c721df6386fd8717ee2fe17a70d79b28c8c66aed694e9a5e4ece3cb17649",
+  "stage_b_sources_unchanged": true,
+  "stage_b_source_archive": "../003-stage-b-20261016/source_snapshot.tar.gz",
+  "plan_sha256": "48adae2dc82c9a26c898b803e0fb1ae50a886251ade68a3ca31ffaac8361ceef",
+  "runtime": {
+    "image": "nvcr.io/nvidia/pytorch:26.01-py3",
+    "uid_gid": "1001:1001",
+    "mount": "/home/cuiym:/workspace",
+    "python": "/workspace/src/venvs/megatron/bin/python",
+    "host_driver": "550.120",
+    "env": {
+      "USER": "cuiym",
+      "LD_LIBRARY_PATH": "/usr/local/cuda/compat/lib.real:/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/nvidia/lib64",
+      "DSPP_FA_SPLIT_CACHE": "/workspace/.cache/dspp-fa-split",
+      "TORCHINDUCTOR_CACHE_DIR": "/tmp/dspp-split-inductor"
+    }
+  },
+  "commands": [
+    "python tools/measure_dspp_fa_regions.py --output docs/assets/fa-split/004-region-evidence-20261016 --warmup 10 --repeats 30",
+    "python tools/plot_dspp_fa_regions.py --evidence docs/assets/fa-split/004-region-evidence-20261016/evidence.json --font /tmp/NotoSansCJK-Regular.ttc"
+  ],
+  "raw_trace_note": "execution.pt.trace.json is retained locally and ignored by Git; evidence.json contains all plotted GPU events.",
+  "startup_failure": "First invocation failed at torch CUDA initialization before any timing. Repeated with explicit compatibility-library path; failure log retained.",
+  "files_sha256": {
+    "capture.log": "740583786f560ffd83d6852064b58e017dc3eebf900b8a6a502d08d904eab887",
+    "evidence.json": "e30e7a54fc0c07dabb7170f37add2a26ca8a49a285e920775bff9909fb0f3757",
+    "execution.pt.trace.json": "82b2ef8bf9fb07ee6f23501ea35bdc0c2b01775d08137c3fb7141aca6f1f68cc",
+    "gpu_region_execution.png": "7cf6435315d1df0bd45e74925094e42fc9ffca2138ca5991bebe52b5a92bbffa",
+    "gpu_region_execution.svg": "d673a2aa25db712598df8fa389c0723a0dd4c5a5919c9ae0233d125897a99d68",
+    "repeated_backward_timing.png": "39476aeff6282b6183d9c93b1fb162d3ca13574f82bd0bef8119234083c92e27",
+    "repeated_backward_timing.svg": "d4a49c1b10ee9293bb28a55688d93671b8939412fae2358fb2c503283f3ed8f2",
+    "scripts_snapshot.tar.gz": "09cc45bb1dfe62863e9cb68f22d99c60737125655a2fb7cf208ceea98482304a",
+    "startup-failure.log": "757a019897c72662122cf0620bfbe5dbcd5a0571c7c50aeba4592ef5f5952cb0"
+  }
+}

@@ -55,13 +55,65 @@ class _ItemLayout:
 class DsppSequenceKVState:
     """Iteration-scoped per-layer, per-logical-sequence K/V state."""
 
-    def __init__(self, *, validate_runtime: bool = False) -> None:
+    def __init__(self, *, validate_runtime: bool = False,
+                 split_attention_backward: bool = False,
+                 history_dkv_after_dx: bool = False) -> None:
         self._entries: Dict[Tuple[int, int], _SequenceLayerEntry] = {}
         self._current_meta: Optional[DsppMicrobatchMeta] = None
         self._prepared_cu_seqlens: Dict[
             Tuple[int, torch.device], Tuple[torch.Tensor, torch.Tensor]
         ] = {}
         self.validate_runtime = bool(validate_runtime)
+        # Original split mode runs inside attention backward. Optional after-dx
+        # mode holds history states until a separate, immediately following H.
+        self.split_attention_backward = bool(split_attention_backward)
+        if history_dkv_after_dx and not split_attention_backward:
+            raise ValueError("history dKV after dx requires split attention backward")
+        self.history_dkv_after_dx = bool(history_dkv_after_dx)
+        self._history_task_id = None
+        self._history_task_ready = False
+        self._history_jobs = []
+
+    @property
+    def pending_history_count(self) -> int:
+        return len(self._history_jobs)
+
+    def begin_backward_task(self, microbatch_id: int) -> None:
+        """Own one B/H pair; no next backward until its H has been drained."""
+        if not self.history_dkv_after_dx:
+            raise RuntimeError("after-dx task mode is not enabled")
+        if self._history_task_id is not None or self._history_jobs:
+            raise RuntimeError("previous history task has not completed")
+        self._history_task_id = microbatch_id
+        self._history_task_ready = False
+
+    def mark_dx_ready(self, microbatch_id: int) -> None:
+        """Called only after the complete stage backward has returned."""
+        if self._history_task_id != microbatch_id or self._history_task_ready:
+            raise RuntimeError("invalid or duplicate dx-ready boundary")
+        self._history_task_ready = True
+
+    def run_history_task(self, microbatch_id: int) -> int:
+        """Execute all layers' history dKV immediately after dx publication.
+
+        This state owns tensor references until kernels and routing have been
+        submitted on the same stream used for B. No autograd graph is retained.
+        A failed task stays blocked rather than being silently retried.
+        """
+        if self._history_task_id != microbatch_id or not self._history_task_ready:
+            raise RuntimeError("history task requires its completed stage dx")
+        self._history_task_ready = False
+        from .fa_split import backward_dkv
+        count = len(self._history_jobs)
+        for split_state, layer_idx, layouts, current_shape in self._history_jobs:
+            dk, dv = backward_dkv(split_state, "history", compact=True)
+            self._route_key_value_grads(
+                layer_idx, layouts, dk, dv, current_shape,
+                route_history=True, return_current=False, compact_region="history",
+            )
+        self._history_jobs.clear()
+        self._history_task_id = None
+        return count
 
     def __bool__(self) -> bool:
         # An empty state is still an active cache for the first segment.
@@ -234,10 +286,20 @@ class DsppSequenceKVState:
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Route history gradients backward and return current-segment gradients."""
 
+        return self._route_key_value_grads(
+            layer_idx, layouts, assembled_key_grad, assembled_value_grad,
+            current_shape, route_history=True, return_current=True,
+        )
+
+    def _route_key_value_grads(
+        self, layer_idx, layouts, assembled_key_grad, assembled_value_grad,
+        current_shape, *, route_history, return_current, compact_region=None,
+    ):
+
         direct_current = bool(layouts) and all(
             not layout.history and layout.item.is_last_segment for layout in layouts
         )
-        if direct_current:
+        if direct_current and return_current:
             if (
                 assembled_key_grad.shape != current_shape
                 or assembled_value_grad.shape != current_shape
@@ -251,7 +313,7 @@ class DsppSequenceKVState:
             return assembled_key_grad, assembled_value_grad
 
         single_item = len(layouts) == 1
-        if not single_item:
+        if return_current and not single_item:
             current_key_grad = assembled_key_grad.new_empty(current_shape)
             current_value_grad = assembled_value_grad.new_empty(current_shape)
         assembled_offset = 0
@@ -261,24 +323,28 @@ class DsppSequenceKVState:
             key = self._entry_key(layer_idx, item.sequence_id)
             entry = self._entries.get(key)
             for segment_id, segment_length in layout.history:
+                if compact_region == "current":
+                    continue
                 end = assembled_offset + segment_length
-                if entry is None:
-                    raise RuntimeError(
-                        "KV state disappeared before history gradient routing"
+                if route_history:
+                    if entry is None or (not return_current and not any(
+                        segment.segment_id == segment_id for segment in entry.segments
+                    )):
+                        raise RuntimeError("history gradient consumer is no longer retained")
+                    self._accumulate(
+                        entry.pending_key_grads, segment_id,
+                        assembled_key_grad[assembled_offset:end],
                     )
-                self._accumulate(
-                    entry.pending_key_grads,
-                    segment_id,
-                    assembled_key_grad[assembled_offset:end],
-                )
-                self._accumulate(
-                    entry.pending_value_grads,
-                    segment_id,
-                    assembled_value_grad[assembled_offset:end],
-                )
+                    self._accumulate(
+                        entry.pending_value_grads, segment_id,
+                        assembled_value_grad[assembled_offset:end],
+                    )
                 assembled_offset = end
 
-            assembled_end = assembled_offset + item.token_length
+            assembled_end = assembled_offset + (0 if compact_region == "history" else item.token_length)
+            if not return_current:
+                assembled_offset = assembled_end
+                continue
             key_grad = assembled_key_grad[assembled_offset:assembled_end]
             value_grad = assembled_value_grad[assembled_offset:assembled_end]
             if not item.is_last_segment:
@@ -323,6 +389,8 @@ class DsppSequenceKVState:
 
         if assembled_offset != assembled_key_grad.size(0):
             raise RuntimeError("assembled K/V gradient layout was not fully consumed")
+        if not return_current:
+            return None
         if current_key_grad.shape != current_shape:
             raise RuntimeError(
                 "current K/V gradient shape does not match physical task"
@@ -330,6 +398,8 @@ class DsppSequenceKVState:
         return current_key_grad, current_value_grad
 
     def clear(self) -> None:
+        if self._history_task_id is not None or self._history_jobs:
+            raise RuntimeError("cannot clear an unfinished history task")
         self._entries.clear()
         self._current_meta = None
         self._prepared_cu_seqlens.clear()
@@ -342,6 +412,8 @@ class DsppSequenceKVState:
         self._prepared_cu_seqlens.clear()
 
     def assert_empty(self) -> None:
+        if self._history_task_id is not None or self._history_jobs:
+            raise RuntimeError("DSPP history task has not completed")
         if self._entries:
             summary = {
                 key: {
@@ -385,6 +457,14 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
             raise ValueError(
                 "query and K/V sequence, batch, and head dimensions must match"
             )
+        ctx.split_attention_backward = state.split_attention_backward
+        ctx.history_dkv_after_dx = state.history_dkv_after_dx
+        if ctx.split_attention_backward:
+            # Reject unsupported configurations before mutating retained KV state.
+            if query.dtype != torch.bfloat16 or query.size(-1) != 128:
+                raise ValueError("DSPP split attention backward requires BF16 and head dimension 128")
+            if current_key.size(2) <= 0 or query.size(2) % current_key.size(2):
+                raise ValueError("DSPP split attention backward requires Hq divisible by Hkv")
         valid_tokens = meta.valid_token_count
         query_valid = query[:valid_tokens, 0].contiguous()
         current_key_valid = current_key[:valid_tokens, 0].contiguous()
@@ -480,44 +560,79 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
                 output_grad_valid, (0, query.size(-1) - output_grad_valid.size(-1))
             )
         output_grad_valid = output_grad_valid.contiguous()
-        query_grad = torch.empty_like(query)
-        key_grad = torch.empty_like(key)
-        value_grad = torch.empty_like(value)
-        _wrapped_flash_attn_varlen_backward(
-            output_grad_valid,
-            query,
-            key,
-            value,
-            output,
-            softmax_lse,
-            query_grad,
-            key_grad,
-            value_grad,
-            cu_q,
-            cu_k,
-            ctx.meta.max_seqlen_q,
-            ctx.meta.max_seqlen_k,
-            0.0,
-            ctx.scale,
-            True,
-            -1,
-            -1,
-            0.0,
-            None,
-            False,
-            rng_state,
-            False,
-        )
+        if ctx.history_dkv_after_dx and (
+            ctx.state._history_task_id != ctx.meta.microbatch_id
+            or ctx.state._history_task_ready
+        ):
+            raise RuntimeError("after-dx backward requires its active physical task")
+        if ctx.split_attention_backward:
+            from .fa_split import prepare_backward, backward_dq, backward_dkv, backward_dq_current
+
+            # Frozen forward metadata: never consult the state's currently
+            # selected microbatch during backward. Host tuples avoid a CUDA
+            # metadata round trip for the per-sequence prototype dispatcher.
+            split_inputs = (query, key, value, output, output_grad_valid, softmax_lse)
+            if ctx.history_dkv_after_dx:
+                split_inputs = tuple(t.detach() for t in split_inputs)
+            split_state = prepare_backward(
+                *split_inputs,
+                softmax_scale=ctx.scale,
+                cu_seqlens_q=ctx.meta.cu_seqlens_q,
+                cu_seqlens_k=ctx.meta.cu_seqlens_k,
+            )
+            if ctx.history_dkv_after_dx:
+                query_grad, key_grad, value_grad = backward_dq_current(split_state)
+                if any(layout.history for layout in ctx.layouts):
+                    ctx.state._history_jobs.append(
+                        (split_state, ctx.layer_idx, ctx.layouts, ctx.current_shape)
+                    )
+            else:
+                query_grad = backward_dq(split_state)
+                key_grad, value_grad = backward_dkv(split_state, "current")
+                history_key_grad, history_value_grad = backward_dkv(split_state, "history")
+                key_grad.add_(history_key_grad)
+                value_grad.add_(history_value_grad)
+        else:
+            query_grad = torch.empty_like(query)
+            key_grad = torch.empty_like(key)
+            value_grad = torch.empty_like(value)
+            _wrapped_flash_attn_varlen_backward(
+                output_grad_valid,
+                query,
+                key,
+                value,
+                output,
+                softmax_lse,
+                query_grad,
+                key_grad,
+                value_grad,
+                cu_q,
+                cu_k,
+                ctx.meta.max_seqlen_q,
+                ctx.meta.max_seqlen_k,
+                0.0,
+                ctx.scale,
+                True,
+                -1,
+                -1,
+                0.0,
+                None,
+                False,
+                rng_state,
+                False,
+            )
         query_grad = query_grad[..., : ctx.original_head_dim]
         key_grad = key_grad[..., : ctx.original_head_dim]
         value_grad = value_grad[..., : ctx.original_head_dim]
-        current_key_grad, current_value_grad = ctx.state.distribute_key_value_grads(
-            ctx.layer_idx,
-            ctx.layouts,
-            key_grad,
-            value_grad,
-            ctx.current_shape,
-        )
+        if ctx.history_dkv_after_dx:
+            current_key_grad, current_value_grad = ctx.state._route_key_value_grads(
+                ctx.layer_idx, ctx.layouts, key_grad, value_grad, ctx.current_shape,
+                route_history=False, return_current=True, compact_region="current",
+            )
+        else:
+            current_key_grad, current_value_grad = ctx.state.distribute_key_value_grads(
+                ctx.layer_idx, ctx.layouts, key_grad, value_grad, ctx.current_shape,
+            )
         if ctx.valid_tokens == ctx.query_physical_shape[0]:
             query_grad = query_grad.unsqueeze(1)
             current_key_grad = current_key_grad.unsqueeze(1)

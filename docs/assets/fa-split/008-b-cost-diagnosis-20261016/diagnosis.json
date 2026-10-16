@@ -1,0 +1,335 @@
+{
+  "scope": "Cause diagnosis, not a new clean stage-B timing result. Production source unchanged.",
+  "training_profile": {
+    "fused": {
+      "tasks": 2,
+      "B_cpu_median_us": 9768.372,
+      "attention_cpu_median_us": 1523.6075,
+      "B_gpu_kernel_sum_median_us": 611.8455,
+      "B_gpu_events_per_task": [
+        37,
+        37
+      ],
+      "main_kernel_us": [
+        [
+          391.876
+        ],
+        [
+          390.116
+        ]
+      ]
+    },
+    "after_dx": {
+      "tasks": 2,
+      "B_cpu_median_us": 10957.935,
+      "attention_cpu_median_us": 2699.4605,
+      "B_gpu_kernel_sum_median_us": 623.5754999999999,
+      "B_gpu_events_per_task": [
+        40,
+        40
+      ],
+      "main_kernel_us": [
+        [
+          283.939,
+          124.385
+        ],
+        [
+          284.098,
+          124.801
+        ]
+      ]
+    }
+  },
+  "isolated_initial": {
+    "scope": "Attention-only, Q2048/K6144/Hq4/Hkv2/d128/BF16; NOT complete B.",
+    "method": "Three outer-boundary samples; profiler separate. Graph is an execution-cost diagnostic, not production training.",
+    "correctness_relative_l2": {
+      "split_B": [
+        2.1181325791985728e-05,
+        0.0,
+        0.0
+      ],
+      "native_B": [
+        2.1212637875578366e-05,
+        0.0,
+        0.0
+      ]
+    },
+    "eager": {
+      "fused": {
+        "median_us": 496.63999676704407,
+        "samples_us": [
+          502.78401374816895,
+          496.63999676704407,
+          489.47200179100037
+        ]
+      },
+      "split_B": {
+        "median_us": 548.8640069961548,
+        "samples_us": [
+          557.0560097694397,
+          531.4559936523438,
+          548.8640069961548
+        ]
+      },
+      "native_B": {
+        "median_us": 447.488009929657,
+        "samples_us": [
+          447.488009929657,
+          445.43999433517456,
+          453.6319971084595
+        ]
+      },
+      "prepare": {
+        "median_us": 100.41599720716476,
+        "samples_us": [
+          100.41599720716476,
+          99.32799637317657,
+          105.47199845314026
+        ]
+      },
+      "dq": {
+        "median_us": 316.4159953594208,
+        "samples_us": [
+          316.4159953594208,
+          320.44801115989685,
+          315.39198756217957
+        ]
+      },
+      "current": {
+        "median_us": 162.81600296497345,
+        "samples_us": [
+          162.81600296497345,
+          162.81600296497345,
+          163.83999586105347
+        ]
+      },
+      "H": {
+        "median_us": 287.7439856529236,
+        "samples_us": [
+          287.7439856529236,
+          287.7439856529236,
+          287.7439856529236
+        ]
+      }
+    },
+    "graph": {
+      "fused": {
+        "median_us": 405.5039882659912,
+        "samples_us": [
+          406.5279960632324,
+          405.5039882659912,
+          404.4800102710724
+        ]
+      },
+      "split_B": {
+        "median_us": 421.88799381256104,
+        "samples_us": [
+          423.93600940704346,
+          421.88799381256104,
+          421.88799381256104
+        ]
+      },
+      "native_B": {
+        "median_us": 423.93600940704346,
+        "samples_us": [
+          423.93600940704346,
+          422.91200160980225,
+          423.93600940704346
+        ]
+      },
+      "prepare": {
+        "median_us": 13.311999849975109,
+        "samples_us": [
+          13.311999849975109,
+          11.264000087976456,
+          13.311999849975109
+        ]
+      },
+      "dq": {
+        "median_us": 288.7679934501648,
+        "samples_us": [
+          289.792001247406,
+          288.7679934501648,
+          287.7439856529236
+        ]
+      },
+      "current": {
+        "median_us": 136.19199395179749,
+        "samples_us": [
+          138.2399946451187,
+          136.19199395179749,
+          135.0719928741455
+        ]
+      },
+      "H": {
+        "median_us": 260.09601354599,
+        "samples_us": [
+          260.09601354599,
+          260.09601354599,
+          260.09601354599
+        ]
+      }
+    }
+  },
+  "isolated_ablation": {
+    "scope": "Attention-only, Q2048/K6144/Hq4/Hkv2/d128/BF16; NOT complete B.",
+    "method": "Three outer-boundary samples; profiler separate. Graph is an execution-cost diagnostic, not production training.",
+    "correctness_relative_l2": {
+      "split_B": [
+        2.4836577722453512e-05,
+        0.0,
+        0.0
+      ],
+      "native_B": [
+        2.696118644962553e-05,
+        0.0,
+        0.0
+      ],
+      "combined_native_B": [
+        2.5770435968297534e-05,
+        0.0,
+        0.0
+      ]
+    },
+    "eager": {
+      "fused": {
+        "median_us": 546.8159914016724,
+        "samples_us": [
+          570.3679919242859,
+          546.8159914016724,
+          543.7440276145935
+        ]
+      },
+      "split_B": {
+        "median_us": 624.6399879455566,
+        "samples_us": [
+          654.3359756469727,
+          593.9199924468994,
+          624.6399879455566
+        ]
+      },
+      "native_B": {
+        "median_us": 462.8480076789856,
+        "samples_us": [
+          462.8480076789856,
+          461.8239998817444,
+          474.11200404167175
+        ]
+      },
+      "prepare": {
+        "median_us": 157.69599378108978,
+        "samples_us": [
+          157.69599378108978,
+          152.5759994983673,
+          166.9120043516159
+        ]
+      },
+      "dq": {
+        "median_us": 331.7759931087494,
+        "samples_us": [
+          331.7759931087494,
+          330.7519853115082,
+          331.7759931087494
+        ]
+      },
+      "current": {
+        "median_us": 174.0799993276596,
+        "samples_us": [
+          174.0799993276596,
+          174.0799993276596,
+          176.12800002098083
+        ]
+      },
+      "H": {
+        "median_us": 300.03198981285095,
+        "samples_us": [
+          301.05599761009216,
+          300.03198981285095,
+          297.9840040206909
+        ]
+      },
+      "combined_native_B": {
+        "median_us": 435.2000057697296,
+        "samples_us": [
+          435.2000057697296,
+          443.3920085430145,
+          435.2000057697296
+        ]
+      }
+    },
+    "graph": {
+      "fused": {
+        "median_us": 407.55200386047363,
+        "samples_us": [
+          409.59998965263367,
+          407.55200386047363,
+          406.5279960632324
+        ]
+      },
+      "split_B": {
+        "median_us": 424.9599874019623,
+        "samples_us": [
+          428.0320107936859,
+          424.9599874019623,
+          424.9599874019623
+        ]
+      },
+      "native_B": {
+        "median_us": 425.9839951992035,
+        "samples_us": [
+          427.0080029964447,
+          425.9839951992035,
+          423.93600940704346
+        ]
+      },
+      "prepare": {
+        "median_us": 18.432000651955605,
+        "samples_us": [
+          19.45599913597107,
+          18.432000651955605,
+          17.40800030529499
+        ]
+      },
+      "dq": {
+        "median_us": 290.8160090446472,
+        "samples_us": [
+          290.8160090446472,
+          290.8160090446472,
+          290.8160090446472
+        ]
+      },
+      "current": {
+        "median_us": 139.26400244235992,
+        "samples_us": [
+          140.28799533843994,
+          139.26400244235992,
+          138.2399946451187
+        ]
+      },
+      "H": {
+        "median_us": 262.14399933815,
+        "samples_us": [
+          265.21599292755127,
+          262.14399933815,
+          261.1199915409088
+        ]
+      },
+      "combined_native_B": {
+        "median_us": 386.04798913002014,
+        "samples_us": [
+          387.07199692726135,
+          386.04798913002014,
+          385.0240111351013
+        ]
+      }
+    }
+  },
+  "limitations": [
+    "Profiler changes host timings; do not subtract profiled GPU sums from clean task times to assign exact overhead.",
+    "CUDA Graph is a diagnostic removing repeated host submission, not production PP graph support.",
+    "Combined probe only validates single-sequence, aligned Q2048/history4096, Hq4/Hkv2, d128 BF16. No whole-stage correctness or timing claim.",
+    "GPU resource allocation is observed; barriers/loads/shared-memory effects are not individually ablated.",
+    "Three samples per isolated case; one training run per mode with two warmup iterations; no further clean B repetition."
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "created_at": "2026-10-16T14:49:57.604893+08:00",
+  "scope": "Isolated FA2 split backward: region/GQA/varlen correctness, not production integration or performance.",
+  "environment": {
+    "gpu": "NVIDIA L40 (SM89)",
+    "torch": "2.10.0a0+a36e1d39eb.nv26.01.42222806",
+    "cuda": "13.1",
+    "flash_attention": "2.7.4.post1"
+  },
+  "git_head": "abd39e566b49e06dce32df5f218fa7c1ead7dddd",
+  "code_identity_note": "HEAD alone does not contain the uncommitted split implementation. Source hashes and source_snapshot.tar.gz identify this stage B result.",
+  "extension_build": "e10d6e9353428102",
+  "source_sha256": {
+    "megatron/core/kv_cache/fa_split.py": "789259765f04445923c7d9708a472e659ab6d14b85f70549eb89a27e5e1e513e",
+    "megatron/core/kv_cache/fa_split_build.py": "6c65289406b2d447930ec4bfa8b829fca7988e1b3deaad96d3ee860c2189de03",
+    "tests/unit_tests/dspp/test_fa_split.py": "beecb34fb5001b9e987b3e4cdfc81ec1019815d2ae25947c419d6e03179910ae",
+    "tests/unit_tests/dspp/test_fa_split_regions.py": "a0c15a73b5a4516aedd8fe1e878bca44df589ca42897371798f1a299447ffa74",
+    "tools/build_dspp_fa_split.py": "4c53dc5e1c0b1f33350c0901d506ea29373785a0991b540a7360a0616e68e515",
+    "megatron/core/kv_cache/fa_split_src/LICENSE.cutlass": "6fc6ad419e4d26571a14c7c4d26b65345865c20dd8686ddcf5e8673f54d3d233",
+    "megatron/core/kv_cache/fa_split_src/LICENSE.flash-attention": "8c9ccb96c065e706135b6cbad279b721da6156e51f3a5f27c6b3329af9416d73",
+    "megatron/core/kv_cache/fa_split_src/THIRD_PARTY.md": "263b9c8b78c714603bf09b467cd76f6454b3627bd446d1528e10b39a3bec700f",
+    "megatron/core/kv_cache/fa_split_src/backward.cu": "a41546fc8232b5372f62dbb8fc83e33fd791ec048ce72c7a7115c9b36f38d9ab",
+    "megatron/core/kv_cache/fa_split_src/bindings.cpp": "355d089323a0b35120327f97275edfbf10a9195cd7230f158db7e58a0350293c",
+    "megatron/core/kv_cache/fa_split_src/flash_bwd_split.patch": "cf305e245ecde91a2f54659b2df254bf02a706445ebcb94ce7622f54ea23109f",
+    "megatron/core/kv_cache/fa_split_src/upstream.json": "163c55a7526f5f78f8d1924021e163e4cb7c58daf505c64d74e463cb6778057e"
+  },
+  "plan_sha256": "32591581cf53ec43a83300a3398df8b60fa63a152665646d0da3eb6af065af0a",
+  "commands": {
+    "build": "python tools/build_dspp_fa_split.py",
+    "tests": "python -m pytest -q -s -o cache_dir=/tmp/dspp-stage-b-pytest tests/unit_tests/dspp/test_fa_split.py tests/unit_tests/dspp/test_fa_split_regions.py tests/unit_tests/dspp/test_packed_attention.py tests/unit_tests/dspp/test_kv_state.py",
+    "memcheck": "compute-sanitizer --tool memcheck --error-exitcode 99 --kernel-name kns=dspp_split_detail python -m pytest -q tests/unit_tests/dspp/test_fa_split_regions.py -k 'regions_gqa_fused or varlen_regions or repeat_order'",
+    "initcheck": "compute-sanitizer --tool initcheck --error-exitcode 99 python -m pytest -q tests/unit_tests/dspp/test_fa_split_regions.py -k 'varlen_regions and cuda'",
+    "racecheck": "compute-sanitizer --tool racecheck --error-exitcode 99 --kernel-name kns=dspp_split_detail python -m pytest -q tests/unit_tests/dspp/test_fa_split_regions.py -k region_repeat_order"
+  },
+  "runtime": {
+    "image": "nvcr.io/nvidia/pytorch:26.01-py3",
+    "mount": "/home/cuiym:/workspace",
+    "python": "/workspace/src/venvs/megatron/bin/python",
+    "uid_gid": "1001:1001",
+    "env": {
+      "USER": "cuiym",
+      "DSPP_FA_SPLIT_CACHE": "/workspace/.cache/dspp-fa-split",
+      "TORCHINDUCTOR_CACHE_DIR": "/tmp/dspp-split-inductor",
+      "MAX_JOBS": "2"
+    }
+  },
+  "raw_trace_note": "The 9 .pt.trace.json files are local, ignored by Git, from the final 99-test run. validation.json retains launch counts/grids. No performance comparison was made.",
+  "files_sha256": {
+    "build.log": "1ca7fe228ba4f8c45e80f0f75e9eac1ec35c33ed189b0ad9b0cfdaa16b0cad5d",
+    "initcheck.log": "2b358e49fe81f240b4aa19c8d89f6e6576bf798e423de97a450c18bc96fc7b12",
+    "initial-tests.log": "b8e699024adf4eadca8cb9462ca48e74f2c1dcaf6a81937c9156d630564fd005",
+    "intermediate-tests.log": "8ba53a6722ea5b87c4955199dc291127a5077f23653b32cffff504aee8b29894",
+    "memcheck.log": "625c454c798b944db2646f283666d73fd560dd0afe3010ba36148cb6eb46e72f",
+    "q129-k1025-all.pt.trace.json": "468ce7dbdede7c17696072c349b24e2e26484389cf76d889fa8d559bf8a00691",
+    "q129-k1025-current.pt.trace.json": "a6ad445c442e2574b241ac65b95d742ac0204b84e5a8832e4fcff0c3e341006a",
+    "q129-k1025-history.pt.trace.json": "283f59417b65298cd8f90335aa2ed9860fe2324499b00b7e1288788d3dc06ee5",
+    "q129-k1026-all.pt.trace.json": "ebc9d9b20092fe8d0fb29cdf7b864f2b06bafbd79ee8c3d313d31f6967f643b3",
+    "q129-k1026-current.pt.trace.json": "bdb2af78b7233036d14199a3a27993c64e3051dbbc7884306150b81fd8df3fa1",
+    "q129-k1026-history.pt.trace.json": "dad61de82001616ab2324c266bf7eb2a7d0d85110371167a83c5843f65f8548a",
+    "q17-k17-all.pt.trace.json": "20e89df1208c62afafc2e75b50939dea6a596184d6e16815a2f0df19043ac64b",
+    "q17-k17-current.pt.trace.json": "a6a3e6dcda52947a4eed4b2db5d46acccf44514e7348a46acd8c9fe694f6318d",
+    "q17-k17-history.pt.trace.json": "ca185337426d523bdbffc925c7ed01eae75bc0a2a9132d6a793412d40339177c",
+    "racecheck.log": "c40a9513bbf2846c258167911438464871bcab78c8978ceee4044029a08a7087",
+    "source_snapshot.tar.gz": "3f770fa9c424f560ad214f1363d6adcc30b0bfdcf77ea58c87ee5cffc2eb89ec",
+    "unit-tests.log": "e0ab75f54bff1a97cbd4731b9c0b7f2b3a16b6f609631876d382d0b1bf4f7efb",
+    "validation.json": "19a9c1021d16e73b76f9ba84401ab100544a59672443a9fc9e4bf5218e207b79"
+  }
+}

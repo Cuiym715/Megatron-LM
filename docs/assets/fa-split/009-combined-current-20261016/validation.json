@@ -1,0 +1,114 @@
+{
+  "unit_tests": 212,
+  "unit_skipped": 0,
+  "memcheck": {
+    "tests": 27,
+    "deselected": 11,
+    "errors": 0,
+    "kernel_filter": "kns=dspp_split_detail"
+  },
+  "pp": {
+    "4": {
+      "records": 9,
+      "stage_dx_count": 165,
+      "gradient_tensor_count": 117,
+      "history_tasks": 114,
+      "drained_states": 36,
+      "max_relative_l2": {
+        "gradient_checks": 0.012262674247041274,
+        "stage_dx_checks": 0.011855912781370158
+      },
+      "tolerance": {
+        "atol": 0.004,
+        "rtol": 0.01,
+        "relative_l2_max": 0.02,
+        "initial_parameters": "exact"
+      }
+    },
+    "2": {
+      "records": 9,
+      "stage_dx_count": 165,
+      "gradient_tensor_count": 117,
+      "history_tasks": 114,
+      "drained_states": 36,
+      "max_relative_l2": {
+        "gradient_checks": 0.0071514758943306824,
+        "stage_dx_checks": 0.006743962243352173
+      },
+      "tolerance": {
+        "atol": 0.004,
+        "rtol": 0.01,
+        "relative_l2_max": 0.02,
+        "initial_parameters": "exact"
+      }
+    },
+    "1": {
+      "records": 9,
+      "stage_dx_count": 165,
+      "gradient_tensor_count": 117,
+      "history_tasks": 114,
+      "drained_states": 36,
+      "max_relative_l2": {
+        "gradient_checks": 8.202841362913305e-10,
+        "stage_dx_checks": 0
+      },
+      "tolerance": {
+        "atol": 0.004,
+        "rtol": 0.01,
+        "relative_l2_max": 0.02,
+        "initial_parameters": "exact"
+      }
+    }
+  },
+  "measurement_source_hashes_verified": true,
+  "highlighted_timing": {
+    "stage": 1,
+    "model_chunk": 0,
+    "layout_q_history": [
+      [
+        2048,
+        4096
+      ]
+    ],
+    "count_per_mode": 4,
+    "median_ms": {
+      "fused_B_ms": 5.856256008148193,
+      "after_dx_B_ms": 6.154239892959595,
+      "H_ms": 0.6446079909801483,
+      "B_plus_H_ms": 6.821375876665115
+    },
+    "min_max_ms": {
+      "fused_B_ms": [
+        5.833727836608887,
+        5.87775993347168
+      ],
+      "after_dx_B_ms": [
+        5.697535991668701,
+        6.304768085479736
+      ],
+      "H_ms": [
+        0.5888000130653381,
+        0.6799359917640686
+      ],
+      "B_plus_H_ms": [
+        6.286336004734039,
+        6.93964809179306
+      ]
+    },
+    "after_dx_B_vs_fused_fraction": 0.05088300176713534,
+    "run_medians": {
+      "measurement": {
+        "fused_B_ms": 5.856256008148193,
+        "after_dx_B_ms": 6.001152038574219,
+        "H_ms": 0.611840009689331,
+        "B_plus_H_ms": 6.61299204826355
+      },
+      "measurement-reverse": {
+        "fused_B_ms": 5.855743885040283,
+        "after_dx_B_ms": 6.154239892959595,
+        "H_ms": 0.6671359837055206,
+        "B_plus_H_ms": 6.821375876665115
+      }
+    }
+  }
+}

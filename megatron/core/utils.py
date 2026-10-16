@@ -306,4 +306,6 @@ def cuda_sync_and_record(*, sync_level):
 
 
 def cuda_sync_and_record_at_backward(x, *, sync_level):
+    if sync_level > get_args().kaimm_cuda_synchronize_level:
+        return x
     return SyncAtBackwardFunction.apply(x, sync_level)

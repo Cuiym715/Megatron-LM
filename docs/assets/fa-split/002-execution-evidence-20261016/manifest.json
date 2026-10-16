@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-16",
+  "timezone": "Asia/Shanghai",
+  "scope": "Actual GPU kernel launches from isolated attention; not stage F/B/W, deferred history dKV, or a speed benchmark.",
+  "config": {
+    "length": 2048,
+    "heads": 16,
+    "head_dim": 128,
+    "dtype": "BF16",
+    "causal": true,
+    "dropout": 0,
+    "seed": 1234
+  },
+  "environment": {
+    "gpu": "NVIDIA L40",
+    "torch": "2.10.0a0+a36e1d39eb.nv26.01.42222806",
+    "cuda": "13.1",
+    "flash_attention": "2.7.4.post1"
+  },
+  "source_sha256": {
+    "megatron/core/kv_cache/fa_split.py": "6e4dbb0e971af45c3e8b1be1eba2febe8099ee65729d4e7bc35a6fe1197b7199",
+    "megatron/core/kv_cache/fa_split_build.py": "6c65289406b2d447930ec4bfa8b829fca7988e1b3deaad96d3ee860c2189de03",
+    "megatron/core/kv_cache/fa_split_src/LICENSE.cutlass": "6fc6ad419e4d26571a14c7c4d26b65345865c20dd8686ddcf5e8673f54d3d233",
+    "megatron/core/kv_cache/fa_split_src/LICENSE.flash-attention": "8c9ccb96c065e706135b6cbad279b721da6156e51f3a5f27c6b3329af9416d73",
+    "megatron/core/kv_cache/fa_split_src/THIRD_PARTY.md": "065b8d222b3029ca7ff909c13e21be567ac06f5915025ee5de09cbbbae702ddf",
+    "megatron/core/kv_cache/fa_split_src/backward.cu": "0871515400981f941b0a39422abd5477b7024e798236bb96c03dfb1da864ff57",
+    "megatron/core/kv_cache/fa_split_src/bindings.cpp": "bcaea7a374d8277d8c277f11b00af46aaef42bdeb91b2d2faf33173bb78bd985",
+    "megatron/core/kv_cache/fa_split_src/flash_bwd_split.patch": "cf305e245ecde91a2f54659b2df254bf02a706445ebcb94ce7622f54ea23109f",
+    "megatron/core/kv_cache/fa_split_src/upstream.json": "163c55a7526f5f78f8d1924021e163e4cb7c58daf505c64d74e463cb6778057e",
+    "tools/trace_dspp_fa_split.py": "d9727813280e432f93c3709e123974886a16448a5f57ad01c9598c13f3e685d6"
+  },
+  "plot_script_sha256": "bc70ad5748b98796f97add9366b80552d38d32bd03c9e9dc9eb2e76b5ebd1d56",
+  "validation_input": {
+    "path": "docs/assets/fa-split/001-stage-a-20261016/validation.json",
+    "sha256": "616ad088c76d7bebe5064e995e807173e8e9f530b0b6c14d991128b339b45e2a"
+  },
+  "commands": [
+    "python tools/trace_dspp_fa_split.py --output docs/assets/fa-split/002-execution-evidence-20261016 --length 2048 --heads 16",
+    "python tools/plot_dspp_fa_split.py --evidence docs/assets/fa-split/002-execution-evidence-20261016/evidence.json --validation docs/assets/fa-split/001-stage-a-20261016/validation.json --font /tmp/NotoSansCJK-Regular.ttc"
+  ],
+  "raw_trace_note": "execution.pt.trace.json is local and ignored by Git. evidence.json retains GPU events used in the plot; rerunning produces a new trace with different timestamps.",
+  "files_sha256": {
+    "capture.log": "8435155d4230f4b131dea8b4b5cc14089c3b6c4edf96d11bc7d7defbbc013b69",
+    "evidence.json": "2bebf88707123be2eaa7fc6f0e30cc8568f28b1a5cce6bd4af35424e559be40b",
+    "execution.pt.trace.json": "25d47b7818385963da791381b02cd549cc1676364f6e02ed3b6d54cde57f5847",
+    "gpu_execution.png": "ac89bc4eee257ead0b54e61d27729a65876a582545401daf98df7a447e5a5076",
+    "gpu_execution.svg": "2645cb3a37e52106ef7e680dcf3a4e1b9008033a65db48fd16cd81ce837fecf5",
+    "gradient_accuracy.png": "016e042b9da79007e4ebd6433d0063c5df9af8b57135cce1def24e4d4e001e0f",
+    "gradient_accuracy.svg": "fc7fc49afbe2eda639e04d7ec66fa98ab0619fb0f9cce082d856345eeb5fdf30"
+  }
+}

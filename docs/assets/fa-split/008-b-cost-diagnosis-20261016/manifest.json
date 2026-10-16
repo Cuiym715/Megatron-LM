@@ -1,0 +1,208 @@
+{
+  "created_utc": "2026-10-16T09:06:52.300250+00:00",
+  "git_head": "abd39e566b49e06dce32df5f218fa7c1ead7dddd",
+  "environment": {
+    "image": "nvcr.io/nvidia/pytorch:26.01-py3",
+    "gpu": "3 x NVIDIA L40 (SM89)",
+    "host_driver": "550.120",
+    "torch": "2.10.0a0+a36e1d39eb.nv26.01.42222806",
+    "cuda_toolkit": "13.1",
+    "flash_attn": "2.7.4.post1",
+    "python": "/workspace/src/venvs/megatron/bin/python (3.12)",
+    "container_user": "1001:1001",
+    "mount": "/home/cuiym:/workspace",
+    "extension_cache_key": "6b7a77a01a54ad92"
+  },
+  "production_source_unchanged_from_007": true,
+  "production_source_hashes": {
+    "megatron/profile_utils.py": "1d2c3a5319d643f0ff20f4e639465936fb861d1ad291df7af809a5b632acd3d3",
+    "megatron/core/utils.py": "288977b84558394506b8892dbbd22fc3540269a736d1a0639c9dab6e21ef910d",
+    "megatron/initialize.py": "2b964d6547ff64ae38cbd5b5d5baa30526f0d5c97ce2639de5b3d90af320deee",
+    "megatron/arguments.py": "f5d32d856821357648e0fe68634d220649b7fb8a031906a0767912a54066f4fe",
+    "megatron/core/pipeline_parallel/dspp_timeline.py": "0da8f40344ed860ca7b529fae6ee6d44c275deb817aef7b61ee7f08288097724",
+    "megatron/core/pipeline_parallel/schedules.py": "ca61880a34dea59c208ef28d3ab1f83f57b2f581b35bc78df9dc8481c1079319",
+    "megatron/core/kv_cache/fa_split.py": "d0a812c1d7995beadb7c73b9080c6ea6ec1535b58b996d618e8a755cfeaf4343",
+    "megatron/core/kv_cache/dspp_packed_attention.py": "b092f9cc2fa2e7f95dafd836f419cd7b8241aa2be31ef44afc74df6d96905a00",
+    "megatron/core/kv_cache/fa_split_src/backward.cu": "dd1328a84f20324ef55cd6ae6fa292c7d1e00af72601708f7d6bebd5990d44cf",
+    "megatron/core/kv_cache/fa_split_src/bindings.cpp": "b6343daaa2b50c3619aa23de401a6299a4a1738f288326dba57be1f448ad2a98",
+    "examples/measure_dspp_clean_tasks.sh": "e910edec03cc1ccf135b831f9fbfdb6479e38f6853dbb9ef3952ab03327d037b",
+    "examples/run_dspp_b23_l40.sh": "1aaf10723a91b1599440fe1f459547362bbda0be72c46d7dac43d2849bd352a5"
+  },
+  "source_files": {
+    "tools/diagnose_dspp_attention_cost.py": {
+      "bytes": 6822,
+      "sha256": "d81892d527611b59e9dc8bd484af43280b2c4ed156c92a4fce338623f2de28de"
+    },
+    "tools/diagnose_dspp_training_cost.py": {
+      "bytes": 2815,
+      "sha256": "a6a87160b5e1eee4db13e4eb75450e75c1975a741830a734324df4b2ff401557"
+    },
+    "tools/summarize_dspp_cost_diagnosis.py": {
+      "bytes": 3258,
+      "sha256": "c9e0606f894d1a5f56c49726eb44136f961f95bd42e0b77ab1e2b2cf120b02b5"
+    },
+    "tools/dspp_cost_probe.cu": {
+      "bytes": 2865,
+      "sha256": "c4fca69f63d4429cca1f862385d82608ef977324d8a024b312a91c84855a4bc2"
+    },
+    "tools/dspp_cost_probe_bindings.cpp": {
+      "bytes": 309,
+      "sha256": "369a6d5a04cf57036da971aded6fc9224e29449dc0abb9db35091518e7186012"
+    },
+    "docs/dspp-history-dkv-split-implementation-plan.md": {
+      "bytes": 78093,
+      "sha256": "b7604baea9983653221bedbf250a0f1f9a6a93ecbad74cf76e3af5f37f43b4ce"
+    }
+  },
+  "commands": {
+    "isolated": "python tools/diagnose_dspp_attention_cost.py --output <new-dir>",
+    "ablation": "python tools/diagnose_dspp_attention_cost.py --combined-probe --output <new-dir>",
+    "training": "For mode fused (split=0) and after_dx (split=1), one run each: TRAIN_ITERS=3 HIDDEN_SIZE=512 FFN_HIDDEN_SIZE=1024 NUM_ATTENTION_HEADS=4 NUM_QUERY_GROUPS=2 NUM_LAYERS=6 LAYERS_PER_VPP=1 SEQ_LENGTH=8192 MICRO_SEQ_LENGTH=2048 MICRO_BATCH_SIZE=4 GLOBAL_BATCH_SIZE=8 DSPP_DEBUG_BATCHES=0 LEARNING_RATE=0 MIN_LEARNING_RATE=0 DATA_PATH=/workspace/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data DSPP_TASK_TIMING_ONLY=1 DSPP_SPLIT_ATTENTION_BACKWARD=<split> DSPP_HISTORY_DKV_AFTER_DX=<split> DSPP_TIMELINE_DIR=<output>/timeline DSPP_TIMELINE_ITERATION=3 DSPP_COST_DIAG_ROOT=<output> TRAIN_ENTRYPOINT=tools/diagnose_dspp_training_cost.py timeout 300 bash examples/run_dspp_b23_l40.sh",
+    "summary": "python tools/summarize_dspp_cost_diagnosis.py <trace> --output <summary.json>"
+  },
+  "external_inputs": {
+    "/home/cuiym/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data.bin": {
+      "bytes": 1540992,
+      "sha256": "235e6d7721d15a9f4222b2339c1392965f1cf6bc659a4471b38fc6be3edc0d1b"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data.idx": {
+      "bytes": 2602,
+      "sha256": "f77dca272855e39145d1bfdb489d7e1c458926483677720dea7cd302422e1e73"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/clean-timing-measure-final-20261016/data.json": {
+      "bytes": 343,
+      "sha256": "7ba3bb62288c9e2036b16c33c35f6f244fc0958f4ccf7fa3922d4e06084f5dcd"
+    }
+  },
+  "notes": [
+    "First isolated capture failed because CUDA Graph requires non-default stream; failure log kept. No values reported from failed attempt.",
+    "Initial successful attention diagnostic preceded adding optional combined probe; ordinary calls and numerical algorithm unchanged. Final snapshot includes both modes.",
+    "Three samples per isolated case, one diagnostic training run per mode. No new clean B/H measurement.",
+    "Profiler alters host timing. Graph removes repeated CPU dispatch and is not integrated with production training.",
+    "Combined probe is restricted to aligned single-sequence diagnostic input; no production correctness/support claim.",
+    "Raw pt.trace.json files are local ignored evidence; parsed summaries retain correlated GPU event details.",
+    "Production source remains exactly 007. No commit, push or git add."
+  ],
+  "evidence_files": {
+    "attention-final/execution.pt.trace.json": {
+      "bytes": 86396,
+      "sha256": "cac43d1f83513e92b3db49e2775e409e824c517e91e299592f524350d9b04038"
+    },
+    "attention-final/profile-summary.json": {
+      "bytes": 32233,
+      "sha256": "7331974e19f52b4c4871cb7127dae0b8b0486a7a7036d402a770ac528b4f9e24"
+    },
+    "attention-final/timing.json": {
+      "bytes": 2830,
+      "sha256": "2a86d750f6e15849907fa97c4e596ed54006efbbcbaf170a998eb0e7fb3565dc"
+    },
+    "attention-final-launch.log": {
+      "bytes": 4412,
+      "sha256": "6db7926c46e04a31305c5c969096d4dfc9be6466e15979782869e0482a242882"
+    },
+    "attention-launch.log": {
+      "bytes": 2076,
+      "sha256": "707abf7dbe4a47e31e522ace3d0903b2929082ebdfb8a02da2d9286946e845b0"
+    },
+    "combined-probe/execution.pt.trace.json": {
+      "bytes": 101336,
+      "sha256": "a3efa8c8746866cbc85f75ce042859ec78bd884859f1ecb6a94a6672175a180b"
+    },
+    "combined-probe/profile-summary.json": {
+      "bytes": 38952,
+      "sha256": "1f29458f688a6485099da22f4b8f85976afa0c8aa2435ea42c74f37ccbf5ede1"
+    },
+    "combined-probe/timing.json": {
+      "bytes": 3277,
+      "sha256": "07dadb3036484ee36a99c1720bb8a08cf9470dd94b3fa9b4cc7cf70b2379b1ea"
+    },
+    "combined-probe-launch.log": {
+      "bytes": 4859,
+      "sha256": "55d25e6d5b6a36e5ae1e07c7a4d1a0311c663f1a7928521a3c5329957ed1067b"
+    },
+    "diagnosis.json": {
+      "bytes": 8210,
+      "sha256": "f84c5a0708775a086b238a9556282b5a4bcdcc83098c587bb21fcb3320c7afb6"
+    },
+    "source-snapshot.tar.gz": {
+      "bytes": 37393,
+      "sha256": "61d23b5a41d781eb6778a1a977614ed8ca0da758e18dff375b75ecfe80bcda57"
+    },
+    "training/after_dx/profile-summary.json": {
+      "bytes": 2777847,
+      "sha256": "c08807397fa3b288efe4c392f61cb48b1c37b2492846d239b20ac4cadb28b75c"
+    },
+    "training/after_dx/stage1.pt.trace.json": {
+      "bytes": 6754988,
+      "sha256": "1ed3843f8fc899e10353d5bc2fe6923421dd74c3ccf7b4fa4914aee4ca338533"
+    },
+    "training/after_dx/timeline/iteration_000003.svg": {
+      "bytes": 20854,
+      "sha256": "501cd368123010a0b480fa4cb7fd8c0aedacda12d85747692f690f1468baaab2"
+    },
+    "training/after_dx/timeline/iteration_000003_microbatches.md": {
+      "bytes": 2813,
+      "sha256": "22a013fa28f951ee1085d4325de18352fc983fba9e42fd3d071cd9a68b9a4fd4"
+    },
+    "training/after_dx/timeline/iteration_000003_rank_0.json": {
+      "bytes": 18702,
+      "sha256": "117e2f900aa6a71889e3b8f0d029cbbe0b9abc1607537be976defc01ebed6a5d"
+    },
+    "training/after_dx/timeline/iteration_000003_rank_1.json": {
+      "bytes": 18729,
+      "sha256": "a0b326a22648266e9f7be48d21366b547087fd708df2d4c2e0465860695f84b9"
+    },
+    "training/after_dx/timeline/iteration_000003_rank_2.json": {
+      "bytes": 18707,
+      "sha256": "0b75b6aa3d7e6f54e942c0f9c7040d4c097dbff210e7f54809a6457c970ac021"
+    },
+    "training/after_dx/timeline/iteration_000003_summary.json": {
+      "bytes": 2635,
+      "sha256": "9729507888576497d7de4a9f07ebccad00270924107f3669f80cacc29858b2a1"
+    },
+    "training/after_dx/train.log": {
+      "bytes": 36142,
+      "sha256": "3c9e1ea02d670f05bcb9035a38833aae2cf05043126baa183f52d93d975bbbeb"
+    },
+    "training/fused/profile-summary.json": {
+      "bytes": 2206640,
+      "sha256": "c5c228d7f4260b7183860398438bd01a58051ad5e9bf9af56ca20c4c43d22884"
+    },
+    "training/fused/stage1.pt.trace.json": {
+      "bytes": 6322875,
+      "sha256": "bf3b6bed5bd3bb1e833d2289ec829afc3dd4a644bf6920622204f8cf85bdb1a6"
+    },
+    "training/fused/timeline/iteration_000003.svg": {
+      "bytes": 16763,
+      "sha256": "055ea85aba27671320a05fe34d75afeeb634c8e07b07930c011bcf05117ef2d1"
+    },
+    "training/fused/timeline/iteration_000003_microbatches.md": {
+      "bytes": 2813,
+      "sha256": "22a013fa28f951ee1085d4325de18352fc983fba9e42fd3d071cd9a68b9a4fd4"
+    },
+    "training/fused/timeline/iteration_000003_rank_0.json": {
+      "bytes": 13896,
+      "sha256": "1d19a7d932389297b9a861d5f80d00f079717776ae7e0fb8f42d357b3c5f6aa6"
+    },
+    "training/fused/timeline/iteration_000003_rank_1.json": {
+      "bytes": 13915,
+      "sha256": "43365f5e92f9426d4600b590ac1e57ea532452a7107b8f4ff316e96d3ae20843"
+    },
+    "training/fused/timeline/iteration_000003_rank_2.json": {
+      "bytes": 13911,
+      "sha256": "cbe62ff68c1351ead5fc44e865f561a4342b9b1d96f24538eeb9fe75ad601b28"
+    },
+    "training/fused/timeline/iteration_000003_summary.json": {
+      "bytes": 1908,
+      "sha256": "939d14f4d561c635a7d969402de6ae4cc0cb4a7be58a88a3b356e18896f569ba"
+    },
+    "training/fused/train.log": {
+      "bytes": 36142,
+      "sha256": "7287e81508bbe20c98589cd6db1f79f4ae29ec5011832d096136dd41a23bb8df"
+    },
+    "training-launch.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}
