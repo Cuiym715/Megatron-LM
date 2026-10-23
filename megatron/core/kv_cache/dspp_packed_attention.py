@@ -528,6 +528,7 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
         ctx.state = state
         ctx.meta = meta
         ctx.layouts = layouts
+        ctx.has_history = any(layout.history for layout in layouts)
         ctx.layer_idx = int(layer_idx)
         ctx.scale = scale
         ctx.original_head_dim = original_head_dim
@@ -565,7 +566,12 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
             or ctx.state._history_task_ready
         ):
             raise RuntimeError("after-dx backward requires its active physical task")
-        if ctx.split_attention_backward:
+        # In after-dx mode an entirely history-free physical task needs no H.
+        # Its full KV output has exactly the compact-current layout expected by
+        # the route below. Keep task ownership/consumer handling unchanged.
+        if ctx.split_attention_backward and not (
+            ctx.history_dkv_after_dx and not ctx.has_history
+        ):
             from .fa_split import prepare_backward, backward_dq, backward_dkv, backward_dq_current
 
             # Frozen forward metadata: never consult the state's currently
@@ -582,7 +588,7 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
             )
             if ctx.history_dkv_after_dx:
                 query_grad, key_grad, value_grad = backward_dq_current(split_state)
-                if any(layout.history for layout in ctx.layouts):
+                if ctx.has_history:
                     ctx.state._history_jobs.append(
                         (split_state, ctx.layer_idx, ctx.layouts, ctx.current_shape)
                     )

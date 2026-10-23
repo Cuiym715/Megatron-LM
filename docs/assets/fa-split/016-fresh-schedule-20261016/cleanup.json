@@ -1,0 +1,58 @@
+{
+  "date": "2026-10-17",
+  "status": "completed",
+  "files": [
+    {
+      "path": "/home/cuiym/src/Megatron-LM-kwai/docs/assets/fa-split/008-b-cost-diagnosis-20261016/training/after_dx/stage1.pt.trace.json",
+      "bytes": 6754988,
+      "reason": "旧历史 dKV 原始性能 trace；新016采集已验收，原摘要与配置保留。"
+    },
+    {
+      "path": "/home/cuiym/src/Megatron-LM-kwai/docs/assets/fa-split/008-b-cost-diagnosis-20261016/training/fused/stage1.pt.trace.json",
+      "bytes": 6322875,
+      "reason": "旧历史 dKV 原始性能 trace；新016采集已验收，原摘要与配置保留。"
+    },
+    {
+      "path": "/home/cuiym/docs/v4/design/history-dkv/assets/research/002-baseline-20261016/c2048_sample_fixed2/traces/rank_0.1792116828068278650.pt.trace.json",
+      "bytes": 43184089,
+      "reason": "旧历史 dKV 原始性能 trace；新016采集已验收，原摘要与配置保留。"
+    },
+    {
+      "path": "/home/cuiym/docs/v4/design/history-dkv/assets/research/002-baseline-20261016/c2048_sample_fixed2/traces/rank_1.1792116828055242337.pt.trace.json",
+      "bytes": 41963363,
+      "reason": "旧历史 dKV 原始性能 trace；新016采集已验收，原摘要与配置保留。"
+    },
+    {
+      "path": "/home/cuiym/docs/v4/design/history-dkv/assets/research/002-baseline-20261016/c2048_sample_fixed2/traces/rank_2.1792116828021152516.pt.trace.json",
+      "bytes": 40726734,
+      "reason": "旧历史 dKV 原始性能 trace；新016采集已验收，原摘要与配置保留。"
+    },
+    {
+      "path": "/home/cuiym/docs/v4/design/history-dkv/assets/research/002-baseline-20261016/c4096_sample_fixed2/traces/rank_0.1792116938782758718.pt.trace.json",
+      "bytes": 22106878,
+      "reason": "旧历史 dKV 原始性能 trace；新016采集已验收，原摘要与配置保留。"
+    },
+    {
+      "path": "/home/cuiym/docs/v4/design/history-dkv/assets/research/002-baseline-20261016/c4096_sample_fixed2/traces/rank_1.1792116938772890180.pt.trace.json",
+      "bytes": 21340615,
+      "reason": "旧历史 dKV 原始性能 trace；新016采集已验收，原摘要与配置保留。"
+    },
+    {
+      "path": "/home/cuiym/docs/v4/design/history-dkv/assets/research/002-baseline-20261016/c4096_sample_fixed2/traces/rank_2.1792116938750182620.pt.trace.json",
+      "bytes": 20558841,
+      "reason": "旧历史 dKV 原始性能 trace；新016采集已验收，原摘要与配置保留。"
+    }
+  ],
+  "total_bytes": 202958383,
+  "removed_directories": [],
+  "preserved": [
+    "001–015小体积摘要、配置、代码身份和正确性证据",
+    "所有数据集及 input fixtures",
+    "build、上游FA源码、torch扩展缓存",
+    "历史梯度/dx验证快照和opt015源码副本",
+    "016新采集及失败诊断证据",
+    "其他项目及其他DSPP实验",
+    "Git历史"
+  ],
+  "note": "未发现需要整目录删除且不含应保留材料的旧性能临时目录；不扩大范围。"
+}

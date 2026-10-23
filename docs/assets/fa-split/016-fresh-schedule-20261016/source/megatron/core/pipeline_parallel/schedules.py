@@ -1,0 +1,4235 @@
+# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+
+import contextlib
+import math
+import os
+import threading
+import time
+from collections import deque
+from dataclasses import dataclass, field
+from functools import partial
+from typing import Callable, Deque, Dict, Iterator, List, Optional, Tuple, Union, Type
+
+import torch
+import torch.distributed as dist
+from torch.autograd.variable import Variable
+from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
+
+from megatron import get_args
+from megatron.core import parallel_state
+from megatron.core.datasets.dspp_training import DsppTrainingBatch
+from megatron.core.datasets.dspp_chunk_tuner import (
+    estimate_dspp_chunk_layout,
+    estimate_stage_peak_live_slots,
+    select_dspp_chunk_size,
+    select_dspp_structural_chunk_size,
+    update_activation_bytes_per_live_token,
+)
+from megatron.core.datasets.dspp_ordering import (
+    build_dspp_ordering_plan,
+    render_dspp_microbatch_report,
+)
+from megatron.core.enums import ModelType
+from megatron.core.pipeline_parallel import offload, p2p_communication
+from megatron.core.kv_cache import Cache, DsppSequenceKVState
+from megatron.core.pipeline_parallel.slice_v import (
+    build_slice_v_execution_plan,
+    build_slice_v_schedule,
+)
+from megatron.core.pipeline_parallel.dspp_timeline import DsppTimelineRecorder
+from megatron.core.pipeline_parallel.dspp_progress import (
+    DsppGpuProgressTracker,
+    dspp_communication_buffer_count,
+)
+from megatron.core.zbpp_utils import WeightGradStore
+from megatron.core.transformer.moe.router import MoEAuxLossAutoScaler
+from megatron.core.utils import cuda_sync_and_record, get_attr_wrapped_model, get_model_type
+from megatron.model.utils import slice_lm_inputs_along_cp, pad_to_be_divisible
+from megatron.profile_utils import annotate_forward_range, annotate_backward_range
+
+# Types
+Shape = Union[List[int], torch.Size]
+
+def get_forward_backward_func(slicing=False, variable_slicing=False, dspp=False):
+    """Retrieves the appropriate forward_backward function given the
+    configuration of parallel_state.
+
+    Returns a function that will perform all of the forward and
+    backward passes of the model given the pipeline model parallel
+    world size and virtual pipeline model parallel world size in the
+    global parallel_state.
+
+    The function returned takes the following arguments:
+
+    forward_step_func (required): A function that takes a data
+        iterator and a model as its arguments and return the model's
+        forward output and the loss function. The loss function should
+        take one torch.Tensor and return a torch.Tensor of loss and a
+        dictionary of string -> torch.Tensor.
+
+        For example:
+
+        def loss_func(loss_mask, output_tensor):
+            losses = output_tensor.float()
+            loss_mask = loss_mask.view(-1).float()
+            loss = torch.sum(losses.view(-1) * loss_mask) / loss_mask.sum()
+
+            # Reduce loss for logging.
+            averaged_loss = average_losses_across_data_parallel_group([loss])
+
+            return loss, {'lm loss': averaged_loss[0]}
+
+        def forward_step(data_iterator, model):
+            data, loss_mask = next(data_iterator)
+            output = model(data)
+            return output, partial(loss_func, loss_mask)
+
+
+        forward_backward_func(forward_step_func=forward_step, ...)
+
+
+    data_iterator (required): an iterator over the data, will be
+        passed as is to forward_step_func. Expected to be a list of
+        iterators in the case of interleaved pipeline parallelism.
+
+    model (required): the actual model. Expected to be a list of
+        modules in the case of interleaved pipeline parallelism.
+
+    num_microbatches (int, required):
+        The number of microbatches to go through
+
+    dtype (required when using pipeline parallelism): dtype used in
+        p2p communication, usually params_dtype
+
+    tensor_shape (required when using pipeline parallelism): Shape of
+        tensor. The tensor is expected to be 3D and its order of
+        dimension is supposed to be ``(sequence, batch, hidden)``.
+
+    decoder_seq_length (int, required for ModelType.encoder_and_decoder models):
+        Sequence length of the decoder portion, used to determine tensor shapes.
+
+    grad_scaler (optional, default=None): If using loss scaling,
+        this function should take the loss and return the scaled
+        loss. If None, no function is called on the loss.
+
+    sequence_parallel (optional, default=False):
+        Set to :obj:`True` for this function to handle sequence
+        length.  When :obj:`True`, the sequence length on each tensor
+        model parallel rank is updated to
+        :math:`original\_sequence\_length /
+        tensor\_model\_parallel\_world\_size`.
+        TODO: Do we need this? Just roll into tensor_shape arg?
+
+    overlap_p2p_comm (optional, default=False): When True
+        some of the peer to peer communication for pipeline
+        parallelism will overlap with computation. Must be False if
+        batch_p2p_comm is true.
+
+    batch_p2p_comm (optional, default=True): When true use
+        batch_isend_irecv, otherwise use individual isend and irecv
+        calls. Must be false if overlap_p2p_comm is True.
+
+    forward_only (optional, default=False): Perform only the forward step
+
+    timers (optional, default=None): TODO
+
+    collect_non_loss_data: TODO
+
+    enable_autocast (optional, default=False): If True, runs the
+        forward_step_func call inside torch.autocast context
+
+    deallocate_pipeline_outputs (optional, default=False): If True, output data
+        is deallocated after the tensor is sent to the next pipeline stage.
+        Helps with saving memory, does nothing when pipeline parallel is
+        not used.
+
+    no_sync_func (optional): Function that creates a context that
+        suppresses asynchronous data-parallel communication. If the
+        model is an instance of torch.nn.DistributedDataParallel, the
+        default is to use torch.nn.DistributedDataParallel.no_sync.
+
+    grad_sync_func (optional): Function that launches asynchronous
+        gradient reductions (e.g. distributed optimizer gradient
+        reduce-scatters). The function should take one argument: an
+        iterable of parameters whose gradients are to be synchronized.
+
+    param_sync_func (optional): Function that launches asynchronous
+        parameter synchronizations (e.g. distributed optimizer
+        parameter all-gathers). The function should take one argument:
+        an iterable of parameters to be synchronized.
+
+    pre_p2p_func (optional): Function that is to be called before p2p
+        communication in warmup passes and cooldown passes.
+
+    post_p2p_async_func (optional): Function that is to be called after
+        p2p communication in warmup passes and cooldown passes. The
+        function should take one argument: the list of p2p communication
+        handles.
+
+    offload_delay_to_next_stage (optional, default=False): If True, delay
+        the timing of offload to the next stage of the same microbatch.
+
+    """
+    pipeline_model_parallel_size = parallel_state.get_pipeline_model_parallel_world_size()
+    if dspp:
+        if pipeline_model_parallel_size == 1:
+            if parallel_state.get_virtual_pipeline_model_parallel_world_size() is not None:
+                raise NotImplementedError(
+                    "single-stage DSPP does not support virtual pipeline chunks"
+                )
+            return forward_backward_dspp_no_pipelining
+        if pipeline_model_parallel_size == 3 and (
+            parallel_state.get_virtual_pipeline_model_parallel_world_size() == 2
+        ):
+            return pipelining_with_dspp_stage_local_v
+        raise NotImplementedError("distributed DSPP requires PP=3 and VPP=2")
+    if pipeline_model_parallel_size > 1:
+        if parallel_state.get_virtual_pipeline_model_parallel_world_size() is not None:
+            if variable_slicing:
+                args = get_args()
+                if getattr(args, 'variable_seq_schedule', '1f1b') == 'slice-v':
+                    forward_backward_func = pipelining_with_variable_slicing_slice_v
+                else:
+                    raise NotImplementedError(
+                        "variable sequence slicing 1f1b is implemented for "
+                        "non-interleaved pipeline parallelism; unset "
+                        "--num-layers-per-virtual-pipeline-stage or set "
+                        "--variable-seq-schedule slice-v."
+                    )
+            elif slicing:
+                forward_backward_func = pipelining_with_interleaved_slicing
+            else:
+                forward_backward_func = forward_backward_pipelining_with_interleaving
+        else:
+            if variable_slicing:
+                forward_backward_func = pipelining_with_variable_slicing
+            elif slicing:
+                forward_backward_func = pipelining_with_slicing
+            else:
+                forward_backward_func = forward_backward_pipelining_without_interleaving
+    else:
+        forward_backward_func = forward_backward_no_pipelining
+    return forward_backward_func
+
+def deallocate_output_tensor(out, deallocate_pipeline_outputs=False):
+    '''Pseudo-deallocate (i.e., set to scalar) the output tensor's '.data' field.
+
+    This method should be called right after the output tensor has been
+    sent to the next pipeline stage. At this point, the output tensor is
+    only useful for its '.grad_fn' field, and not its '.data'.
+    '''
+    if (out is None) or (not deallocate_pipeline_outputs):
+        return
+    assert isinstance(out, torch.Tensor), \
+        "expected Tensor, found %s." % type(out).__name__
+    assert out._base is None, \
+        "counter-productive to free a view of another tensor."
+    out.data = torch.empty(
+        (1,),
+        device = out.device,
+        dtype = out.dtype,
+    )
+
+def custom_backward(output, grad_output):
+    '''Directly call C++ autograd engine.
+
+    To make the 'deallocate_output_tensor' (above) optimization work, the C++
+    autograd engine must be called directly, bypassing Pytorch's
+    torch.autograd.backward. Pytorch's 'backward' checks that the output and
+    grad have the same shape, while C++'s 'backward' does not.
+    '''
+
+    assert output.numel() == 1, \
+        "output should be pseudo-'freed' in schedule, to optimize memory"
+    assert isinstance(output, torch.Tensor), \
+        "output == '%s'." % type(output).__name__
+    assert isinstance(grad_output, (torch.Tensor, type(None))), \
+        "grad_output == '%s'." % type(grad_output).__name__
+
+    # Handle scalar output
+    if grad_output is None:
+        assert output.numel() == 1, "implicit grad requires scalar output."
+        grad_output = torch.ones_like(
+            output,
+            memory_format = torch.preserve_format,
+        )
+
+    # Call c++ engine [ see torch/csrc/autograd/python_engine.cpp ]
+    Variable._execution_engine.run_backward(
+        tensors = (output,),
+        grad_tensors = (grad_output,),
+        keep_graph = False,
+        create_graph = False,
+        inputs = tuple(),
+        allow_unreachable=True,
+        accumulate_grad=True,
+    )
+
+
+
+
+
+def forward_step(data,
+                 input_tensor,
+                 kv_cache,
+                 forward_step_func,
+                 model,
+                 timers,
+                 autocast_dtype=torch.float,
+                 enable_autocast=False):
+    """Forward step for passed-in model.
+
+    If first stage, input tensor is obtained from data_iterator, otherwise
+    passed-in input_tensor is used.
+
+    Returns output tensor."""
+
+    cuda_sync_and_record(sync_level=2)
+
+    if timers is not None:
+        timers('forward-compute', log_level=2).start()
+
+    unwrap_output_tensor = False
+    if not isinstance(input_tensor, list):
+        input_tensor = [input_tensor]
+        unwrap_output_tensor = True
+
+    set_input_tensor = get_attr_wrapped_model(model, "set_input_tensor")
+    set_input_tensor(input_tensor)
+
+    if enable_autocast:
+        context_manager = torch.autocast("cuda", dtype=autocast_dtype)
+    else:
+        context_manager = contextlib.nullcontext()
+    with context_manager:
+        with annotate_forward_range("forward"):
+            output_tensor = forward_step_func(data, kv_cache, model)
+
+    # Unset the input tensor to release memory.
+    set_input_tensor(None)
+
+    if timers is not None:
+        timers('forward-compute').stop()
+
+    # If T5 model (or other model with encoder and decoder)
+    # and in decoder stack, then send encoder_hidden_state
+    # downstream as well.
+    model_type = get_model_type(model)
+
+    if parallel_state.is_pipeline_stage_after_split() and \
+            model_type == ModelType.encoder_and_decoder:
+        return [output_tensor, input_tensor[-1]]
+    if unwrap_output_tensor:
+        return output_tensor
+    return [output_tensor]
+
+
+def backward_step(input_tensor, output_tensor, output_tensor_grad,
+                  model_type, timers, deallocate_pipeline_outputs=False):
+    """Backward step through passed-in output tensor.
+
+    If last stage, output_tensor_grad is None, otherwise gradient of loss
+    with respect to stage's output tensor.
+
+    Returns gradient of loss with respect to input tensor (None if first
+    stage)."""
+
+    cuda_sync_and_record(sync_level=2)
+
+    # NOTE: This code currently can handle at most one skip connection. It
+    # needs to be modified slightly to support arbitrary numbers of skip
+    # connections.
+
+    if timers is not None:
+        timers('backward-compute', log_level=2).start()
+
+    # Retain the grad on the input_tensor.
+    unwrap_input_tensor_grad = False
+    if not isinstance(input_tensor, list):
+        input_tensor = [input_tensor]
+        unwrap_input_tensor_grad = True
+    for x in input_tensor:
+        if x is not None:
+            x.retain_grad()
+
+    if not isinstance(output_tensor, list):
+        output_tensor = [output_tensor]
+    if not isinstance(output_tensor_grad, list):
+        output_tensor_grad = [output_tensor_grad]
+
+    # Backward pass.
+    with annotate_backward_range("backward"):
+        # No backward pass is needed on the first pipeline stage if all parameters do not require gradients.
+        if output_tensor[0].requires_grad:
+            if deallocate_pipeline_outputs:
+                custom_backward(output_tensor[0], output_tensor_grad[0])
+            else:
+                args = get_args()
+                retain_graph = args.variable_seq_slicing and not args.use_flash_attn
+                torch.autograd.backward(output_tensor, grad_tensors=output_tensor_grad,
+                                        retain_graph=retain_graph)
+
+    # Collect the grad of the input_tensor.
+    input_tensor_grad = [None]
+    if input_tensor is not None:
+        input_tensor_grad = []
+        for x in input_tensor:
+            if x is None:
+                input_tensor_grad.append(None)
+            else:
+                input_tensor_grad.append(x.grad)
+
+    # Handle single skip connection if it exists (encoder_hidden_state in
+    # model with encoder and decoder).
+    if parallel_state.get_pipeline_model_parallel_world_size() > 1 and \
+            parallel_state.is_pipeline_stage_after_split() and \
+            model_type == ModelType.encoder_and_decoder:
+        if output_tensor_grad[1] is not None:
+            input_tensor_grad[-1].add_(output_tensor_grad[1])
+    if unwrap_input_tensor_grad:
+        input_tensor_grad = input_tensor_grad[0]
+
+    if timers is not None:
+        timers('backward-compute').stop()
+
+    return input_tensor_grad
+
+
+def pre_process_forward(model, data, input_shape):
+    group = parallel_state.get_pipeline_model_parallel_group()
+    first = parallel_state.get_pipeline_model_parallel_first_rank()
+    with annotate_forward_range("fwd pre"):
+        if data is None:
+            input_ids = torch.empty(input_shape, dtype=torch.int64, device="cuda")
+        else:
+            data = slice_lm_inputs_along_cp(*data)
+            input_ids = data[0]
+            assert input_ids.shape == input_shape
+        torch.distributed.broadcast(input_ids, first, group)
+        pre_process = get_attr_wrapped_model(model, "pre_process_forward")
+        encoder_input = pre_process(input_ids)
+    dummy_input = offload.forward_empty_backward_identity(encoder_input)
+    return encoder_input, dummy_input, data
+
+
+def pre_process_backward(encoder_input, encoder_input_grad):
+    group = parallel_state.get_pipeline_model_parallel_group()
+    first = parallel_state.get_pipeline_model_parallel_first_rank()
+    with annotate_backward_range("bwd pre"):
+        if encoder_input_grad is None:
+            encoder_input_grad = torch.empty_like(encoder_input)
+        torch.distributed.broadcast(encoder_input_grad, first, group)
+        torch.autograd.backward(encoder_input, encoder_input_grad)
+
+
+def post_process_forward(model, output, tensor_shape, labels_shape, dtype, offload_ratio=0):
+    pp_size = parallel_state.get_pipeline_model_parallel_world_size()
+    group = parallel_state.get_pipeline_model_parallel_group()
+    last = parallel_state.get_pipeline_model_parallel_last_rank()
+    tp_size = parallel_state.get_tensor_model_parallel_world_size()
+    output_shape = ((tensor_shape[0] + pp_size - 1) // pp_size,) + tensor_shape[1:]
+    with annotate_forward_range("fwd post"):
+        if output is None:
+            output = torch.empty(output_shape, dtype=dtype, device="cuda")
+            labels = torch.empty(labels_shape, dtype=torch.int64, device="cuda")
+            scatter_list = None
+        else:
+            labels = output._labels.contiguous(); del output._labels
+            assert output.shape == tensor_shape
+            assert labels.shape == labels_shape
+            output = output.detach()
+            output = pad_to_be_divisible(output, pp_size, dim=0)
+            scatter_list = list(output.chunk(pp_size))
+            output = torch.empty(output_shape, dtype=dtype, device="cuda")
+        torch.distributed.scatter(output, scatter_list, last, group)
+        torch.distributed.broadcast(labels, last, group)
+        output.requires_grad_()
+        output, dummy_output = offload.get_forward_tensor_and_backward_handle(output)
+        post_process = get_attr_wrapped_model(model, "post_process_forward")
+        om = offload.OffloadManager(offload_ratio)
+        with offload.offload_manager(om):
+            loss = post_process(output, labels, pipeline_parallel=True)
+    return dummy_output, loss, om
+
+
+def post_process_backward(loss, grad_loss, output, output_shape):
+    world_size = parallel_state.get_pipeline_model_parallel_world_size()
+    group = parallel_state.get_pipeline_model_parallel_group()
+    last = parallel_state.get_pipeline_model_parallel_last_rank()
+    with annotate_backward_range("bwd post"):
+        if grad_loss is None:
+            grad_loss = torch.empty_like(loss)
+            grad = None
+            gather_list = None
+        else:
+            grad_loss = grad_loss.contiguous()
+            grad_shape = list(output.shape)
+            grad_shape[0] *= world_size
+            grad = output.new_empty(grad_shape)
+            gather_list = list(grad.chunk(world_size))
+        torch.distributed.broadcast(grad_loss, last, group)
+        output.retain_grad()
+        torch.autograd.backward(loss, grad_loss)
+        torch.distributed.gather(output.grad, gather_list, last, group=group)
+        if grad is not None:
+            grad = grad.narrow(0, 0, output_shape[0])   # unpad
+    return grad
+
+
+class MicroBatch:
+    def __init__(self,
+                 slices: List,
+                 kv_cache: Cache,
+                 offload_ratio: float,
+                 forward_func: Callable,
+                 backward_func: Optional[Callable],
+                 loss_func: Optional[Callable],
+                 grad_scaler: Optional[Callable],
+                 batch_idx: Optional[int] = None,
+                 timers: Optional[Callable] = None):
+        self.slices = deque(slices)
+        self.num_slices = len(slices)
+        self.batch_idx = batch_idx
+        self.timers = timers
+        self.kv_cache = kv_cache
+        self.offload_ratio = offload_ratio
+        self.forward_func = forward_func
+        self.backward_func = backward_func
+        self.loss_func = loss_func
+        self.grad_scaler = grad_scaler
+        assert self.forward_func is not None
+        if self.backward_func is not None:
+            self.om_stack = []
+            self.input_stack = []
+            self.output_stack = []
+            self.kv_grad = []
+        if self.loss_func is not None:
+            self.output_tensors = []
+
+    @property
+    def num_slices_to_forward(self):
+        return len(self.slices)
+
+    @property
+    def num_slices_to_backward(self):
+        assert self.backward_func is not None
+        return len(self.om_stack)
+
+    @property
+    def slice_idx(self):
+        return self.cache_len()
+
+    def cache_len(self, offset=0):
+        return (len(self.om_stack) + offset) % self.num_slices
+
+    def curr_om(self):
+        assert self.backward_func is not None
+        return self.om_stack[-1]
+
+    def update_kv_cache(self, ctx_pair):
+        if self.kv_cache:
+            self.kv_cache = self.kv_cache.copy(ctx_pair=ctx_pair)
+
+    def forward(self, input_tensor):
+        """Run forward on one slice of micro-batch."""
+        slice_idx = self.num_slices - len(self.slices)
+        slice = self.slices.popleft()
+        if self.backward_func is not None:
+            dummy_input = input_tensor
+            if input_tensor is not None:
+                input_tensor, dummy_input = offload.get_forward_tensor_and_backward_handle(input_tensor)
+            input_kv = self.kv_cache.detach().dump()
+            self.input_stack.append([dummy_input] + input_kv)
+        om = offload.OffloadManager(self.offload_ratio)
+        timers = self.timers
+        record_context = timers is not None and timers.is_recording_active()
+        if record_context:
+            timers.set_record_context(mb=self.batch_idx,
+                                      chunk=slice_idx,
+                                      num_chunks=self.num_slices)
+        with offload.offload_manager(om):
+            output_tensor = self.forward_func(slice, input_tensor, self.kv_cache)
+        if record_context:
+            timers.clear_record_context()
+        self.om_stack.append(om)
+        if self.backward_func is not None:
+            dummy_output = offload.forward_empty_backward_identity(output_tensor)
+            output_kv = self.kv_cache.dump() # if self.num_slices_to_forward else []
+            self.output_stack.append([dummy_output] + output_kv)
+        if self.loss_func is not None:
+            self.output_tensors.append(output_tensor)
+            output_tensor = None
+        if self.num_slices_to_forward == 0 and self.kv_cache:
+            self.kv_cache = self.kv_cache.copy(retain_kv=False)
+        return output_tensor
+
+    def pop_data(self):
+        return self.slices.popleft()
+
+    def append_data(self, data):
+        self.slices.appendleft(data)
+
+    def pop_output(self):
+        assert self.loss_func is not None
+        return self.output_tensors.pop()
+
+    def append_output(self, output):
+        assert self.loss_func is not None
+        self.output_tensors.append(output)
+
+    def pop_output_grad(self):
+        assert self.loss_func is not None
+        return self.output_tensor_grads.pop()
+
+    def compute_loss(self, loss_div):
+        """Compute the loss if in the last stage, otherwise do nothing."""
+        # Set the loss scale for the auxiliary loss of the MoE layer.
+        # Since we use a trick to do backward on the auxiliary loss, we need to set the scale explicitly.
+        if get_args().num_experts is not None:
+            # Calculate the loss scale based on the grad_scale_func if available, else default to 1.
+            loss_scale = (
+                self.grad_scaler(torch.ones(())) if self.grad_scaler is not None else torch.ones(())
+            )
+            # Set the loss scale
+            MoEAuxLossAutoScaler.set_loss_scale(loss_scale / loss_div)
+        if self.loss_func is None:
+            return None
+        output_tensor = torch.cat(self.output_tensors, dim=-1)
+        # TODO(lizhiouyang): support the collect_non_loss_data logic.
+        loss, loss_reduced = self.loss_func(output_tensor)
+        if self.backward_func is not None:
+            loss /= loss_div
+            if self.grad_scaler is not None:
+                loss = self.grad_scaler(loss)
+            self.output_tensor_grads = list(torch.autograd.grad(loss, self.output_tensors))
+        del self.output_tensors
+        return loss_reduced
+
+    def backward(self, output_tensor_grad):
+        """Run backward on one slice of micro-batch (in reversed order of forward)."""
+        assert self.backward_func is not None
+        slice_idx = len(self.om_stack) - 1
+        om = self.om_stack.pop()
+        assert om.is_complete()
+        def _missing_grad(grad):
+            if grad is None:
+                return True
+            if isinstance(grad, (list, tuple)):
+                return all(item is None for item in grad)
+            return False
+        if self.loss_func is not None or _missing_grad(output_tensor_grad):
+            if hasattr(self, 'output_tensor_grads') and self.output_tensor_grads:
+                output_tensor_grad = self.output_tensor_grads.pop()
+            elif _missing_grad(output_tensor_grad):
+                raise RuntimeError("Missing output_tensor_grad for a non-last pipeline stage microbatch.")
+        if isinstance(output_tensor_grad, (list, tuple)):
+            assert len(output_tensor_grad) == 1, \
+                f"Expected one output tensor grad, got {len(output_tensor_grad)}."
+            output_tensor_grad = output_tensor_grad[0]
+        inputs = self.input_stack.pop()
+        outputs = self.output_stack.pop()
+        output_tensor_grads = [output_tensor_grad] + self.kv_grad
+        outputs_and_grads = [
+            (output, grad)
+            for output, grad in zip(outputs, output_tensor_grads, strict=False)
+            if grad is not None
+        ]
+        assert outputs_and_grads, "No tensor gradients available for this backward slice."
+        outputs, output_tensor_grad = map(list, zip(*outputs_and_grads))
+        timers = self.timers
+        record_context = timers is not None and timers.is_recording_active()
+        if record_context:
+            timers.set_record_context(mb=self.batch_idx,
+                                      chunk=slice_idx,
+                                      num_chunks=self.num_slices)
+        input_tensor_grad, *self.kv_grad = self.backward_func(inputs, outputs, output_tensor_grad)
+        if record_context:
+            timers.clear_record_context()
+        om.check_ref()
+        return input_tensor_grad
+
+    def backward_b(self, output_tensor_grad, chunk=0):
+        """Run only activation-gradient work and defer weight gradients."""
+        WeightGradStore.assert_supported()
+        with WeightGradStore.set_split_bw(True):
+            input_tensor_grad = self.backward(output_tensor_grad)
+            WeightGradStore.flush(chunk=chunk)
+        return input_tensor_grad
+
+    def weight_grad(self, pop_num=1, chunk=0):
+        """Run deferred weight-gradient work for this microbatch."""
+        WeightGradStore.assert_supported()
+        return WeightGradStore.pop(chunk=chunk, pop_num=pop_num, timers=self.timers)
+
+
+class GroupedBatch:
+    def __init__(self,
+                 mbatches: List[MicroBatch],
+                 num_stages: int,
+                 group_size: int):
+        self.mbatches = mbatches
+        self.num_stages = num_stages
+        self.group_size = group_size
+        self.fwd_batch_idx = 0
+        self.bwd_batch_idx = 0
+
+    def forward_stage_idx(self, offset=0):
+        return (self.fwd_batch_idx + offset) // self.group_size % self.num_stages
+
+    def backward_stage_idx(self, offset=0):
+        return self.num_stages - 1 - (self.bwd_batch_idx + offset) // self.group_size % self.num_stages
+
+    def prev_mbatch(self):
+        return self.mbatches[self.fwd_batch_idx - 1]
+
+    def curr_fwd_mbatch(self):
+        return self.mbatches[self.fwd_batch_idx]
+
+    def curr_bwd_mbatch(self):
+        stage_idx = (self.num_stages - 1 - self.bwd_batch_idx // self.group_size)
+        batch_idx = self.bwd_batch_idx % self.group_size
+        return self.mbatches[stage_idx * self.group_size + batch_idx]
+
+    @property
+    def num_batches_to_forward(self):
+        return sum(b.num_slices_to_forward for b in self.mbatches)
+
+    @property
+    def num_batches_to_backward(self):
+        return sum(b.num_slices_to_backward for b in self.mbatches)
+
+    def forward(self, input_tensor):
+        parallel_state.set_virtual_pipeline_model_parallel_rank(self.forward_stage_idx())
+        output_tensor = self.curr_fwd_mbatch().forward(input_tensor)
+        self.fwd_batch_idx += 1
+        return output_tensor
+
+    def compute_loss(self, loss_div):
+        loss = self.prev_mbatch().compute_loss(loss_div)
+        return loss
+
+    def backward(self, output_tensor_grad):
+        parallel_state.set_virtual_pipeline_model_parallel_rank(self.backward_stage_idx())
+        input_tensor_grad = self.curr_bwd_mbatch().backward(output_tensor_grad)
+        self.bwd_batch_idx += 1
+        return input_tensor_grad
+
+
+class CycledBatch:
+    def __init__(self,
+                 batch_idx: int,
+                 mbatches: List[MicroBatch],
+                 group_size: int):
+        self.batch_idx = batch_idx
+        self.mbatches = mbatches
+        self.group_size = group_size
+        self.num_slices_per_cycle = len(mbatches) * self.group_size
+        self.num_cycles = mbatches[0].num_slices // group_size
+        self.num_slices = len(mbatches) * mbatches[0].num_slices
+        self.slice_idx = 0
+
+    def stage_idx(self, offset=0):
+        return (self.slice_idx + offset) % self.num_slices_per_cycle // self.group_size
+
+    def cache_len(self, offset=0):
+        idx = self.slice_idx + offset
+        return (idx // self.num_slices_per_cycle) % self.num_cycles * self.group_size + idx % self.group_size
+
+    def prev_mbatch(self):
+        return self.mbatches[self.stage_idx(offset=-1)]
+
+    def curr_mbatch(self):
+        return self.mbatches[self.stage_idx()]
+
+    @property
+    def num_slices_to_forward(self):
+        return sum(b.num_slices_to_forward for b in self.mbatches)
+
+    @property
+    def num_slices_to_backward(self):
+        return sum(b.num_slices_to_backward for b in self.mbatches)
+
+    def forward(self, input_tensor):
+        parallel_state.set_virtual_pipeline_model_parallel_rank(self.stage_idx())
+        output_tensor = self.curr_mbatch().forward(input_tensor)
+        self.slice_idx += 1
+        return output_tensor
+
+    def compute_loss(self, loss_div):
+        assert self.slice_idx == self.num_slices
+        self.slice_idx -= 1
+        return self.prev_mbatch().compute_loss(loss_div)
+
+    def backward(self, output_tensor_grad):
+        parallel_state.set_virtual_pipeline_model_parallel_rank(self.stage_idx())
+        input_tensor_grad = self.curr_mbatch().backward(output_tensor_grad)
+        self.slice_idx -= 1
+        return input_tensor_grad
+
+
+@dataclass(frozen=True)
+class CtxPair:
+    """Informations for attention workload balance."""
+    peer: int
+    # mbid: int
+    stage_idx: int
+    cache_len: int
+    nfwd: int
+    nbwd: int
+    cache: bool
+    local_qo: List = field(default_factory=list, repr=False, hash=False, compare=False)
+    other_kv: List = field(default_factory=list, repr=False, hash=False, compare=False)
+    other_qo: List = field(default_factory=list, repr=False, hash=False, compare=False)
+    reqs: List = field(default_factory=list, repr=False, hash=False, compare=False)
+
+
+class AttnBalancer:
+    """Redistribute the attention workloads by exchange key-value with a peer."""
+    def __init__(self, num_mb, rank, size, threshold):
+        self.num_mb = num_mb
+        self.pp_rank = rank
+        self.pp_size = size
+        self.threshold = threshold
+
+    def calc_ctx_pair(self, batch) -> CtxPair:
+        """Calculate the peer to exchange key-value with."""
+        if not self.threshold:
+            return None
+
+        # batch_idx = [batch.batch_idx(offset=self.pp_rank - i + prior) for i in range(self.pp_size)]
+        stage_idx = [batch.stage_idx(offset=self.pp_rank - i) for i in range(self.pp_size)]
+        cache_len = [batch.cache_len(offset=self.pp_rank - i) for i in range(self.pp_size)]
+        # print(f'{self.pp_rank}: {batch_idx=}')
+        # print(f'{self.pp_rank}: {cache_len=}')
+        # avg = sum(cache_len) / self.pp_size
+        # len = cache_len[self.pp_rank]
+        # com = avg * 2 - len
+        # assert com in cache_len, (self.pp_rank, cache_len)
+        # idx = cache_len.index(com)
+        # vol = int(avg - len)
+
+        ord = sorted(cache_len)
+        len = cache_len[self.pp_rank]
+        com = ord[self.pp_size - 1 - ord.index(len)]
+        peer = cache_len.index(com)
+        avg = (com + len) / 2
+        vol = int(avg - len)
+        if abs(vol) > abs(self.threshold):    # clip to vaule of threshold
+            vol = int(math.copysign(self.threshold, vol))
+        # mbid = batch_idx[self.pp_rank] if vol < 0 else batch_idx[peer]
+        ckid = stage_idx[self.pp_rank] # if vol < 0 else stage_idx[peer]
+        clen = cache_len[self.pp_rank]
+
+        # cnt_mb = batch_idx[self.pp_rank]
+        slice_idx = batch.slice_idx
+        cnt_mb = batch.batch_idx
+        if slice_idx >= batch.num_slices:   # forward to next batch
+            slice_idx -= batch.num_slices
+            cnt_mb += 1
+        if slice_idx < 0:                   # backward to next batch
+            slice_idx += batch.num_slices
+            cnt_mb += 1
+        if cnt_mb >= self.num_mb:
+            return CtxPair(peer, ckid, clen, False, False, False)
+
+        fwd = not (slice_idx + 1 < self.pp_size - self.pp_rank and cnt_mb == 0 or
+                    batch.num_slices - slice_idx <= self.pp_rank and cnt_mb + 1 == self.num_mb)
+        bwd = not (slice_idx + 1 < self.pp_size - self.pp_rank and cnt_mb + 1 == self.num_mb or
+                    batch.num_slices - slice_idx <= self.pp_rank and cnt_mb == 0)
+        nfwd = vol if fwd else 0
+        nbwd = vol if bwd else 0
+        junc = slice_idx + 1 < self.pp_size - self.pp_rank or batch.num_slices - slice_idx <= self.pp_rank
+
+        cache = self.threshold < 0 and not junc
+        # if fwd or bwd:
+        #     print(f"rank{self.pp_rank}: {msg}: {idx, vol, fwd, bwd} {cache_len}", flush=True)
+        return CtxPair(peer, ckid, clen, nfwd, nbwd, cache)
+
+
+def forward_backward_no_pipelining(*,
+                                   forward_step_func,
+                                   get_batch_func,
+                                   data_iterator: Union[Iterator, List[Iterator]],
+                                   model: Union[torch.nn.Module, List[torch.nn.Module]],
+                                   num_microbatches: int,
+                                   micro_seq_length: int,
+                                   kv_cache_class: Type[Cache],
+                                   dtype: Optional[torch.dtype] = None,
+                                   tensor_shape: Optional[Shape] = None, # unused
+                                   decoder_seq_length: Optional[int] = None, # unused
+                                   grad_scaler: Callable = None,
+                                   sequence_parallel: bool = False, # unused
+                                   overlap_p2p_comm: bool = False, # unused
+                                   batch_p2p_comm: bool = True, # unused
+                                   attn_balance: int = 0, # unused
+                                   vocab_in_pp: bool = False, # unused
+                                   forward_only: bool = False,
+                                   timers: Callable = None,
+                                   collect_non_loss_data: bool = False,
+                                   enable_autocast: bool = False,
+                                   deallocate_pipeline_outputs: bool = False,
+                                   no_sync_func: Optional[Callable] = None,
+                                   grad_sync_func: Optional[Callable] = None, # unused
+                                   param_sync_func: Optional[Callable] = None, # unused
+                                   pre_p2p_func: Optional[Callable] = None, # unused
+                                   post_p2p_async_func: Optional[Callable] = None, # unused
+                                   offload_ratio: float = 0,
+                                   offload_delay_to_next_stage: bool = False, # unused
+                                   ):
+    """Run forward and backward passes with no pipeline parallelism
+    (no inter-stage communication).
+
+    Returns dictionary with losses.
+
+
+    See get_forward_backward_func() for argument details
+    """
+
+    if isinstance(model, list):
+        assert len(model) == 1, \
+            "non-pipeline-parallel schedule does not support model chunking"
+        model = model[0]
+    if isinstance(data_iterator, list):
+        assert len(data_iterator) == 1, \
+            "non-pipeline-parallel schedule does not support model chunking"
+        data_iterator = data_iterator[0]
+    assert not isinstance(model, torchDDP), "torchDDP is no longer supported."
+    model_type = get_model_type(model)
+
+    forward_func = partial(forward_step, forward_step_func=forward_step_func, model=model,
+                           timers=timers, enable_autocast=enable_autocast)
+    backward_func = None if forward_only else partial(backward_step, model_type=model_type,
+                            timers=timers, deallocate_pipeline_outputs=deallocate_pipeline_outputs)
+
+    cnt_onload = 0
+    make_microbatch_idx = 0
+    def make_microbatch():
+        nonlocal make_microbatch_idx
+        if timers is not None:
+            record_context = timers.is_recording_active()
+            if record_context:
+                timers.set_record_context(mb=make_microbatch_idx)
+            timers('batch-generator', log_level=2).start()
+        sliced_batch, loss_func = get_batch_func(data_iterator)
+        if timers is not None:
+            timers('batch-generator').stop()
+            if record_context:
+                timers.clear_record_context()
+        slices = sliced_batch(micro_seq_length)
+        kv_cache = kv_cache_class()
+        mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func,
+                        backward_func, loss_func, grad_scaler,
+                        batch_idx=make_microbatch_idx,
+                        timers=timers)
+        make_microbatch_idx += 1
+        return mb
+
+    forward_data_store = []
+    for _ in range(num_microbatches):
+        mb = make_microbatch()
+        # forward
+        offload_req = None
+        while mb.num_slices_to_forward:
+            mb.forward(None)
+            if offload_req:
+                offload_req.wait(); offload_req = None
+            curr_om = mb.curr_om()
+            if mb.num_slices_to_forward > 1:
+                offload_req = curr_om.offload(prior_works=[torch.cuda.current_stream().record_event()])
+            else:
+                curr_om.reset()
+        # compute loss
+        forward_data_store.append(mb.compute_loss(num_microbatches))
+        if forward_only:
+            continue
+        # backward
+        prior_works = [torch.cuda.current_stream().record_event()]
+        while mb.num_slices_to_backward:
+            next_om = mb.curr_om()
+            onload_req = next_om.onload(prior_works=prior_works, buffer_name="onload", buffer_idx=cnt_onload % 2)
+            cnt_onload += 1
+            if onload_req:
+                onload_req.wait(); onload_req = None
+            prior_works = [torch.cuda.current_stream().record_event()]
+            mb.backward(None)
+
+    return forward_data_store
+
+
+def _prepare_adaptive_dspp_chunk(
+    logical_batches, micro_seq_length, pipeline_size, dtype
+):
+    args = get_args()
+    if not getattr(args, 'dspp_auto_chunk_size', False):
+        return micro_seq_length, None
+
+    sequence_groups = [batch.plan.sequence_lengths for batch, _ in logical_batches]
+    max_chunk_size = int(getattr(args, 'dspp_max_chunk_size', 0) or args.seq_length)
+    element_size = torch.empty((), dtype=dtype).element_size()
+    if pipeline_size > 1:
+        max_p2p_bytes = int(getattr(args, 'dspp_max_p2p_bytes', 0) or 0)
+        if max_p2p_bytes:
+            p2p_token_limit = max_p2p_bytes // (args.hidden_size * element_size)
+            max_chunk_size = min(max_chunk_size, p2p_token_limit)
+
+    min_chunk_size = int(args.dspp_min_chunk_size)
+    if max_chunk_size <= 0:
+        raise RuntimeError(
+            "DSPP auto chunk has no valid candidate: effective maximum "
+            f"{max_chunk_size}. Increase --dspp-max-p2p-bytes or set it to 0 "
+            "to leave the bound to the memory model."
+        )
+
+    free_bytes, total_bytes = torch.cuda.mem_get_info()
+    allocated_bytes = torch.cuda.memory_allocated()
+    reserved_bytes = torch.cuda.memory_reserved()
+    reserve_bytes = int(args.dspp_memory_reserve_mib) * 1024 * 1024
+    locally_usable_bytes = min(
+        int(total_bytes * args.dspp_memory_utilization),
+        max(0, free_bytes + reserved_bytes - reserve_bytes),
+    )
+    activation_budget_bytes = max(0, locally_usable_bytes - allocated_bytes)
+    configured_rate = float(args.dspp_activation_bytes_per_token)
+    activation_rate = (
+        configured_rate
+        if configured_rate > 0
+        else getattr(args, '_dspp_activation_bytes_per_live_token', None)
+    )
+    if pipeline_size > 1:
+        stage = parallel_state.get_pipeline_model_parallel_rank()
+        neighbor_count = int(stage > 0) + int(stage < pipeline_size - 1)
+        recv_lookahead = int(getattr(args, 'dspp_recv_lookahead', 2))
+        send_inflight_depth = int(
+            getattr(args, 'dspp_send_inflight_depth', 2)
+        )
+        # Reserve every outgoing send, one receive at the current dependency,
+        # and every future preposted receive. This intentionally double counts
+        # some activation storage so automatic chunking remains OOM-safe.
+        communication_buffer_count = dspp_communication_buffer_count(
+            neighbor_count=neighbor_count,
+            recv_lookahead=recv_lookahead,
+            send_inflight_depth=send_inflight_depth,
+        )
+    else:
+        communication_buffer_count = 0
+    communication_bytes_per_chunk_token = (
+        communication_buffer_count * args.hidden_size * element_size
+    )
+    selection_policy = getattr(args, 'dspp_chunk_selection', 'memory')
+    ordering_mode = getattr(
+        args, 'dspp_microbatch_order', 'warmup-short-steady-long'
+    )
+    packing_strategy = getattr(args, 'dspp_packing_strategy', 'baseline')
+    decision_details = None
+    selector = select_dspp_chunk_size
+    if selection_policy == 'structure-aware':
+        selector = select_dspp_structural_chunk_size
+    selection_kwargs = dict(
+        sequence_length_groups=sequence_groups,
+        pipeline_size=pipeline_size,
+        bootstrap_chunk_size=micro_seq_length,
+        min_chunk_size=min_chunk_size,
+        max_chunk_size=max_chunk_size,
+        alignment=int(args.dspp_chunk_alignment),
+        activation_bytes_per_live_token=activation_rate,
+        activation_budget_bytes=activation_budget_bytes,
+        memory_safety_factor=float(args.dspp_memory_safety_factor),
+        communication_bytes_per_chunk_token=communication_bytes_per_chunk_token,
+        ordering_mode=ordering_mode,
+        packing_strategy=packing_strategy,
+    )
+    if selector is select_dspp_structural_chunk_size:
+        selection_kwargs.update(
+            saturation_chunk_size=int(
+                getattr(args, 'dspp_saturation_chunk_size', 0)
+                or min_chunk_size
+            ),
+            saturation_slack=float(getattr(args, 'dspp_saturation_slack', 0.20)),
+            execution_profile_path=getattr(args, 'dspp_execution_profile', None),
+            p2p_profile_path=getattr(args, 'dspp_p2p_profile', None),
+            hidden_size=int(args.hidden_size),
+            dtype_bytes=element_size,
+        )
+    if selection_policy == 'per-iteration-menu':
+        # Lazy import avoids datasets.dspp_dag -> pipeline_parallel package ->
+        # schedules initialization forming a module-level cycle.
+        from megatron.core.datasets.dspp_chunk_selector import (
+            load_profiled_chunk_bank,
+            select_per_iteration_chunks,
+        )
+        # The bootstrap iteration has no activation-memory observation yet.
+        # Preserve the configured safe chunk once, then use the profiled menu.
+        if activation_rate is None:
+            selected_chunk = min(max_chunk_size, max(1, micro_seq_length))
+            selection_reason = 'bootstrap-no-activation-sample'
+        else:
+            menu = tuple(
+                entry.capacity
+                for entry in load_profiled_chunk_bank(args.dspp_chunk_menu)
+                for chunk in (entry.capacity,)
+                if min_chunk_size <= chunk <= max_chunk_size
+            )
+            if not menu:
+                raise RuntimeError(
+                    "DSPP profiled chunk bank is empty after configured min/max bounds"
+                )
+            local_feasible = []
+            for chunk in menu:
+                candidate_layout = estimate_dspp_chunk_layout(
+                    sequence_groups,
+                    chunk_size=chunk,
+                    pipeline_size=pipeline_size,
+                    ordering_mode=ordering_mode,
+                    packing_strategy=packing_strategy,
+                )
+                activation_estimate = math.ceil(
+                    candidate_layout.peak_live_tokens
+                    * activation_rate
+                    * float(args.dspp_memory_safety_factor)
+                )
+                communication_estimate = (
+                    chunk * communication_bytes_per_chunk_token
+                )
+                local_feasible.append(
+                    activation_estimate + communication_estimate
+                    <= activation_budget_bytes
+                )
+            feasible_tensor = torch.tensor(
+                local_feasible, dtype=torch.int32, device='cuda'
+            )
+            pp_group = parallel_state.get_pipeline_model_parallel_group()
+            first_rank = parallel_state.get_pipeline_model_parallel_first_rank()
+            if dist.is_initialized() and dist.get_world_size() > 1:
+                # A candidate is eligible only if every PP stage can hold it.
+                dist.all_reduce(feasible_tensor, op=dist.ReduceOp.MIN, group=pp_group)
+            globally_feasible = tuple(
+                chunk for chunk, allowed in zip(menu, feasible_tensor.tolist())
+                if allowed
+            )
+            if not globally_feasible:
+                raise RuntimeError(
+                    "DSPP profiled chunk bank has no memory-feasible candidate on all PP ranks"
+                )
+            is_decision_rank = (
+                not dist.is_initialized() or dist.get_rank() == first_rank
+            )
+            selected_value = 0
+            if is_decision_rank:
+                decision = select_per_iteration_chunks(
+                    (sequence_groups,),
+                    candidate_chunks=globally_feasible,
+                    pipeline_size=pipeline_size,
+                    ordering_mode=ordering_mode,
+                    packing_strategy=packing_strategy,
+                    execution_profile_path=args.dspp_execution_profile,
+                    profile_bank_path=args.dspp_chunk_menu,
+                    p2p_profile_path=getattr(args, 'dspp_p2p_profile', None),
+                    hidden_size=int(args.hidden_size),
+                    dtype_bytes=element_size,
+                    communication_cost_mode=getattr(
+                        args, 'dspp_dag_communication_cost', 'profile'
+                    ),
+                    p2p_bandwidth_bytes_per_ms=(
+                        float(getattr(args, 'dspp_p2p_bandwidth_gbps', 25.0))
+                        * 1.0e6
+                    ),
+                    p2p_latency_ms=(
+                        float(getattr(args, 'dspp_p2p_latency_us', 20.0))
+                        / 1000.0
+                    ),
+                    require_profile_coverage=False,
+                    efficiency_top_k=int(getattr(args, 'dspp_efficiency_top_k', 4)),
+                    efficiency_slack=float(getattr(args, 'dspp_efficiency_slack', 0.05)),
+                    current_chunk_size=getattr(args, '_dspp_current_chunk_size', None),
+                )[0]
+                selected_value = decision.selected_chunk_size
+                decision_details = decision.to_dict()
+                decision_details['memory_feasible_chunks'] = list(
+                    globally_feasible
+                )
+                screened_chunks = [
+                    candidate['chunk_size']
+                    for candidate in decision_details['candidates']
+                    if candidate['selected_by_screen']
+                ]
+                planned_costs = {
+                    candidate['chunk_size']: round(
+                        candidate['predicted_makespan_ms'], 3
+                    )
+                    for candidate in decision_details['candidates']
+                    if candidate['fully_planned']
+                }
+                print(
+                    '[dspp][chunk-decision] '
+                    f'memory_feasible={list(globally_feasible)}, '
+                    f'screened={screened_chunks}, '
+                    f'dag_costs_ms={planned_costs}, '
+                    f'selected={selected_value}, '
+                    f'decision_ms={decision_details["decision_ms"]:.3f}',
+                    flush=True,
+                )
+            selected_tensor = torch.tensor(
+                selected_value, dtype=torch.int64, device='cuda'
+            )
+            if dist.is_initialized() and dist.get_world_size() > 1:
+                dist.broadcast(selected_tensor, src=first_rank, group=pp_group)
+            selected_chunk = int(selected_tensor.item())
+            selection_reason = 'per-iteration-profiled-menu'
+    else:
+        local_selection = selector(**selection_kwargs)
+        selected_tensor = torch.tensor(
+            local_selection.chunk_size, dtype=torch.int64, device='cuda'
+        )
+        if dist.is_initialized() and dist.get_world_size() > 1:
+            dist.all_reduce(
+                selected_tensor,
+                op=dist.ReduceOp.MIN,
+                group=parallel_state.get_pipeline_model_parallel_group(),
+            )
+        selected_chunk = int(selected_tensor.item())
+        selection_reason = local_selection.reason
+        if selected_chunk <= 0:
+            raise RuntimeError(
+                "DSPP auto chunk found no memory-feasible size on at least one pipeline rank; "
+                f"local budget={activation_budget_bytes} bytes, local total estimate="
+                f"{local_selection.estimated_peak_dynamic_bytes} bytes at "
+                f"chunk={local_selection.layout.chunk_size}"
+            )
+
+    for batch, _ in logical_batches:
+        batch.rechunk_(selected_chunk)
+        batch.release_rechunk_source_()
+
+    layout = estimate_dspp_chunk_layout(
+        sequence_groups,
+        chunk_size=selected_chunk,
+        pipeline_size=pipeline_size,
+        ordering_mode=getattr(
+            args, 'dspp_microbatch_order', 'warmup-short-steady-long'
+        ),
+        packing_strategy=getattr(args, 'dspp_packing_strategy', 'baseline'),
+    )
+    previous_chunk = getattr(args, '_dspp_current_chunk_size', None)
+    args._dspp_current_chunk_size = selected_chunk
+    estimated_peak_activation_bytes = (
+        math.ceil(
+            layout.peak_live_tokens
+            * activation_rate
+            * float(args.dspp_memory_safety_factor)
+        )
+        if activation_rate is not None
+        else None
+    )
+    estimated_communication_bytes = (
+        selected_chunk * communication_bytes_per_chunk_token
+    )
+    estimated_peak_dynamic_bytes = (
+        estimated_peak_activation_bytes + estimated_communication_bytes
+        if estimated_peak_activation_bytes is not None
+        else None
+    )
+    args._dspp_chunk_selection = {
+        'chunk_size': selected_chunk,
+        'reason': selection_reason,
+        'max_segment_count': layout.max_segment_count,
+        'peak_live_slots': layout.peak_live_slots,
+        'peak_live_tokens': layout.peak_live_tokens,
+        'activation_budget_bytes': activation_budget_bytes,
+        'activation_bytes_per_live_token': activation_rate,
+        'estimated_peak_activation_bytes': estimated_peak_activation_bytes,
+        'communication_buffer_count': communication_buffer_count,
+        'estimated_communication_bytes': estimated_communication_bytes,
+        'estimated_peak_dynamic_bytes': estimated_peak_dynamic_bytes,
+    }
+    if decision_details is not None:
+        args._dspp_chunk_selection.update({
+            'chunk_decision_ms': decision_details['decision_ms'],
+            'chunk_memory_feasible_menu': decision_details[
+                'memory_feasible_chunks'
+            ],
+            'chunk_screened_menu': [
+                candidate['chunk_size']
+                for candidate in decision_details['candidates']
+                if candidate['selected_by_screen']
+            ],
+            'chunk_candidate_costs': {
+                str(candidate['chunk_size']): candidate['predicted_makespan_ms']
+                for candidate in decision_details['candidates']
+            },
+            'chunk_profiled_compute_fraction': {
+                str(candidate['chunk_size']): candidate['profiled_compute_fraction']
+                for candidate in decision_details['candidates']
+            },
+            'chunk_low_confidence_compute_fraction': {
+                str(candidate['chunk_size']): candidate['low_confidence_compute_fraction']
+                for candidate in decision_details['candidates']
+            },
+            'chunk_compute_lower_bounds_ms': {
+                str(candidate['chunk_size']): candidate['compute_lower_bound_ms']
+                for candidate in decision_details['candidates']
+            },
+            'chunk_fully_planned': {
+                str(candidate['chunk_size']): candidate['fully_planned']
+                for candidate in decision_details['candidates']
+            },
+            'chunk_pruning_reasons': {
+                str(candidate['chunk_size']): candidate['rejection_reason']
+                for candidate in decision_details['candidates']
+                if candidate['rejection_reason'] is not None
+            },
+        })
+    if (
+        (not dist.is_initialized() or dist.get_rank() == 0)
+        and previous_chunk != selected_chunk
+    ):
+        print(
+            "[dspp][auto-chunk] "
+            f"chunk_size={selected_chunk}, max_segments={layout.max_segment_count}, "
+            f"peak_live_slots={layout.peak_live_slots}, reason={selection_reason}",
+            flush=True,
+        )
+    return selected_chunk, layout
+
+
+def _begin_dspp_activation_observation(enabled):
+    if not enabled:
+        return None
+    baseline = torch.cuda.memory_allocated()
+    torch.cuda.reset_peak_memory_stats()
+    return baseline
+
+
+def _finish_dspp_activation_observation(baseline, peak_live_tokens):
+    if baseline is None:
+        return
+    args = get_args()
+    peak = torch.cuda.max_memory_allocated()
+    dynamic_bytes = max(0, peak - baseline)
+    sample_bytes_per_live_token = (
+        dynamic_bytes / peak_live_tokens if peak_live_tokens > 0 else None
+    )
+    observed = update_activation_bytes_per_live_token(
+        getattr(args, '_dspp_activation_bytes_per_live_token', None),
+        baseline_allocated_bytes=baseline,
+        peak_allocated_bytes=peak,
+        peak_live_tokens=peak_live_tokens,
+    )
+    args._dspp_activation_bytes_per_live_token = observed
+    selection = getattr(args, '_dspp_chunk_selection', None)
+    if selection is not None:
+        selection['baseline_allocated_bytes'] = baseline
+        selection['observed_peak_allocated_bytes'] = peak
+        selection['observed_dynamic_activation_bytes'] = dynamic_bytes
+        selection['observed_sample_bytes_per_live_token'] = sample_bytes_per_live_token
+        selection['observed_activation_bytes_per_live_token'] = observed
+
+
+def forward_backward_dspp_no_pipelining(*,
+                                        forward_step_func,
+                                        get_batch_func,
+                                        data_iterator: Union[Iterator, List[Iterator]],
+                                        model: Union[torch.nn.Module, List[torch.nn.Module]],
+                                        num_microbatches: int,
+                                        micro_seq_length: int,
+                                        kv_cache_class: Type[Cache], # unused
+                                        dtype: Optional[torch.dtype] = None,
+                                        tensor_shape: Optional[Shape] = None, # unused
+                                        decoder_seq_length: Optional[int] = None, # unused
+                                        grad_scaler: Callable = None,
+                                        sequence_parallel: bool = False,
+                                        overlap_p2p_comm: bool = False,
+                                        batch_p2p_comm: bool = True, # unused
+                                        attn_balance: int = 0,
+                                        vocab_in_pp: bool = False,
+                                        forward_only: bool = False,
+                                        timers: Callable = None,
+                                        collect_non_loss_data: bool = False,
+                                        enable_autocast: bool = False,
+                                        deallocate_pipeline_outputs: bool = False,
+                                        no_sync_func: Optional[Callable] = None,
+                                        grad_sync_func: Optional[Callable] = None,
+                                        param_sync_func: Optional[Callable] = None,
+                                        pre_p2p_func: Optional[Callable] = None,
+                                        post_p2p_async_func: Optional[Callable] = None,
+                                        offload_ratio: float = 0,
+                                        offload_delay_to_next_stage: bool = False,
+                                        ):
+    """Execute DSPP physical microbatches on one stage.
+
+    One :class:`DsppSequenceKVState` is shared by every physical microbatch
+    derived from a logical dataloader batch.  Forward follows plan order and
+    backward follows exact reverse order, making segment dependencies a
+    structural property of this executor rather than a hot-path graph check.
+
+    ``estimated_flops`` in the batch plan is never read here. CUDA kernels and
+    autograd determine real execution time.
+    """
+
+    del (
+        kv_cache_class,
+        tensor_shape,
+        decoder_seq_length,
+        batch_p2p_comm,
+        no_sync_func,
+        grad_sync_func,
+        param_sync_func,
+        pre_p2p_func,
+        post_p2p_async_func,
+        offload_delay_to_next_stage,
+    )
+    if isinstance(model, list):
+        if len(model) != 1:
+            raise ValueError("DSPP B1 requires exactly one model chunk")
+        model = model[0]
+    if isinstance(data_iterator, list):
+        if len(data_iterator) != 1:
+            raise ValueError("DSPP B1 requires exactly one data iterator")
+        data_iterator = data_iterator[0]
+    if parallel_state.get_pipeline_model_parallel_world_size() != 1:
+        raise ValueError("DSPP B1 requires pipeline model parallel size 1")
+    if sequence_parallel:
+        raise ValueError("DSPP B1 does not support sequence parallelism")
+    if overlap_p2p_comm:
+        raise ValueError("DSPP B1 has no pipeline P2P communication")
+    if attn_balance:
+        raise ValueError("DSPP B1 does not support attention balancing")
+    if vocab_in_pp:
+        raise ValueError("DSPP B1 does not support vocab-in-pipeline")
+    if offload_ratio:
+        raise ValueError("DSPP B1 does not support activation offload")
+    if deallocate_pipeline_outputs:
+        raise ValueError("DSPP B1 does not pseudo-deallocate physical outputs")
+    if collect_non_loss_data:
+        raise NotImplementedError("DSPP B1 does not collect non-loss data")
+    if micro_seq_length <= 0:
+        raise ValueError("DSPP requires a positive micro_seq_length")
+
+    model_type = get_model_type(model)
+    if model_type == ModelType.encoder_and_decoder:
+        raise ValueError("DSPP B1 supports decoder-only models")
+    forward_func = partial(
+        forward_step,
+        forward_step_func=forward_step_func,
+        model=model,
+        timers=timers,
+        enable_autocast=enable_autocast,
+    )
+    backward_func = None if forward_only else partial(
+        backward_step,
+        model_type=model_type,
+        timers=timers,
+        deallocate_pipeline_outputs=False,
+    )
+
+    # Read the logical accumulation set first so variable-length groups can be
+    # weighted by their actual number of LM targets. The physical model work
+    # still runs one logical group at a time, so only data tensors (not all
+    # activation graphs) are retained across groups.
+    logical_batches = []
+    for logical_microbatch_id in range(num_microbatches):
+        if timers is not None:
+            timers("batch-generator", log_level=2).start()
+        training_batch, loss_func = get_batch_func(data_iterator)
+        if timers is not None:
+            timers("batch-generator").stop()
+        if not isinstance(training_batch, DsppTrainingBatch):
+            raise TypeError(
+                "DSPP get_batch_func must return a DsppTrainingBatch as its first value"
+            )
+        logical_batches.append((training_batch, loss_func))
+
+    micro_seq_length, adaptive_layout = _prepare_adaptive_dspp_chunk(
+        logical_batches,
+        micro_seq_length,
+        pipeline_size=1,
+        dtype=dtype or getattr(get_args(), 'params_dtype', torch.float32),
+    )
+    for training_batch, _ in logical_batches:
+        if training_batch.plan.chunk_size != micro_seq_length:
+            raise ValueError(
+                "DSPP training batch chunk size does not match micro_seq_length"
+            )
+
+    total_valid_tokens = sum(
+        training_batch.valid_token_count
+        for training_batch, _ in logical_batches
+    )
+    if total_valid_tokens <= 0:
+        raise RuntimeError("DSPP iteration contains no valid LM targets")
+
+    observation_baseline = _begin_dspp_activation_observation(
+        adaptive_layout is not None and not forward_only
+    )
+    forward_data_store = []
+    debug_limit = getattr(get_args(), "variable_seq_debug_num_batches", 0)
+    for logical_microbatch_id, (training_batch, loss_func) in enumerate(
+        logical_batches
+    ):
+        debug_count = getattr(
+            forward_backward_dspp_no_pipelining, "_debug_count", 0
+        )
+        debug_runtime = debug_count < debug_limit
+        if debug_limit:
+            forward_backward_dspp_no_pipelining._debug_count = debug_count + 1
+        if debug_runtime:
+            training_batch.validate()
+            physical_layout = [
+                [
+                    (
+                        item.sequence_id,
+                        item.segment_id,
+                        item.token_offset,
+                        item.token_length,
+                    )
+                    for item in physical.meta.items
+                ]
+                for physical in training_batch.physical_microbatches
+            ]
+            print(
+                "[dspp][batch] "
+                f"logical_microbatch={logical_microbatch_id}, "
+                f"sequence_lengths={training_batch.plan.sequence_lengths}, "
+                f"valid_tokens={training_batch.valid_token_count}, "
+                f"physical_microbatches={len(physical_layout)}, "
+                f"layout={physical_layout}",
+                flush=True,
+            )
+
+        state = DsppSequenceKVState(
+            validate_runtime=debug_runtime,
+            split_attention_backward=getattr(get_args(), 'dspp_split_attention_backward', False),
+            history_dkv_after_dx=getattr(get_args(), 'dspp_history_dkv_after_dx', False),
+        )
+        outputs = []
+        for physical in training_batch.physical_microbatches:
+            state.set_microbatch(physical.meta)
+            model_batch = (
+                physical.tokens,
+                physical.position_ids,
+                None,
+                physical.labels,
+            )
+            outputs.append(forward_func(model_batch, None, state))
+
+        combined_output = torch.cat(outputs, dim=-1)
+        loss, loss_reduced = loss_func(combined_output)
+        token_weight = training_batch.valid_token_count / total_valid_tokens
+        # The caller averages the returned dictionaries over Megatron logical
+        # microbatches. Compensate for that outer average so logs report the
+        # same token-weighted objective used by backward.
+        forward_data_store.append(
+            {
+                key: value * token_weight * num_microbatches
+                for key, value in loss_reduced.items()
+            }
+        )
+
+        if forward_only:
+            # Forward-only evaluation has no reverse pass that could drain
+            # retained K/V. It is safe to release the iteration-owned state.
+            state.clear()
+            continue
+
+        loss = loss * token_weight
+        if grad_scaler is not None:
+            loss = grad_scaler(loss)
+        output_grads = torch.autograd.grad(loss, outputs)
+        for physical, output, output_grad in reversed(
+            list(zip(training_batch.physical_microbatches, outputs, output_grads, strict=True))
+        ):
+            if state.history_dkv_after_dx:
+                state.begin_backward_task(physical.meta.microbatch_id)
+            backward_func(None, output, output_grad)
+            if state.history_dkv_after_dx:
+                state.mark_dx_ready(physical.meta.microbatch_id)
+                state.run_history_task(physical.meta.microbatch_id)
+        state.finish_iteration()
+
+    _finish_dspp_activation_observation(
+        observation_baseline,
+        adaptive_layout.peak_live_tokens if adaptive_layout is not None else 0,
+    )
+    return forward_data_store
+
+
+class _DsppVTaskBatch:
+    """Per-logical-batch activation state for one V-pipeline model chunk."""
+
+    def __init__(self, training_batch, forward_func, backward_func,
+                 grad_scaler, total_valid_tokens, is_loss_stage, chunk,
+                 split_attention_backward=False, history_dkv_after_dx=False):
+        self.training_batch = training_batch
+        self.forward_func = forward_func
+        self.backward_func = backward_func
+        self.grad_scaler = grad_scaler
+        self.total_valid_tokens = total_valid_tokens
+        self.is_loss_stage = is_loss_stage
+        self.chunk = chunk
+        self.kv_state = DsppSequenceKVState(
+            split_attention_backward=split_attention_backward,
+            history_dkv_after_dx=history_dkv_after_dx,
+        )
+        self.inputs = {}
+        self.outputs = {}
+        self.output_grads = {}
+        self.loss_contribution = None
+
+    def forward(self, split, input_tensor):
+        physical = self.training_batch.physical_microbatches[split]
+        self.kv_state.set_microbatch(physical.meta)
+        model_batch = (
+            physical.tokens,
+            physical.position_ids,
+            None,
+            physical.labels,
+        )
+        output_tensor = self.forward_func(model_batch, input_tensor, self.kv_state)
+        self.inputs[split] = input_tensor
+        self.outputs[split] = output_tensor
+        if self.is_loss_stage:
+            loss_sum = (output_tensor.float() * physical.loss_mask).sum()
+            loss = loss_sum / self.total_valid_tokens
+            self.loss_contribution = loss.detach()
+            scaled_loss = loss
+            if self.grad_scaler is not None:
+                scaled_loss = self.grad_scaler(scaled_loss)
+            if self.backward_func is not None:
+                self.output_grads[split] = torch.autograd.grad(
+                    scaled_loss, output_tensor
+                )[0]
+        return None if self.is_loss_stage else output_tensor
+
+    def backward(self, split, output_tensor_grad):
+        if self.kv_state.history_dkv_after_dx:
+            self.kv_state.begin_backward_task(
+                self.training_batch.physical_microbatches[split].meta.microbatch_id
+            )
+        if self.is_loss_stage:
+            output_tensor_grad = self.output_grads.pop(split)
+        input_tensor = self.inputs.pop(split)
+        output_tensor = self.outputs.pop(split)
+        with WeightGradStore.set_split_bw(True):
+            input_tensor_grad = self.backward_func(
+                input_tensor, output_tensor, output_tensor_grad
+            )
+            WeightGradStore.flush(chunk=self.chunk)
+        if self.kv_state.history_dkv_after_dx:
+            self.kv_state.mark_dx_ready(
+                self.training_batch.physical_microbatches[split].meta.microbatch_id
+            )
+        return input_tensor_grad
+
+    def history(self, split):
+        return self.kv_state.run_history_task(
+            self.training_batch.physical_microbatches[split].meta.microbatch_id
+        )
+
+    def weight(self, progress_tracker=None, progress_parent=None):
+        WeightGradStore.pop(
+            chunk=self.chunk,
+            pop_num=1,
+            progress_tracker=progress_tracker,
+            progress_parent=progress_parent,
+        )
+
+
+def _pad_dspp_v_split_counts(split_counts, pipeline_size):
+    """Add communication-only slots when a short iteration cannot fill V warmup."""
+
+    counts = list(split_counts)
+    if len(counts) < 2:
+        raise ValueError("distributed DSPP requires at least two logical microbatches")
+    while sum(counts) < max(counts) + 2 * pipeline_size - 2:
+        smallest = min(range(len(counts)), key=counts.__getitem__)
+        counts[smallest] += 1
+    return counts
+
+
+def pipelining_with_dspp_stage_local_v(*,
+                                       forward_step_func,
+                                       get_batch_func,
+                                       data_iterator: Union[Iterator, List[Iterator]],
+                                       model: Union[torch.nn.Module, List[torch.nn.Module]],
+                                       num_microbatches: int,
+                                       micro_seq_length: int,
+                                       kv_cache_class: Type[Cache], # unused
+                                       dtype: Optional[torch.dtype] = None,
+                                       tensor_shape: Optional[Shape] = None,
+                                       decoder_seq_length: Optional[int] = None, # unused
+                                       grad_scaler: Callable = None,
+                                       sequence_parallel: bool = False,
+                                       overlap_p2p_comm: bool = False, # unused
+                                       batch_p2p_comm: bool = True, # unused
+                                       attn_balance: int = 0,
+                                       vocab_in_pp: bool = False,
+                                       forward_only: bool = False,
+                                       timers: Callable = None,
+                                       collect_non_loss_data: bool = False,
+                                       enable_autocast: bool = False,
+                                       deallocate_pipeline_outputs: bool = False,
+                                       no_sync_func: Optional[Callable] = None,
+                                       grad_sync_func: Optional[Callable] = None,
+                                       param_sync_func: Optional[Callable] = None,
+                                       pre_p2p_func: Optional[Callable] = None,
+                                       post_p2p_async_func: Optional[Callable] = None,
+                                       offload_ratio: float = 0,
+                                       offload_delay_to_next_stage: bool = False,
+                                       ):
+    """Run DSPP V-ZB from the current stage's local F/B/W event stream.
+
+    Communication carries only fixed ``[chunk, 1, hidden]`` activations. Two
+    NCCL groups bind traffic to the physical next/previous direction. Task
+    identity is ``(logical_microbatch, physical_microbatch)`` and is used only
+    to retain local activation state and order each directed message stream.
+    """
+
+    del (kv_cache_class, decoder_seq_length, overlap_p2p_comm, batch_p2p_comm,
+         no_sync_func, grad_sync_func, param_sync_func, pre_p2p_func,
+         post_p2p_async_func, offload_delay_to_next_stage)
+    if not isinstance(model, list) or len(model) != 2:
+        raise ValueError("distributed DSPP requires exactly two model chunks")
+    if isinstance(data_iterator, list):
+        data_iterator = data_iterator[0]
+    if sequence_parallel or attn_balance or vocab_in_pp or offload_ratio:
+        raise ValueError("DSPP PP currently excludes SP, attention balance, vocab PP, and offload")
+    if deallocate_pipeline_outputs or collect_non_loss_data:
+        raise ValueError("DSPP PP does not support output deallocation or non-loss collection")
+    if dtype is None or tensor_shape is None:
+        raise ValueError("DSPP PP requires a fixed pipeline dtype and tensor shape")
+
+    pipeline_size = parallel_state.get_pipeline_model_parallel_world_size()
+    stage = parallel_state.get_pipeline_model_parallel_rank()
+    if pipeline_size != 3:
+        raise ValueError("distributed DSPP currently requires PP=3")
+    WeightGradStore.assert_supported()
+
+    logical_batches = []
+    for _ in range(num_microbatches):
+        if timers is not None:
+            timers("batch-generator", log_level=2).start()
+        training_batch, loss_func = get_batch_func(data_iterator)
+        if timers is not None:
+            timers("batch-generator").stop()
+        if not isinstance(training_batch, DsppTrainingBatch):
+            raise TypeError("DSPP get_batch_func must return DsppTrainingBatch")
+        logical_batches.append((training_batch, loss_func))
+
+    micro_seq_length, adaptive_layout = _prepare_adaptive_dspp_chunk(
+        logical_batches,
+        micro_seq_length,
+        pipeline_size=pipeline_size,
+        dtype=dtype,
+    )
+    for training_batch, _ in logical_batches:
+        if training_batch.plan.chunk_size != micro_seq_length:
+            raise ValueError(
+                "DSPP training batch chunk size does not match micro_seq_length"
+            )
+
+    total_valid_tokens = sum(batch.valid_token_count for batch, _ in logical_batches)
+    if total_valid_tokens <= 0:
+        raise RuntimeError("DSPP iteration contains no valid LM targets")
+    args = get_args()
+    ordering = build_dspp_ordering_plan(
+        [batch for batch, _ in logical_batches],
+        pp_degree=pipeline_size,
+        mode=getattr(args, 'dspp_microbatch_order', 'warmup-short-steady-long'),
+        # Execution-cost calibration is consumed by chunk planning only.  It
+        # must not silently change the ordering policy in a chunk-size
+        # ablation; ordering has its own explicit profile option.
+        profile_path=getattr(args, 'dspp_order_profile', None),
+    )
+    schedule_groups = ordering.schedule_groups
+    split_counts = [len(group) for group in schedule_groups]
+    schedule_split_counts = _pad_dspp_v_split_counts(split_counts, pipeline_size)
+    schedules, _ = build_slice_v_schedule(
+        pipeline_size, len(schedule_split_counts), schedule_split_counts
+    )
+    schedule = schedules[stage]
+    if forward_only:
+        schedule = [node for node in schedule if node.kind == 'F']
+
+    model_type = get_model_type(model[0])
+    if model_type == ModelType.encoder_and_decoder:
+        raise ValueError("DSPP supports decoder-only models")
+    forward_funcs = [
+        partial(forward_step, forward_step_func=forward_step_func,
+                model=model_chunk, timers=timers,
+                enable_autocast=enable_autocast)
+        for model_chunk in model
+    ]
+    backward_func = None if forward_only else partial(
+        backward_step, model_type=model_type, timers=timers,
+        deallocate_pipeline_outputs=False
+    )
+
+    task_batches = {}
+    for logical_id, (training_batch, _loss_func) in enumerate(logical_batches):
+        for chunk in range(2):
+            task_batches[(logical_id, chunk)] = _DsppVTaskBatch(
+                training_batch=training_batch,
+                forward_func=forward_funcs[chunk],
+                backward_func=backward_func,
+                grad_scaler=grad_scaler,
+                total_valid_tokens=total_valid_tokens,
+                is_loss_stage=(chunk == 1 and stage == 0),
+                chunk=chunk,
+                split_attention_backward=getattr(args, 'dspp_split_attention_backward', False),
+                history_dkv_after_dx=getattr(args, 'dspp_history_dkv_after_dx', False),
+            )
+
+    slot_to_task = {
+        (group_id, split): task
+        for group_id, group in enumerate(schedule_groups)
+        for split, task in enumerate(group)
+    }
+    ordering_metadata = {
+        'mode': getattr(args, 'dspp_microbatch_order', 'warmup-short-steady-long'),
+        'v_layer_layout': getattr(args, 'dspp_v_layer_layout', 'balanced'),
+        'cost_source': ordering.cost_source,
+        'warmup_count': ordering.warmup_count,
+        'warmup_task_count': ordering.warmup_task_count,
+        'warmup_short_only_count': ordering.warmup_short_only_count,
+        'entrance_order': ordering.entrance_order,
+        'schedule_group_sizes': split_counts,
+        'schedule_group_sizes_with_padding': schedule_split_counts,
+    }
+    timeline = DsppTimelineRecorder(
+        args,
+        stage=stage,
+        ordering=ordering_metadata,
+    )
+    progress = DsppGpuProgressTracker(stage)
+    if timeline.enabled and stage == 0:
+        model_layout = {}
+        balanced_layout = getattr(args, 'dspp_v_layer_layout', 'balanced') == 'balanced'
+        layer_slots = args.num_layers if balanced_layout else args.num_layers + 1
+        layers_per_logical_stage = layer_slots // (2 * pipeline_size)
+        for layout_stage in range(pipeline_size):
+            descriptions = []
+            for layout_chunk in range(2):
+                logical_stage = (
+                    layout_stage if layout_chunk == 0
+                    else 2 * pipeline_size - layout_stage - 1
+                )
+                begin = logical_stage * layers_per_logical_stage
+                end = min(args.num_layers, begin + layers_per_logical_stage)
+                layers = list(range(begin + 1, end + 1))
+                roles = []
+                if layout_stage == 0 and layout_chunk == 0:
+                    roles.append('embedding')
+                if layout_stage == 0 and layout_chunk == 1:
+                    roles.append('output-head/loss')
+                role_text = f" + {', '.join(roles)}" if roles else ''
+                descriptions.append(
+                    f"chunk{layout_chunk} transformer_layers={layers}{role_text}"
+                )
+            model_layout[layout_stage] = descriptions
+        timeline.microbatch_report = render_dspp_microbatch_report(
+            [batch for batch, _ in logical_batches],
+            ordering,
+            schedule_split_counts=schedule_split_counts,
+            model_layout=model_layout,
+        )
+
+    def message_key(node):
+        return (node.kind, node.chunk, node.microbatch, node.split)
+
+    def incoming_sender(target_stage, node):
+        if node.kind == 'F' and node.chunk == 0 and target_stage > 0:
+            return target_stage - 1
+        if node.kind == 'F' and node.chunk == 1 and target_stage < pipeline_size - 1:
+            return target_stage + 1
+        if node.kind == 'B' and node.chunk == 1 and target_stage > 0:
+            return target_stage - 1
+        if node.kind == 'B' and node.chunk == 0 and target_stage < pipeline_size - 1:
+            return target_stage + 1
+        return None
+
+    # A sender may compute messages in a different F/B interleave than its
+    # receiver consumes them. Queue ready tensors and submit them in the
+    # receiver's local order; this is lane-local ordering, not global timing.
+    expected_sends = {}
+    for peer in (stage - 1, stage + 1):
+        if 0 <= peer < pipeline_size:
+            peer_schedule = schedules[peer]
+            if forward_only:
+                peer_schedule = [node for node in peer_schedule if node.kind == 'F']
+            expected_sends[peer] = [
+                message_key(node) for node in peer_schedule
+                if incoming_sender(peer, node) == stage
+            ]
+    send_cursor = {peer: 0 for peer in expected_sends}
+    ready_sends = {peer: {} for peer in expected_sends}
+    send_index_by_key = {
+        peer: {key: index for index, key in enumerate(keys)}
+        for peer, keys in expected_sends.items()
+    }
+    inflight_sends = {peer: deque() for peer in expected_sends}
+    recv_lookahead = int(getattr(args, 'dspp_recv_lookahead', 2))
+    send_inflight_depth = int(
+        getattr(args, 'dspp_send_inflight_depth', 2)
+    )
+    credit_send_requests = []
+    ack_send_requests = []
+    ready_signal_send_requests = []
+    p2p_debug = os.environ.get('DSPP_P2P_DEBUG', '0') == '1'
+    p2p_debug_sequence = 0
+
+    def debug_p2p(message):
+        nonlocal p2p_debug_sequence
+        if not p2p_debug:
+            return
+        print(
+            f'[dspp][p2p-debug][stage={stage}][seq={p2p_debug_sequence}] {message}',
+            flush=True,
+        )
+        p2p_debug_sequence += 1
+
+    def group_for(sender, receiver):
+        edge = min(sender, receiver)
+        if receiver > sender:
+            return parallel_state.get_pipeline_model_parallel_next_group(edge)
+        return parallel_state.get_pipeline_model_parallel_prev_group(edge)
+
+    # NCCL P2P kernels can consume GPU progress resources while waiting for an
+    # unmatched peer operation. Use the existing CPU/Gloo pipeline group as a
+    # rendezvous channel: the receiver advertises readiness at its real recv
+    # node, and the sender launches NCCL only after both the credit and tensor
+    # are available. All NCCL calls stay on the training thread. During a
+    # blocking dependency wait, that thread cooperatively launches other
+    # credit-matched sends, which breaks cross-edge wait cycles without
+    # prefetching activation tensors.
+    credit_group = parallel_state.get_pipeline_model_parallel_group_gloo()
+
+    def credit_tag(data_sender, data_receiver):
+        return 2_000_000 + data_sender * pipeline_size + data_receiver
+
+    def ack_tag(data_sender, data_receiver):
+        return 3_000_000 + data_sender * pipeline_size + data_receiver
+
+    def ready_tag(data_sender, data_receiver):
+        return 4_000_000 + data_sender * pipeline_size + data_receiver
+
+    credit_counts = {peer: 0 for peer in expected_sends}
+    credit_locks = {peer: threading.Lock() for peer in expected_sends}
+
+    def credit_worker(peer):
+        peer_rank = parallel_state.get_pipeline_model_parallel_global_rank(peer)
+        for _ in expected_sends[peer]:
+            credit = torch.empty(1, dtype=torch.uint8, device='cpu')
+            dist.recv(
+                credit,
+                src=peer_rank,
+                group=credit_group,
+                tag=credit_tag(stage, peer),
+            )
+            with credit_locks[peer]:
+                credit_counts[peer] += 1
+
+    credit_threads = []
+    for peer in expected_sends:
+        thread = threading.Thread(
+            target=credit_worker,
+            args=(peer,),
+            name=f'dspp-credit-{stage}-from-{peer}',
+            daemon=True,
+        )
+        thread.start()
+        credit_threads.append(thread)
+
+    local_receive_schedule = schedule
+    if forward_only:
+        local_receive_schedule = [
+            node for node in local_receive_schedule if node.kind == 'F'
+        ]
+    expected_receives = {}
+    for peer in (stage - 1, stage + 1):
+        if 0 <= peer < pipeline_size:
+            expected_receives[peer] = [
+                message_key(node) for node in local_receive_schedule
+                if incoming_sender(stage, node) == peer
+            ]
+    recv_cursor = {peer: 0 for peer in expected_receives}
+    recv_post_cursor = {peer: 0 for peer in expected_receives}
+    pending_receives = {peer: {} for peer in expected_receives}
+    ack_counts = {peer: 0 for peer in expected_receives}
+    ack_locks = {peer: threading.Lock() for peer in expected_receives}
+    ready_indices = {peer: set() for peer in expected_receives}
+    ready_locks = {peer: threading.Lock() for peer in expected_receives}
+
+    def ready_worker(peer):
+        peer_rank = parallel_state.get_pipeline_model_parallel_global_rank(peer)
+        for _ in expected_receives[peer]:
+            ready_index = torch.empty(1, dtype=torch.int64, device='cpu')
+            dist.recv(
+                ready_index,
+                src=peer_rank,
+                group=credit_group,
+                tag=ready_tag(peer, stage),
+            )
+            with ready_locks[peer]:
+                ready_indices[peer].add(int(ready_index[0]))
+
+    ready_threads = []
+    if recv_lookahead > 0:
+        for peer in expected_receives:
+            thread = threading.Thread(
+                target=ready_worker,
+                args=(peer,),
+                name=f'dspp-ready-{stage}-from-{peer}',
+                daemon=True,
+            )
+            thread.start()
+            ready_threads.append(thread)
+
+    def ack_worker(peer):
+        peer_rank = parallel_state.get_pipeline_model_parallel_global_rank(peer)
+        for _ in expected_receives[peer]:
+            ack = torch.empty(1, dtype=torch.uint8, device='cpu')
+            dist.recv(
+                ack,
+                src=peer_rank,
+                group=credit_group,
+                tag=ack_tag(peer, stage),
+            )
+            with ack_locks[peer]:
+                ack_counts[peer] += 1
+
+    ack_threads = []
+    for peer in expected_receives:
+        thread = threading.Thread(
+            target=ack_worker,
+            args=(peer,),
+            name=f'dspp-ack-{stage}-from-{peer}',
+            daemon=True,
+        )
+        thread.start()
+        ack_threads.append(thread)
+
+    def flush_ready_sends(peer=None):
+        peers = (peer,) if peer is not None else tuple(expected_sends)
+        launched = 0
+        for target in peers:
+            inflight = inflight_sends[target]
+            while inflight and inflight[0][0].is_completed():
+                request, _tensor = inflight.popleft()
+                request.wait()
+            while len(inflight) < send_inflight_depth:
+                cursor = send_cursor[target]
+                if cursor >= len(expected_sends[target]):
+                    break
+                key = expected_sends[target][cursor]
+                if key not in ready_sends[target]:
+                    break
+                tensor = ready_sends[target][key]
+                payload_bytes = tensor.numel() * tensor.element_size()
+                with credit_locks[target]:
+                    credit_count = credit_counts[target]
+                    has_credit = credit_count > cursor
+                if not has_credit:
+                    break
+                ready_sends[target].pop(key)
+                debug_p2p(
+                    f'send-ready peer={target} key={key} reason=matched-credit '
+                    f'payload_bytes={payload_bytes} inflight={len(inflight)}'
+                )
+                debug_p2p(f'post-send peer={target} key={key}')
+                peer_rank = parallel_state.get_pipeline_model_parallel_global_rank(target)
+                group = group_for(stage, target)
+                operation = dist.P2POp(dist.isend, tensor, peer_rank, group)
+                if timeline.recording:
+                    with timeline.communication(f"send_s{stage}_to_s{target}/{key}"):
+                        request = dist.batch_isend_irecv([operation])[0]
+                else:
+                    request = dist.batch_isend_irecv([operation])[0]
+                ack = torch.ones(1, dtype=torch.uint8, device='cpu')
+                ack_request = dist.isend(
+                    ack,
+                    dst=peer_rank,
+                    group=credit_group,
+                    tag=ack_tag(stage, target),
+                )
+                ack_send_requests.append((ack_request, ack))
+                progress.track_p2p(
+                    operation="send",
+                    sender=stage,
+                    receiver=target,
+                    key=key,
+                    work=request,
+                    payload_bytes=payload_bytes,
+                )
+                debug_p2p(f'posted-send peer={target} key={key}')
+                inflight.append((request, tensor))
+                send_cursor[target] = cursor + 1
+                launched += 1
+        return launched
+
+    def submit_send(peer, node, tensor):
+        key = message_key(node)
+        ready_sends[peer][key] = tensor.contiguous()
+        debug_p2p(f'queued-send peer={peer} key={key}')
+        if recv_lookahead > 0:
+            ready_index = torch.tensor(
+                [send_index_by_key[peer][key]], dtype=torch.int64, device='cpu'
+            )
+            peer_rank = parallel_state.get_pipeline_model_parallel_global_rank(peer)
+            ready_request = dist.isend(
+                ready_index,
+                dst=peer_rank,
+                group=credit_group,
+                tag=ready_tag(stage, peer),
+            )
+            ready_signal_send_requests.append((ready_request, ready_index))
+        flush_ready_sends(peer)
+
+    recv_shape = get_actual_tensor_shape(
+        tensor_shape, sequence_parallel=False, micro_seq_length=micro_seq_length
+    )
+    recv_shape = (recv_shape[0], 1, recv_shape[2])
+
+    def wait_for_send_launch(sender, cursor):
+        # Do not wait for the payload to finish on the host. Only wait until the
+        # peer has launched the matching NCCL send, while cooperatively
+        # launching this rank's credit-matched sends. The subsequent Work.wait
+        # restores the normal asynchronous compute-stream dependency.
+        while True:
+            with ack_locks[sender]:
+                send_launched = ack_counts[sender] > cursor
+            if send_launched:
+                return
+            fill_receive_lookaheads()
+            if flush_ready_sends() == 0:
+                time.sleep(0.00005)
+
+    def post_receive(sender, cursor):
+        key = expected_receives[sender][cursor]
+        tensor = torch.empty(
+            recv_shape, dtype=dtype, device=torch.cuda.current_device(),
+            requires_grad=True,
+        )
+        sender_rank = parallel_state.get_pipeline_model_parallel_global_rank(sender)
+        credit = torch.ones(1, dtype=torch.uint8, device='cpu')
+        credit_request = dist.isend(
+            credit,
+            dst=sender_rank,
+            group=credit_group,
+            tag=credit_tag(sender, stage),
+        )
+        credit_send_requests.append((credit_request, credit))
+        debug_p2p(f'posted-credit sender={sender} key={key}')
+        group = group_for(sender, stage)
+        operation = dist.P2POp(dist.irecv, tensor, sender_rank, group)
+        debug_p2p(f'post-recv sender={sender} key={key}')
+        if timeline.recording:
+            with timeline.communication(
+                f"recv_s{sender}_to_s{stage}/{key}"
+            ):
+                request = dist.batch_isend_irecv([operation])[0]
+        else:
+            request = dist.batch_isend_irecv([operation])[0]
+        progress_token = progress.track_p2p(
+            operation="recv",
+            sender=sender,
+            receiver=stage,
+            key=key,
+            work=request,
+            payload_bytes=tensor.numel() * tensor.element_size(),
+        )
+        return key, tensor, request, progress_token
+
+    def fill_receive_lookahead(sender):
+        while (
+            recv_post_cursor[sender] < len(expected_receives[sender])
+            and recv_post_cursor[sender] - recv_cursor[sender] < recv_lookahead
+        ):
+            cursor = recv_post_cursor[sender]
+            with ready_locks[sender]:
+                sender_ready = cursor in ready_indices[sender]
+            if not sender_ready:
+                break
+            pending_receives[sender][cursor] = post_receive(sender, cursor)
+            with ready_locks[sender]:
+                ready_indices[sender].discard(cursor)
+            recv_post_cursor[sender] = cursor + 1
+
+    def fill_receive_lookaheads():
+        for sender in expected_receives:
+            fill_receive_lookahead(sender)
+
+    def wait_for_sender_ready(sender, cursor):
+        while True:
+            # Cooperative progress may post this very receive and consume its
+            # ready marker between the check below and the next iteration.
+            if cursor in pending_receives[sender]:
+                return
+            with ready_locks[sender]:
+                if cursor in ready_indices[sender]:
+                    return
+            fill_receive_lookaheads()
+            if flush_ready_sends() == 0:
+                time.sleep(0.00005)
+
+    def receive(sender, node):
+        key = message_key(node)
+        cursor = recv_cursor[sender]
+        expected_key = expected_receives[sender][cursor]
+        if key != expected_key:
+            raise RuntimeError(
+                f"DSPP receive order mismatch from stage {sender}: "
+                f"expected {expected_key}, got {key}"
+            )
+        posted = pending_receives[sender].pop(cursor, None)
+        if posted is None:
+            if recv_lookahead > 0:
+                wait_for_sender_ready(sender, cursor)
+                posted = pending_receives[sender].pop(cursor, None)
+            if posted is None:
+                posted = post_receive(sender, cursor)
+            if recv_lookahead > 0:
+                with ready_locks[sender]:
+                    ready_indices[sender].discard(cursor)
+            recv_post_cursor[sender] = max(recv_post_cursor[sender], cursor + 1)
+        _posted_key, tensor, request, progress_token = posted
+        progress.wait_enter(progress_token)
+        if timeline.recording:
+            with timeline.communication(
+                f"wait-recv_s{sender}_to_s{stage}/{key}"
+            ):
+                wait_for_send_launch(sender, cursor)
+                request.wait()
+        else:
+            wait_for_send_launch(sender, cursor)
+            request.wait()
+        recv_cursor[sender] = cursor + 1
+        progress.wait_return(progress_token)
+        debug_p2p(f'wait-returned-recv sender={sender} key={key}')
+        fill_receive_lookahead(sender)
+        return tensor
+
+    def detach_boundary(tensor):
+        tensor = tensor.detach()
+        tensor.requires_grad_()
+        return tensor
+
+    local_forward = {}
+    local_backward = {}
+    total_loss = None
+    local_peak_live_tokens = (
+        estimate_stage_peak_live_slots(schedule, schedule_groups)
+        * micro_seq_length
+    )
+    observation_baseline = _begin_dspp_activation_observation(
+        adaptive_layout is not None and not forward_only
+    )
+    for node in schedule:
+        fill_receive_lookaheads()
+        flush_ready_sends()
+        debug_p2p(
+            f'node slot={node.slot} kind={node.kind}{node.chunk} '
+            f'group={node.microbatch} split={node.split}'
+        )
+        parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
+        slot_id = (node.microbatch, node.split)
+        task_id = slot_to_task.get(slot_id)
+        is_padding = task_id is None
+        if is_padding:
+            if node.kind == 'F':
+                if node.chunk == 0:
+                    tensor = (
+                        torch.zeros(recv_shape, dtype=dtype, device=torch.cuda.current_device())
+                        if stage == 0 else receive(stage - 1, node)
+                    )
+                    if stage == pipeline_size - 1:
+                        local_forward[slot_id] = tensor
+                    else:
+                        submit_send(stage + 1, node, tensor)
+                else:
+                    tensor = (
+                        local_forward.pop(slot_id)
+                        if stage == pipeline_size - 1 else receive(stage + 1, node)
+                    )
+                    if stage > 0:
+                        submit_send(stage - 1, node, tensor)
+            elif node.kind == 'B':
+                if node.chunk == 1:
+                    tensor = (
+                        torch.zeros(recv_shape, dtype=dtype, device=torch.cuda.current_device())
+                        if stage == 0 else receive(stage - 1, node)
+                    )
+                    if stage == pipeline_size - 1:
+                        local_backward[slot_id] = tensor
+                    else:
+                        submit_send(stage + 1, node, tensor)
+                else:
+                    tensor = (
+                        local_backward.pop(slot_id)
+                        if stage == pipeline_size - 1 else receive(stage + 1, node)
+                    )
+                    if stage > 0:
+                        submit_send(stage - 1, node, tensor)
+            continue
+        logical_id, physical_id = task_id
+        task_batch = task_batches[(logical_id, node.chunk)]
+        if timeline.recording:
+            physical_meta = task_batch.training_batch.physical_microbatches[physical_id].meta
+            task_kind = f'{node.kind}{node.chunk}'
+        if node.kind == 'F':
+            if node.chunk == 0:
+                input_tensor = None if stage == 0 else receive(stage - 1, node)
+            else:
+                input_tensor = (
+                    local_forward.pop(slot_id)
+                    if stage == pipeline_size - 1
+                    else receive(stage + 1, node)
+                )
+            progress_token = progress.begin_compute(
+                f'F{node.chunk}', node, task_id
+            )
+            if timeline.recording:
+                with timeline.task(
+                    task_kind, task_id, physical_meta, chunk=node.chunk
+                ):
+                    output_tensor = task_batch.forward(physical_id, input_tensor)
+            else:
+                output_tensor = task_batch.forward(physical_id, input_tensor)
+            progress.end_compute(progress_token)
+            if node.chunk == 0:
+                if stage == pipeline_size - 1:
+                    local_forward[slot_id] = detach_boundary(output_tensor)
+                else:
+                    submit_send(stage + 1, node, output_tensor)
+            elif stage > 0:
+                submit_send(stage - 1, node, output_tensor)
+            if task_batch.loss_contribution is not None:
+                contribution = task_batch.loss_contribution
+                total_loss = contribution if total_loss is None else total_loss + contribution
+                task_batch.loss_contribution = None
+        elif node.kind == 'B':
+            if node.chunk == 1:
+                output_grad = None if stage == 0 else receive(stage - 1, node)
+            else:
+                output_grad = (
+                    local_backward.pop(slot_id)
+                    if stage == pipeline_size - 1
+                    else receive(stage + 1, node)
+                )
+            progress_token = progress.begin_compute(
+                f'B{node.chunk}', node, task_id
+            )
+            if timeline.recording:
+                with timeline.task(
+                    task_kind, task_id, physical_meta, chunk=node.chunk
+                ):
+                    input_grad = task_batch.backward(physical_id, output_grad)
+            else:
+                input_grad = task_batch.backward(physical_id, output_grad)
+            progress.end_compute(progress_token)
+            if node.chunk == 1:
+                if stage == pipeline_size - 1:
+                    local_backward[slot_id] = input_grad
+                else:
+                    submit_send(stage + 1, node, input_grad)
+            elif stage > 0:
+                submit_send(stage - 1, node, input_grad)
+            # The complete stage dx is now published to the existing local/P2P
+            # boundary. H is a separate task, immediately next on this stream;
+            # no F/B/W task may consume historical gradients before it finishes.
+            if task_batch.kv_state.history_dkv_after_dx:
+                if task_batch.kv_state.pending_history_count:
+                    history_kind = f'H{node.chunk}'
+                    history_token = progress.begin_compute(history_kind, node, task_id)
+                    if timeline.recording:
+                        with timeline.task(history_kind, task_id, physical_meta, chunk=node.chunk):
+                            task_batch.history(physical_id)
+                    else:
+                        task_batch.history(physical_id)
+                    progress.end_compute(history_token)
+                else:
+                    task_batch.history(physical_id)
+        elif node.kind == 'W':
+            progress_token = progress.begin_compute(
+                f'W{node.chunk}', node, task_id
+            )
+            wgrad_progress = progress if progress.enabled else None
+            if timeline.recording:
+                with timeline.task(
+                    task_kind, task_id, physical_meta, chunk=node.chunk
+                ):
+                    task_batch.weight(wgrad_progress, progress_token)
+            else:
+                task_batch.weight(wgrad_progress, progress_token)
+            progress.end_compute(progress_token)
+
+    while any(
+        send_cursor[peer] != len(expected_sends[peer])
+        for peer in expected_sends
+    ):
+        if flush_ready_sends() == 0:
+            time.sleep(0.00005)
+    for thread in credit_threads:
+        thread.join()
+    for thread in ack_threads:
+        thread.join()
+    for thread in ready_threads:
+        thread.join()
+    for peer in expected_sends:
+        if send_cursor[peer] != len(expected_sends[peer]):
+            raise RuntimeError(f"DSPP has unsent messages for peer stage {peer}")
+    debug_p2p(
+        f'wait-all-sends count={sum(len(queue) for queue in inflight_sends.values())}'
+    )
+    for queue in inflight_sends.values():
+        for request, _tensor in queue:
+            request.wait()
+    for request, _credit in credit_send_requests:
+        request.wait()
+    for request, _ack in ack_send_requests:
+        request.wait()
+    for request, _ready_index in ready_signal_send_requests:
+        request.wait()
+    debug_p2p('all-sends-complete')
+
+    for task_batch in task_batches.values():
+        if forward_only:
+            task_batch.kv_state.clear()
+        else:
+            task_batch.kv_state.finish_iteration()
+    if not forward_only:
+        WeightGradStore.assert_empty()
+    _finish_dspp_activation_observation(
+        observation_baseline, local_peak_live_tokens
+    )
+    real_tasks = len(ordering.entrance_order)
+    scheduled_tasks = sum(schedule_split_counts)
+    if stage == 0:
+        args._dspp_last_iteration_metrics = {
+            'valid_tokens': total_valid_tokens,
+            'physical_microbatches': real_tasks,
+            'physical_token_capacity': real_tasks * micro_seq_length,
+            'schedule_padding_slots': scheduled_tasks - real_tasks,
+            'schedule_slots': scheduled_tasks,
+            'order_cost_source': ordering.cost_source,
+        }
+        if adaptive_layout is not None:
+            args._dspp_last_iteration_metrics.update(args._dspp_chunk_selection)
+    timeline.finish()
+    progress.stop()
+    forward_data_store = []
+    if stage == 0 and total_loss is not None:
+        # Keep Megatron's established "average a list of logical microbatches"
+        # contract while the physical tasks themselves are globally reordered.
+        forward_data_store = [
+            {'lm loss': total_loss} for _ in range(num_microbatches)
+        ]
+    return forward_data_store
+
+
+def get_actual_tensor_shape(tensor_shape, sequence_parallel, micro_seq_length=0):
+    seq_length, batch_size, hidden_size = tensor_shape
+    if micro_seq_length:
+        seq_length = micro_seq_length
+    seq_length //= parallel_state.get_context_parallel_world_size()
+    if sequence_parallel:
+        seq_length //= parallel_state.get_tensor_model_parallel_world_size()
+    return (seq_length, batch_size, hidden_size)
+
+
+def pipelining_with_slicing(*,
+                            forward_step_func,
+                            get_batch_func,
+                            data_iterator: Union[Iterator, List[Iterator]],
+                            model: Union[torch.nn.Module, List[torch.nn.Module]],
+                            num_microbatches: int,
+                            micro_seq_length: int,
+                            kv_cache_class: Type[Cache],
+                            dtype: Optional[torch.dtype] = None,
+                            tensor_shape: Optional[Shape] = None,
+                            decoder_seq_length: Optional[int] = None, # unused
+                            grad_scaler: Callable = None,
+                            sequence_parallel: bool = False,
+                            overlap_p2p_comm: bool = False,
+                            batch_p2p_comm: bool = True,
+                            attn_balance: int = 0,
+                            vocab_in_pp: bool = False, # unused
+                            forward_only: bool = False,
+                            timers: Callable = None,
+                            collect_non_loss_data: bool = False, # unused
+                            enable_autocast: bool = False,
+                            deallocate_pipeline_outputs: bool = False,
+                            no_sync_func: Optional[Callable] = None, # unused
+                            grad_sync_func: Optional[Callable] = None, # unused
+                            param_sync_func: Optional[Callable] = None, # unused
+                            pre_p2p_func: Optional[Callable] = None, # unused
+                            post_p2p_async_func: Optional[Callable] = None, # unused
+                            offload_ratio: float = 0,
+                            offload_delay_to_next_stage: bool = False, # unused
+                            _variable_slicing: bool = False,
+                            ):
+    """Run 1F1B schedule, with batch and token level pipeline parallelism.
+
+    Returns dictionary with losses if the last stage, empty dict otherwise."""
+
+    if isinstance(model, list):
+        assert len(model) == 1, \
+            "Non-interleaved pipeline parallelism does not support model chunking"
+        model = model[0]
+    if isinstance(data_iterator, list):
+        assert len(data_iterator) == 1, \
+            "Non-pipeline-parallel schedule does not support model chunking"
+        data_iterator = data_iterator[0]
+    assert overlap_p2p_comm, \
+        "Slicing pipeline parallelism only supports overlapping p2p communication"
+    assert not batch_p2p_comm, \
+        "Slicing pipeline parallelism does not support using batched p2p communication"
+
+    assert not isinstance(model, torchDDP), "torchDDP is no longer supported."
+    model_type = get_model_type(model)
+    assert model_type != ModelType.encoder_and_decoder, "encoder_and_decoder model is not supported yet."
+    assert not attn_balance, "not implemented"
+
+    pipeline_parallel_size = parallel_state.get_pipeline_model_parallel_world_size()
+    pipeline_parallel_rank = parallel_state.get_pipeline_model_parallel_rank()
+    first_stage = parallel_state.is_pipeline_first_stage()
+    last_stage = parallel_state.is_pipeline_last_stage()
+    args = get_args()
+    # DEBUG for variable length training.
+    variable_seq_debug_limit = getattr(args, 'variable_seq_debug_num_batches', 0)
+
+    num_slices = tensor_shape[0] // micro_seq_length
+    # shape of input_ids.
+    input_shape = (tensor_shape[1], micro_seq_length // parallel_state.get_context_parallel_world_size())
+    tensor_shape = get_actual_tensor_shape(tensor_shape, sequence_parallel, micro_seq_length)
+
+    forward_func = partial(forward_step, forward_step_func=forward_step_func, model=model,
+                           timers=timers, enable_autocast=enable_autocast)
+    backward_func = None if forward_only else partial(backward_step, model_type=model_type,
+                            timers=timers, deallocate_pipeline_outputs=deallocate_pipeline_outputs)
+
+    cnt_microbatches = 0
+    loss_div = num_microbatches
+    forward_data_store = []
+    # minimun number of slices to fullfill the pipeline.
+    num_slices_preset = 1 if _variable_slicing else num_slices
+    # warm up to prefill the pipeline.
+    num_slices_warmup = 2 * (pipeline_parallel_size - pipeline_parallel_rank - 1)
+    # in-flight slices need to gain.
+    num_slices_target = 4096 if forward_only else num_slices_preset + num_slices_warmup
+    # current in-flight slices.
+    num_slices_flight = 0
+    mb_queue = deque()
+    batch_fwd: Optional[MicroBatch] = None
+    batch_bwd: Optional[MicroBatch] = None
+    input_tensor_grad = None
+    output_tensor_grad = None
+    offload_req = None
+    onload_req = None
+    cnt_onload = 0
+    variable_microbatch_specs = deque()
+
+    def read_microbatch_slices(cnt_microbatches):
+        if timers is not None:
+            record_context = timers.is_recording_active()
+            if record_context:
+                timers.set_record_context(mb=cnt_microbatches)
+            timers('batch-generator', log_level=2).start()
+        sliced_batch, loss_func = get_batch_func(data_iterator)
+        if timers is not None:
+            timers('batch-generator').stop()
+            if record_context:
+                timers.clear_record_context()
+        if not last_stage:
+            loss_func = None
+        slices = sliced_batch(micro_seq_length)
+        return slices, loss_func
+
+    def make_microbatch(cnt_microbatches):
+        nonlocal num_slices_target
+        assert cnt_microbatches < num_microbatches, "No more microbatches."
+        if variable_microbatch_specs:
+            slices, loss_func = variable_microbatch_specs.popleft()
+        else:
+            slices, loss_func = read_microbatch_slices(cnt_microbatches)
+        if _variable_slicing:
+            assert len(slices) >= 1, "variable sequence slicing produced no slices."
+            assert len(slices) % pipeline_parallel_size == 0, \
+                "variable sequence slicing currently requires chunk count to be divisible by pipeline size."
+            # DEBUG for variable length training.
+            if cnt_microbatches < variable_seq_debug_limit:
+                print(
+                    "[variable-seq][schedule] "
+                    f"rank={pipeline_parallel_rank}/{pipeline_parallel_size}, "
+                    f"microbatch={cnt_microbatches}, slices={len(slices)}, "
+                    f"warmup_slices={num_slices_warmup}, "
+                    f"target_inflight_slices={num_slices_target}, "
+                    f"current_inflight_slices={num_slices_flight}, "
+                    f"forward_only={forward_only}",
+                    flush=True,
+                )
+        num_slices_total = num_slices_flight + (num_microbatches - cnt_microbatches) * len(slices)
+        if not _variable_slicing:
+            assert num_slices_total >= num_slices_target, "number of total slices is not enough."
+        kv_cache = kv_cache_class()
+        mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func,
+                        backward_func, loss_func, grad_scaler,
+                        batch_idx=cnt_microbatches,
+                        timers=timers)
+        # mb._bwd = []
+        return cnt_microbatches + 1, mb
+
+    if _variable_slicing:
+        variable_microbatch_specs_list = []
+        for microbatch_idx in range(num_microbatches):
+            slices, loss_func = read_microbatch_slices(microbatch_idx)
+            assert len(slices) >= 1, "variable sequence slicing produced no slices."
+            variable_microbatch_specs_list.append([slices, loss_func])
+        max_num_slices = max(len(slices) for slices, _ in variable_microbatch_specs_list)
+        assert max_num_slices >= pipeline_parallel_size, \
+            "variable sequence slicing currently requires at least one chunk per pipeline stage."
+        assert max_num_slices % pipeline_parallel_size == 0, \
+            "variable sequence slicing currently requires chunk count to be divisible by pipeline size."
+        for idx, (slices, _) in enumerate(variable_microbatch_specs_list):
+            assert len(slices) % pipeline_parallel_size == 0, \
+                "variable sequence slicing currently requires chunk count to be divisible by pipeline size."
+            # DEBUG for variable length training.
+            if idx < variable_seq_debug_limit:
+                print(
+                    "[variable-seq][schedule-fixed] "
+                    f"rank={pipeline_parallel_rank}/{pipeline_parallel_size}, "
+                    f"microbatch={idx}, slices={len(slices)}, max_slices={max_num_slices}, "
+                    f"warmup_slices={num_slices_warmup}, "
+                    f"target_inflight_slices={max_num_slices + num_slices_warmup}, "
+                    f"forward_only={forward_only}",
+                    flush=True,
+                )
+        variable_microbatch_specs.extend(variable_microbatch_specs_list)
+        num_slices_preset = max_num_slices
+        num_slices_target = 4096 if forward_only else max_num_slices + num_slices_warmup
+
+    def calc_ctx_pair(batch: MicroBatch, attn_balance):
+        assert attn_balance >= 0, 'attn_balance with cache is not implemented.'
+        if not attn_balance:
+            return None
+        cache_len = [batch.cache_len(offset=pipeline_parallel_rank - i) for i in range(pipeline_parallel_size)]
+        # avg = sum(cache_len) / pipeline_parallel_size
+        # len = cache_len[pipeline_parallel_rank]
+        # com = avg * 2 - len
+        # assert com in cache_len, (pipeline_parallel_rank, cache_len)
+        # idx = cache_len.index(com)
+        # vol = int(avg - len)
+
+        ord = sorted(cache_len)
+        len = cache_len[pipeline_parallel_rank]
+        com = ord[pipeline_parallel_size - 1 - ord.index(len)]
+        idx = cache_len.index(com)
+        avg = (com + len) / 2
+        vol = int(avg - len)
+        fwd = not (batch.slice_idx + 1 < pipeline_parallel_size - pipeline_parallel_rank and cnt_microbatches == 1 or
+                    batch.num_slices - batch.slice_idx <= pipeline_parallel_rank and cnt_microbatches == num_microbatches)
+        bwd = not (batch.slice_idx + 1 < pipeline_parallel_size - pipeline_parallel_rank and cnt_microbatches == num_microbatches or
+                    batch.num_slices - batch.slice_idx <= pipeline_parallel_rank and cnt_microbatches == 1)
+        nfwd = vol if fwd else 0
+        nbwd = vol if bwd else 0
+
+        # if msg == "fwd" and fwd or msg == "bwd" and bwd:
+        #     torch.distributed.barrier(group=parallel_state.get_pipeline_model_parallel_group(), async_op=True)
+        # if fwd or bwd:
+        #     print(f"rank{pipeline_parallel_rank}: {msg}: {idx, vol, fwd, bwd} {cache_len}", flush=True)
+        return CtxPair(idx, 0, nfwd, nbwd)
+
+    # print messages for debug.
+    DEBUG_P2PCOMM = False
+    DEBUG_OFFLOAD = False
+    def print_debug(flag, msg, value=None):
+        if flag:
+            if isinstance(value, torch.Tensor):
+                value = (value.dtype, value.shape, value.abs().mean().item())
+            print(f"rank{pipeline_parallel_rank}: {msg}: {value}", flush=True)
+
+    # vocab in pp
+    if vocab_in_pp:
+        dummy_inputs = deque(); dummy_inputs.append([])
+        dummy_outputs = deque(); dummy_outputs.append([])
+        for cnt_pp_first in range(pipeline_parallel_rank):
+            print_debug(DEBUG_P2PCOMM, "fwd pre+" , value=cnt_pp_first)
+            encoder_input, dummy_input, _ = pre_process_forward(model, None, input_shape)
+            print_debug(DEBUG_P2PCOMM, "fwd pre-" , value=cnt_pp_first)
+            dummy_inputs[-1].append(dummy_input)
+            if len(dummy_inputs[-1]) == num_slices:
+                dummy_inputs.append([])
+            del encoder_input, _
+
+        cnt_pp_first = pipeline_parallel_rank
+        cnt_pp_last = pipeline_parallel_rank - pipeline_parallel_size + 1
+
+    # receive the first input_tensor.
+    print_debug(DEBUG_P2PCOMM, "fwd recv+")
+    input_tensor = p2p_communication.recv_forward(tensor_shape, dtype, batch_p2p_comm, timers)
+    fwd_reqs = []
+    bwd_reqs = []
+    print_debug(DEBUG_P2PCOMM, "fwd recv-")
+
+    while num_slices_flight or num_slices_target:
+        cuda_sync_and_record(sync_level=1)
+        """Forward"""
+        if num_slices_flight < num_slices_target:
+            if not batch_fwd:
+                cnt_microbatches, batch_fwd = make_microbatch(cnt_microbatches)
+                num_slices_target = max(num_slices_target, batch_fwd.num_slices_to_forward + num_slices_warmup)
+
+        if vocab_in_pp and cnt_pp_first < num_microbatches * num_slices:
+            if first_stage:
+                data = batch_fwd.pop_data()
+            else:
+                data = None
+            print_debug(DEBUG_P2PCOMM, "fwd pre+" , value=cnt_pp_first)
+            encoder_input, dummy_input, data = pre_process_forward(model, data, input_shape)
+            print_debug(DEBUG_P2PCOMM, "fwd pre-" , value=cnt_pp_first)
+            dummy_inputs[-1].append(dummy_input)
+            if len(dummy_inputs[-1]) == num_slices:
+                dummy_inputs.append([])
+            if first_stage:
+                batch_fwd.append_data(data)
+                assert input_tensor is None
+                input_tensor = encoder_input.detach().requires_grad_()
+            del encoder_input, data
+
+        if num_slices_flight < num_slices_target:   # do forward to gain in-flight micro-batches.
+            assert all(req.wait() for req in fwd_reqs); fwd_reqs = None
+            print_debug(DEBUG_P2PCOMM, "fwd sendrecv-")
+            batch_fwd.kv_cache.ctx_pair = calc_ctx_pair(batch_fwd, attn_balance)
+            # if not (batch_fwd.slice_idx + 1 < pipeline_parallel_size - pipeline_parallel_rank and cnt_microbatches == 1 or
+            #         batch_fwd.num_slices - batch_fwd.slice_idx <= pipeline_parallel_rank and cnt_microbatches == num_microbatches):
+            #     torch.distributed.all_reduce(torch.empty((), dtype=dtype, device='cuda'), group=parallel_state.get_pipeline_model_parallel_group())
+            # batch_fwd._bwd.append(not (batch_fwd.slice_idx + 1 < pipeline_parallel_size - pipeline_parallel_rank and cnt_microbatches == num_microbatches or
+            #         batch_fwd.num_slices - batch_fwd.slice_idx <= pipeline_parallel_rank and cnt_microbatches == 1))
+            print_debug(DEBUG_P2PCOMM or DEBUG_OFFLOAD, "forward+")
+            output_tensor = batch_fwd.forward(input_tensor); input_tensor = None
+            print_debug(DEBUG_P2PCOMM or DEBUG_OFFLOAD, "forward-")
+            num_slices_flight += 1
+
+            recv_prev = not first_stage and (batch_fwd.num_slices_to_forward or cnt_microbatches < num_microbatches)
+            print_debug(DEBUG_P2PCOMM, "fwd sendrecv+", output_tensor)
+            input_tensor, fwd_reqs = \
+                p2p_communication.send_forward_recv_forward(output_tensor,
+                                                            recv_prev,
+                                                            tensor_shape,
+                                                            dtype,
+                                                            batch_p2p_comm,
+                                                            overlap_p2p_comm,
+                                                            timers)
+
+        if vocab_in_pp and \
+            cnt_pp_last >= 0 and cnt_pp_last < num_microbatches * num_slices:
+            if last_stage:
+                output = (batch_fwd or mb_queue[-1]).pop_output()
+            else:
+                output = None
+            print_debug(DEBUG_P2PCOMM, "fwd post+" , value=cnt_pp_last)
+            dummy_output, loss = post_process_forward(model, output, tensor_shape, input_shape, dtype)
+            print_debug(DEBUG_P2PCOMM, "fwd post-" , value=cnt_pp_last)
+            dummy_outputs[-1].append((dummy_output, loss))
+            if len(dummy_outputs[-1]) == num_slices:
+                dummy_outputs.append([])
+            if last_stage:
+                (batch_fwd or mb_queue[-1]).append_output(loss)
+            del output
+
+        if batch_fwd and batch_fwd.num_slices_to_forward == 0:
+            forward_data_store.append(batch_fwd.compute_loss(loss_div))
+            mb_queue.append(batch_fwd); batch_fwd = None
+
+        if forward_only:
+            num_slices_flight = 0
+            continue
+
+        if offload_req:
+            offload_req.wait(); offload_req = None
+            print_debug(DEBUG_OFFLOAD, "offload-")
+
+        """Offload"""
+        if num_slices_target: # before the cooldown
+            prior_works = fwd_reqs
+            mb = batch_fwd or mb_queue[-1]
+            curr_om = mb.curr_om()
+            if 2 * mb.num_slices_to_forward + num_slices_warmup > 2:
+                # there are enough forward stages to overlap with offload and onload.
+                print_debug(DEBUG_OFFLOAD, "offload+")
+                offload_req = curr_om.offload(prior_works=prior_works)
+            else:
+                # never offload/onload acts. for this slice.
+                curr_om.reset()
+        else: # during the cooldown, no `fwd_reqs` are created.
+            prior_works = bwd_reqs
+
+        """Backward"""
+        if num_slices_flight >= num_slices_target:  # do backward to consume in-flight micro-batches.
+            assert all(req.wait() for req in (bwd_reqs or [])); bwd_reqs = None
+            print_debug(DEBUG_P2PCOMM, "bwd sendrecv-")
+            if onload_req:
+                onload_req.wait(); onload_req = None
+                print_debug(DEBUG_OFFLOAD, "onload-")
+            batch_bwd = batch_bwd or mb_queue.popleft()
+
+        if vocab_in_pp:
+            cnt_pp_first += 1
+            cnt_pp_last += 1
+
+        if vocab_in_pp and \
+            cnt_pp_last >= num_slices and \
+            cnt_pp_last < (num_microbatches + 1) * num_slices:
+            dummy_output, loss = dummy_outputs[0].pop()
+            if len(dummy_outputs[0]) == 0:
+                dummy_outputs.popleft()
+            if last_stage:
+                grad_loss = batch_bwd.pop_output_grad()
+            else:
+                grad_loss = None
+            print_debug(DEBUG_P2PCOMM, "bwd post+" , value=cnt_pp_last)
+            grad = post_process_backward(loss, grad_loss, dummy_output, tensor_shape)
+            print_debug(DEBUG_P2PCOMM, "bwd post-" , value=cnt_pp_last)
+            if last_stage:
+                assert output_tensor_grad is None
+                output_tensor_grad = grad
+            del dummy_output, loss, grad_loss, grad
+
+        if num_slices_flight >= num_slices_target:  # do backward to consume in-flight micro-batches.
+            # if batch_bwd._bwd.pop():
+            #     torch.distributed.all_reduce(torch.empty((), dtype=dtype, device='cuda'), group=parallel_state.get_pipeline_model_parallel_group())
+            print_debug(DEBUG_P2PCOMM or DEBUG_OFFLOAD, "backward+")
+            input_tensor_grad = batch_bwd.backward(output_tensor_grad); output_tensor_grad = None
+            print_debug(DEBUG_P2PCOMM or DEBUG_OFFLOAD, "backward-")
+            if not batch_bwd.num_slices_to_backward:
+                batch_bwd = None
+            num_slices_flight -= 1
+
+        if vocab_in_pp and cnt_pp_first >= num_slices_preset + 2 * (pipeline_parallel_size - 1):
+            dummy_input = dummy_inputs[0].pop()
+            if len(dummy_inputs[0]) == 0:
+                dummy_inputs.popleft()
+            if first_stage:
+                assert input_tensor_grad is not None
+                encoder_input_grad = input_tensor_grad
+                input_tensor_grad = None
+            else:
+                encoder_input_grad = None
+            print_debug(DEBUG_P2PCOMM, "bwd pre+" , value=cnt_pp_first)
+            pre_process_backward(dummy_input, encoder_input_grad)
+            print_debug(DEBUG_P2PCOMM, "bwd pre-" , value=cnt_pp_first)
+            del dummy_input, encoder_input_grad
+
+        num_slices_target = (batch_fwd or cnt_microbatches < num_microbatches) and num_slices_target
+        if num_slices_flight + 1 >= num_slices_target:
+            recv_next = not last_stage and (mb_queue or batch_bwd or batch_fwd)
+            print_debug(DEBUG_P2PCOMM, "bwd sendrecv+")
+            output_tensor_grad, bwd_reqs = \
+                p2p_communication.send_backward_recv_backward(input_tensor_grad,
+                                                              recv_next,
+                                                              tensor_shape,
+                                                              dtype,
+                                                              batch_p2p_comm,
+                                                              overlap_p2p_comm,
+                                                              timers=timers)
+
+        """Onload"""
+        # NOTE(lizhouyang): `onload` should start after the forward, **NOT** the backward.
+        # `prior_works` are usually `fwd_reqs` except for cooldown.
+        if num_slices_flight and num_slices_flight + 1 >= num_slices_target:  # after the second last round of warmup.
+            next_om = (batch_bwd or (mb_queue[0] if mb_queue else batch_fwd)).curr_om()
+            print_debug(DEBUG_OFFLOAD, "onload+", cnt_onload)
+            onload_req = next_om.onload(prior_works=prior_works, buffer_name="onload", buffer_idx=cnt_onload % 2)
+            cnt_onload += 1
+
+    if vocab_in_pp:
+        assert len(dummy_inputs[-1]) == 0
+        dummy_inputs.pop()
+        if pipeline_parallel_rank:
+            assert len(dummy_inputs[0]) == pipeline_parallel_rank
+        else:
+            assert not dummy_inputs
+        while dummy_inputs:
+            dummy_input = dummy_inputs[0].pop()
+            if len(dummy_inputs[0]) == 0:
+                dummy_inputs.popleft()
+            print_debug(DEBUG_P2PCOMM, "bwd pre+" , value=cnt_pp_first)
+            pre_process_backward(dummy_input, None)
+            print_debug(DEBUG_P2PCOMM, "bwd pre-" , value=cnt_pp_first)
+    if not forward_only:
+        assert all(req.wait() for req in (bwd_reqs or [])); bwd_reqs = None
+    return forward_data_store
+
+
+def pipelining_with_variable_slicing(**kwargs):
+    """Run non-interleaved pipeline parallelism with variable chunk counts.
+
+    This is a separate entry point from the original SlimPipe schedules so the
+    baseline remains directly comparable. It reuses the non-interleaved slicing
+    implementation with dynamic target sizing enabled.
+    """
+    return pipelining_with_slicing(_variable_slicing=True, **kwargs)
+
+
+def pipelining_with_variable_slicing_slice_v(*,
+                                         forward_step_func,
+                                         get_batch_func,
+                                         data_iterator: Union[Iterator, List[Iterator]],
+                                         model: Union[torch.nn.Module, List[torch.nn.Module]],
+                                         num_microbatches: int,
+                                         micro_seq_length: int,
+                                         kv_cache_class: Type[Cache],
+                                         dtype: Optional[torch.dtype] = None,
+                                         tensor_shape: Optional[Shape] = None,
+                                         decoder_seq_length: Optional[int] = None,
+                                         grad_scaler: Callable = None,
+                                         sequence_parallel: bool = False,
+                                         overlap_p2p_comm: bool = False,
+                                         batch_p2p_comm: bool = True,
+                                         attn_balance: int = 0,
+                                         vocab_in_pp: bool = False,
+                                         forward_only: bool = False,
+                                         timers: Callable = None,
+                                         collect_non_loss_data: bool = False,
+                                         enable_autocast: bool = False,
+                                         deallocate_pipeline_outputs: bool = False,
+                                         no_sync_func: Optional[Callable] = None,
+                                         grad_sync_func: Optional[Callable] = None,
+                                         param_sync_func: Optional[Callable] = None,
+                                         pre_p2p_func: Optional[Callable] = None,
+                                         post_p2p_async_func: Optional[Callable] = None,
+                                         offload_ratio: float = 0,
+                                         offload_delay_to_next_stage: bool = False,
+                                         ):
+    """Run the SliceV schedule with variable-length slices and two model chunks.
+
+    This is a separate experimental schedule. The existing variable-slicing
+    1F1B schedule remains available through ``--variable-seq-schedule 1f1b``.
+    """
+    assert isinstance(model, list) and len(model) == 2, \
+        "SliceV requires exactly two virtual pipeline model chunks"
+    if isinstance(data_iterator, list):
+        data_iterator = data_iterator[0]
+    assert get_batch_func is not None
+    assert not forward_only, "SliceV only supports backward training"
+    assert not attn_balance, "SliceV does not support attention balancing yet"
+    assert not vocab_in_pp, "SliceV does not support vocab-in-PP yet"
+    assert not no_sync_func and not grad_sync_func and not param_sync_func, \
+        "SliceV does not support custom sync hooks yet"
+    assert not offload_ratio, "SliceV does not support activation offload yet"
+
+    WeightGradStore.assert_supported()
+
+    model_type = get_model_type(model[0])
+    assert model_type != ModelType.encoder_and_decoder, \
+        "SliceV does not support encoder-decoder models"
+
+    pipeline_parallel_size = parallel_state.get_pipeline_model_parallel_world_size()
+    pipeline_parallel_rank = parallel_state.get_pipeline_model_parallel_rank()
+    tensor_shape = get_actual_tensor_shape(tensor_shape, sequence_parallel, micro_seq_length)
+    args = get_args()
+    variable_seq_debug_limit = getattr(args, 'variable_seq_debug_num_batches', 0)
+
+    forward_funcs = [
+        partial(forward_step, forward_step_func=forward_step_func,
+                model=model_chunk, timers=timers,
+                enable_autocast=enable_autocast)
+        for model_chunk in model
+    ]
+    backward_func = partial(backward_step, model_type=model_type,
+                            timers=timers,
+                            deallocate_pipeline_outputs=deallocate_pipeline_outputs)
+
+    microbatches: Dict[Tuple[int, int], MicroBatch] = {}
+    split_counts: List[int] = []
+    forward_data_store = []
+    loss_div = num_microbatches
+
+    for microbatch_idx in range(num_microbatches):
+        if timers is not None:
+            record_context = timers.is_recording_active()
+            if record_context:
+                timers.set_record_context(mb=microbatch_idx)
+            timers('batch-generator', log_level=2).start()
+        sliced_batch, loss_func = get_batch_func(data_iterator)
+        if timers is not None:
+            timers('batch-generator').stop()
+            if record_context:
+                timers.clear_record_context()
+        slices = sliced_batch(micro_seq_length)
+        assert len(slices) >= 1, "variable sequence slicing produced no slices."
+        split_counts.append(len(slices))
+        for chunk in range(2):
+            parallel_state.set_virtual_pipeline_model_parallel_rank(chunk)
+            chunk_loss_func = loss_func if (
+                chunk == 1 and pipeline_parallel_rank == 0
+            ) else None
+            microbatches[(microbatch_idx, chunk)] = MicroBatch(
+                slices,
+                kv_cache_class(),
+                offload_ratio,
+                forward_funcs[chunk],
+                backward_func,
+                chunk_loss_func,
+                grad_scaler,
+                batch_idx=microbatch_idx,
+                timers=timers,
+            )
+
+    schedules, plan = build_slice_v_schedule(
+        pipeline_parallel_size,
+        num_microbatches,
+        split_counts,
+    )
+    schedule = schedules[pipeline_parallel_rank]
+    execution_plan = build_slice_v_execution_plan(schedules)
+
+    def comm_key(node):
+        return (node.kind, node.chunk, node.microbatch, node.split)
+
+    def incoming_messages(stage, stage_schedule):
+        messages = []
+        for node in stage_schedule:
+            key = comm_key(node)
+            if node.kind == 'F' and node.chunk == 0 and stage > 0:
+                messages.append(('prev', key))
+            elif node.kind == 'F' and node.chunk == 1 and stage < pipeline_parallel_size - 1:
+                messages.append(('next', key))
+            elif node.kind == 'B' and node.chunk == 1 and stage > 0:
+                messages.append(('prev', key))
+            elif node.kind == 'B' and node.chunk == 0 and stage < pipeline_parallel_size - 1:
+                messages.append(('next', key))
+        return messages
+
+    def outgoing_messages(stage, stage_schedule):
+        messages = []
+        for node in stage_schedule:
+            key = comm_key(node)
+            if node.kind == 'F' and node.chunk == 0 and stage < pipeline_parallel_size - 1:
+                messages.append(('next', key))
+            elif node.kind == 'F' and node.chunk == 1 and stage > 0:
+                messages.append(('prev', key))
+            elif node.kind == 'B' and node.chunk == 1 and stage < pipeline_parallel_size - 1:
+                messages.append(('next', key))
+            elif node.kind == 'B' and node.chunk == 0 and stage > 0:
+                messages.append(('prev', key))
+        return messages
+
+    def validate_p2p_messages():
+        for left in range(pipeline_parallel_size - 1):
+            right = left + 1
+            left_out = [key for direction, key in outgoing_messages(left, schedules[left])
+                        if direction == 'next']
+            right_in = [key for direction, key in incoming_messages(right, schedules[right])
+                        if direction == 'prev']
+            if sorted(left_out) != sorted(right_in):
+                raise RuntimeError(
+                    "SliceV schedule has mismatched left-to-right P2P messages "
+                    f"between ranks {left}->{right}: send={left_out[:8]}, recv={right_in[:8]}"
+                )
+            right_out = [key for direction, key in outgoing_messages(right, schedules[right])
+                         if direction == 'prev']
+            left_in = [key for direction, key in incoming_messages(left, schedules[left])
+                       if direction == 'next']
+            if sorted(right_out) != sorted(left_in):
+                raise RuntimeError(
+                    "SliceV schedule has mismatched right-to-left P2P messages "
+                    f"between ranks {right}->{left}: send={right_out[:8]}, recv={left_in[:8]}"
+                )
+
+    validate_p2p_messages()
+
+    if variable_seq_debug_limit:
+        # DEBUG for variable length training.
+        print(
+            "[variable-seq][slice-v-schedule] "
+            f"rank={pipeline_parallel_rank}/{pipeline_parallel_size}, "
+            f"split_counts={split_counts}, events={len(schedule)}, "
+            f"phase_repeats={plan.phase_repeats[pipeline_parallel_rank]}",
+            flush=True,
+        )
+    local_forward_bridge: Dict[Tuple[int, int], torch.Tensor] = {}
+    local_backward_bridge: Dict[Tuple[int, int], torch.Tensor] = {}
+    trace_slice_v = variable_seq_debug_limit > 0
+    outgoing_tensors = {}
+    incoming_tensors = {}
+    pending_sends = {}
+
+    def node_desc(node):
+        return (
+            f"kind={node.kind}{node.chunk}, mb={node.microbatch}, "
+            f"split={node.split}, local_slot={node.slot}, "
+            f"start_slot={node.start_time}"
+        )
+
+    def trace(action, node=None, peer=None, key=None):
+        if not trace_slice_v:
+            return
+        details = [f"rank={pipeline_parallel_rank}", f"action={action}"]
+        if node is not None:
+            details.append(node_desc(node))
+        if peer is not None:
+            details.append(f"peer={peer}")
+        if key is not None:
+            details.append(f"key={key}")
+        # DEBUG for variable length training.
+        print("[variable-seq][slice-v-trace] " + ", ".join(details), flush=True)
+
+    def allocate_recv_tensor():
+        if dtype is None:
+            raise RuntimeError("dtype must be provided for SliceV P2P receives")
+        if tensor_shape is None:
+            raise RuntimeError("tensor_shape must be provided for SliceV P2P receives")
+        return torch.empty(tensor_shape,
+                           requires_grad=True,
+                           device=torch.cuda.current_device(),
+                           dtype=dtype)
+
+    pipeline_group = parallel_state.get_pipeline_model_parallel_group()
+
+    def receive(node):
+        key = comm_key(node)
+        try:
+            tensor, request, peer = incoming_tensors.pop(key)
+        except KeyError as exc:
+            raise RuntimeError(f"missing submitted SliceV communication {key}") from exc
+        if not trace_slice_v:
+            request.wait()
+        return tensor
+
+    def save_for_send(tensor, node):
+        key = comm_key(node)
+        if key in outgoing_tensors:
+            raise RuntimeError(f"duplicate SliceV outgoing tensor {key}")
+        outgoing_tensors[key] = tensor
+
+    def run_communication(actions):
+        first_action = actions[0]
+        if pipeline_parallel_rank not in (
+                first_action.sender, first_action.receiver):
+            return
+        peer_stage = (first_action.receiver
+                      if pipeline_parallel_rank == first_action.sender
+                      else first_action.sender)
+        peer = parallel_state.get_pipeline_model_parallel_global_rank(peer_stage)
+        if trace_slice_v:
+            # Keep p2p-complete specific to this transfer during synchronous
+            # debugging instead of including unfinished earlier computation.
+            torch.cuda.current_stream().synchronize()
+        if any(pipeline_parallel_rank == action.sender for action in actions):
+            previous_send = pending_sends.pop(peer, None)
+            if previous_send is not None and not trace_slice_v:
+                previous_request, _previous_tensor, _previous_key = previous_send
+                previous_request.wait()
+
+        transfers = []
+        for action in actions:
+            key = action.message
+            if pipeline_parallel_rank == action.sender:
+                try:
+                    tensor = outgoing_tensors.pop(key)
+                except KeyError as exc:
+                    raise RuntimeError(f"SliceV send tensor {key} is not ready") from exc
+                operation = 'send_next' if peer_stage > pipeline_parallel_rank else 'send_prev'
+                transfers.append((operation, 'send', key, tensor))
+            else:
+                tensor = allocate_recv_tensor()
+                operation = 'recv_prev' if peer_stage < pipeline_parallel_rank else 'recv_next'
+                transfers.append((operation, 'recv', key, tensor))
+
+        if pipeline_parallel_rank % 2 == 0:
+            operation_order = {
+                'send_next': 0, 'recv_prev': 1,
+                'send_prev': 2, 'recv_next': 3,
+            }
+        else:
+            operation_order = {
+                'recv_prev': 0, 'send_next': 1,
+                'recv_next': 2, 'send_prev': 3,
+            }
+        transfers.sort(key=lambda transfer: operation_order[transfer[0]])
+
+        requests = []
+        for _operation, transfer, key, tensor in transfers:
+            trace(f"p2p-{transfer}-begin", peer=peer, key={
+                'task': key,
+                'shape': tuple(tensor.shape),
+                'dtype': str(tensor.dtype),
+                'contiguous': tensor.is_contiguous(),
+            })
+            if transfer == 'send':
+                request = dist.isend(tensor, peer, group=pipeline_group)
+            else:
+                request = dist.irecv(tensor, peer, group=pipeline_group)
+            requests.append(request)
+            if trace_slice_v:
+                request.wait()
+                trace("p2p-wait-returned", peer=peer, key=key)
+                torch.cuda.current_stream().synchronize()
+                trace("p2p-local-complete", peer=peer, key=key)
+        for (_operation, transfer, key, tensor), request in zip(transfers, requests):
+            if transfer == 'send':
+                pending_sends[peer] = (request, tensor, key)
+            else:
+                incoming_tensors[key] = (tensor, request, peer)
+
+    def detach_pipeline_boundary(tensor):
+        if tensor is None:
+            return None
+        detached = tensor.detach()
+        detached.requires_grad_()
+        return detached
+
+    def run_forward(node):
+        parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
+        bridge_key = (node.microbatch, node.split)
+        if node.chunk == 0:
+            input_tensor = None if pipeline_parallel_rank == 0 else receive(node)
+        else:
+            if pipeline_parallel_rank == pipeline_parallel_size - 1:
+                input_tensor = local_forward_bridge.pop(bridge_key)
+            else:
+                input_tensor = receive(node)
+        mb = microbatches[(node.microbatch, node.chunk)]
+        trace("forward-compute-begin", node=node)
+        output_tensor = mb.forward(input_tensor)
+        trace("forward-compute-end", node=node)
+        if node.chunk == 0:
+            if pipeline_parallel_rank == pipeline_parallel_size - 1:
+                local_forward_bridge[bridge_key] = detach_pipeline_boundary(output_tensor)
+            else:
+                save_for_send(output_tensor, node)
+        else:
+            if pipeline_parallel_rank != 0:
+                save_for_send(output_tensor, node)
+        if node.chunk == 1 and mb.num_slices_to_forward == 0:
+            trace("loss-begin", node=node)
+            forward_data_store.append(mb.compute_loss(loss_div))
+            trace("loss-end", node=node)
+
+    def run_backward(node):
+        parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
+        bridge_key = (node.microbatch, node.split)
+        if node.chunk == 1:
+            output_tensor_grad = None if pipeline_parallel_rank == 0 else receive(node)
+        else:
+            if pipeline_parallel_rank == pipeline_parallel_size - 1:
+                output_tensor_grad = local_backward_bridge.pop(bridge_key)
+            else:
+                output_tensor_grad = receive(node)
+        mb = microbatches[(node.microbatch, node.chunk)]
+        trace("backward-compute-begin", node=node)
+        input_tensor_grad = mb.backward_b(output_tensor_grad, chunk=node.chunk)
+        trace("backward-compute-end", node=node)
+        if node.chunk == 1:
+            if pipeline_parallel_rank == pipeline_parallel_size - 1:
+                local_backward_bridge[bridge_key] = input_tensor_grad
+            else:
+                save_for_send(input_tensor_grad, node)
+        else:
+            if pipeline_parallel_rank != 0:
+                save_for_send(input_tensor_grad, node)
+
+    def run_weight(node):
+        parallel_state.set_virtual_pipeline_model_parallel_rank(node.chunk)
+        trace("weight-begin", node=node)
+        microbatches[(node.microbatch, node.chunk)].weight_grad(chunk=node.chunk)
+        trace("weight-end", node=node)
+
+    action_index = 0
+    while action_index < len(execution_plan):
+        action = execution_plan[action_index]
+        if action.kind == 'communication':
+            communication_actions = [action]
+            if action_index + 1 < len(execution_plan):
+                next_action = execution_plan[action_index + 1]
+                if (
+                    next_action.kind == 'communication'
+                    and action.sender == next_action.receiver
+                    and action.receiver == next_action.sender
+                ):
+                    communication_actions.append(next_action)
+                    action_index += 1
+            run_communication(communication_actions)
+            action_index += 1
+            continue
+        node = action.node
+        if node.stage != pipeline_parallel_rank:
+            action_index += 1
+            continue
+        cuda_sync_and_record(sync_level=1)
+        if node.kind == 'F':
+            run_forward(node)
+        elif node.kind == 'B':
+            run_backward(node)
+        elif node.kind == 'W':
+            run_weight(node)
+        else:
+            raise RuntimeError(f"unknown SliceV schedule event: {node}")
+        action_index += 1
+
+    assert not outgoing_tensors, \
+        f"Unsent SliceV tensors: {list(outgoing_tensors.keys())[:8]}"
+    assert not incoming_tensors, \
+        f"Unconsumed SliceV tensors: {list(incoming_tensors.keys())[:8]}"
+    for peer, (request, _tensor, key) in pending_sends.items():
+        if not trace_slice_v:
+            request.wait()
+    assert not local_forward_bridge, \
+        f"Unconsumed local forward bridge tensors: {list(local_forward_bridge.keys())[:8]}"
+    assert not local_backward_bridge, \
+        f"Unconsumed local backward bridge tensors: {list(local_backward_bridge.keys())[:8]}"
+    WeightGradStore.assert_empty()
+    return forward_data_store
+
+
+def pipelining_with_interleaved_slicing(*,
+                                        forward_step_func,
+                                        get_batch_func,
+                                        data_iterator: Union[Iterator, List[Iterator]],
+                                        model: Union[torch.nn.Module, List[torch.nn.Module]],
+                                        num_microbatches: int,
+                                        micro_seq_length: int,
+                                        kv_cache_class: Type[Cache],
+                                        dtype: Optional[torch.dtype] = None,
+                                        tensor_shape: Optional[Shape] = None,
+                                        decoder_seq_length: Optional[int] = None, # unused
+                                        grad_scaler: Callable = None,
+                                        sequence_parallel: bool = False,
+                                        overlap_p2p_comm: bool = False,
+                                        batch_p2p_comm: bool = True,
+                                        attn_balance: int = 0,
+                                        vocab_in_pp: bool = False,
+                                        forward_only: bool = False,
+                                        timers: Callable = None,
+                                        collect_non_loss_data: bool = False, # unused
+                                        enable_autocast: bool = False,
+                                        deallocate_pipeline_outputs: bool = False,
+                                        no_sync_func: Optional[Callable] = None, # unused
+                                        grad_sync_func: Optional[Callable] = None, # unused
+                                        param_sync_func: Optional[Callable] = None, # unused
+                                        pre_p2p_func: Optional[Callable] = None,
+                                        post_p2p_async_func: Optional[Callable] = None,
+                                        offload_ratio: float = 0,
+                                        offload_delay_to_next_stage: bool = False, # unused
+                                        ):
+    """Run interleaved 1F1B schedule (model split into model chunks), with batch and token level pipeline parallelism.
+
+    Returns dictionary with losses if the last stage, empty dict otherwise."""
+    assert isinstance(model, list), \
+        "interleaved pipeline parallelism expected model chunking"
+    assert all(isinstance(chunk, torch.nn.Module) for chunk in model), \
+        "invalid model chunking"
+    assert isinstance(data_iterator, list), \
+        "interleaved pipeline parallelism expected each model chunk to have a data iterator"
+    assert overlap_p2p_comm, \
+        "Slicing pipeline parallelism only supports overlapping p2p communication"
+    assert not batch_p2p_comm, \
+        "Slicing pipeline parallelism does not support using batched p2p communication"
+
+    assert not isinstance(model, torchDDP), "torchDDP is no longer supported."
+    model_type = get_model_type(model[0])
+    assert model_type != ModelType.encoder_and_decoder, \
+        "Interleaving is not supported with an encoder and decoder model."
+
+    assert not no_sync_func, "Not implemented!"
+    assert not grad_sync_func, "Not implemented!"
+    assert not param_sync_func, "Not implemented!"
+
+    pipeline_parallel_size = parallel_state.get_pipeline_model_parallel_world_size()
+    pipeline_parallel_rank = parallel_state.get_pipeline_model_parallel_rank()
+    first_stage = parallel_state.is_pipeline_first_stage(ignore_virtual=True)
+    last_stage = parallel_state.is_pipeline_last_stage(ignore_virtual=True)
+
+    num_slices = tensor_shape[0] // micro_seq_length
+    # shape of input_ids.
+    input_shape = (tensor_shape[1], micro_seq_length // parallel_state.get_context_parallel_world_size())
+    tensor_shape = get_actual_tensor_shape(tensor_shape, sequence_parallel, micro_seq_length)
+
+    cnt_microbatches = 0
+    loss_div = num_microbatches
+    forward_data_store = []
+    num_stages = len(model)
+    # find the minimum factor of `num_slices` that is greater than `pipeline_parallel_size`.
+    assert num_slices >= pipeline_parallel_size
+    group_size = pipeline_parallel_size
+    while num_slices % group_size:
+        group_size += 1
+    # minimun number of slices to fullfill the pipeline.
+    num_slices_preset = num_slices * num_stages
+    # warm up to prefill the pipeline.
+    num_slices_warmup = 2 * (pipeline_parallel_size - pipeline_parallel_rank - 1)
+    # in-flight slices need to gain.
+    num_slices_target = 4096 if forward_only else num_slices_preset + num_slices_warmup
+    # current in-flight slices.
+    num_slices_flight = 0
+    # batches
+    batch_queue: Deque[CycledBatch] = deque()
+    batch_fwd: Optional[CycledBatch] = None
+    batch_bwd: Optional[CycledBatch] = None
+    # recv tensors in advance.
+    recv_fwd_offset = first_stage * (group_size - pipeline_parallel_size)
+    recv_bwd_offset = last_stage * (group_size - pipeline_parallel_size)
+    input_tensors = deque()
+    output_tensor_grads = deque()
+    # send tensors in arrears.
+    # send_fwd_offset = last_stage * (group_size - pipeline_parallel_size)
+    # send_bwd_offset = first_stage * (group_size - pipeline_parallel_size)
+    # output_tensors = deque()
+    # input_tensor_grads = deque()
+    recv_fwd_stage_idx = 0
+    recv_bwd_stage_idx = -1 % num_stages
+    input_tensor_grad = None
+    # offload reqs
+    offload_req = None
+    onload_req = None
+    vocab_offload_req = None
+    vocab_onload_req = None
+    cnt_onload = 0
+
+    # attention balance
+    attn_balancer = AttnBalancer(num_microbatches, pipeline_parallel_rank, pipeline_parallel_size, attn_balance)
+
+    def make_microbatch(model, data_iterator, batch_idx=None):
+        forward_func = partial(forward_step, forward_step_func=forward_step_func, model=model,
+                               timers=timers, enable_autocast=enable_autocast)
+        backward_func = partial(backward_step, model_type=model_type,
+                                timers=timers, deallocate_pipeline_outputs=deallocate_pipeline_outputs) \
+                        if not forward_only else None
+        if timers is not None:
+            record_context = timers.is_recording_active()
+            if record_context:
+                timers.set_record_context(mb=batch_idx)
+            timers('batch-generator', log_level=2).start()
+        sliced_batch, loss_func = get_batch_func(data_iterator)
+        if timers is not None:
+            timers('batch-generator').stop()
+            if record_context:
+                timers.clear_record_context()
+        if not parallel_state.is_pipeline_last_stage():
+            loss_func = None
+        slices = sliced_batch(micro_seq_length)
+        assert len(slices) >= group_size, "number of slices per microbatch is not enough."
+        kv_cache = kv_cache_class()
+        mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func,
+                        backward_func, loss_func, grad_scaler,
+                        batch_idx=batch_idx,
+                        timers=timers)
+        return mb
+
+    def make_cycled_batch(cnt_microbatches):
+        assert cnt_microbatches < num_microbatches, "No more microbatches."
+        mbatches = []
+        for i in range(num_stages):
+            parallel_state.set_virtual_pipeline_model_parallel_rank(i)
+            mbatches.append(make_microbatch(model[i], data_iterator[i],
+                                            cnt_microbatches))
+        cbatch = CycledBatch(cnt_microbatches, mbatches, group_size)
+        num_slices_total = num_slices_flight + (num_microbatches - cnt_microbatches) * cbatch.num_slices_to_forward
+        assert num_slices_total >= num_slices_target, "number of total slices is not enough."
+        return cnt_microbatches + 1, cbatch
+
+    # print messages for debug.
+    DEBUG_CTXPAIR = False
+    DEBUG_P2PCOMM = False
+    DEBUG_OFFLOAD = False
+    cnt_fwd = 0
+    cnt_bwd = 0
+    def print_debug(flag, msg, value=None):
+        if flag:
+            stage = parallel_state.get_virtual_pipeline_model_parallel_rank()
+            if isinstance(value, torch.Tensor):
+                value = (value.dtype, value.shape, value.abs().mean().item())
+            print(f"rank{pipeline_parallel_rank}: {msg}: {value}", flush=True)
+
+
+    # vocab in pp
+    if vocab_in_pp:
+        dummy_inputs = deque(); dummy_inputs.append([])
+        dummy_outputs = deque(); dummy_outputs.append([])
+        for cnt_pp_first in range(pipeline_parallel_rank):
+            print_debug(DEBUG_P2PCOMM, "fwd pre+" , value=cnt_pp_first)
+            encoder_input, dummy_input, _ = pre_process_forward(model[0], None, input_shape)
+            print_debug(DEBUG_P2PCOMM, "fwd pre-" , value=cnt_pp_first)
+            dummy_inputs[-1].append(dummy_input)
+            if len(dummy_inputs[-1]) == num_slices:
+                dummy_inputs.append([])
+            del encoder_input, _
+        cnt_pp_first = pipeline_parallel_rank
+        cnt_pp_last = pipeline_parallel_rank - pipeline_parallel_size + 1
+
+    # receive the first input_tensor.
+    parallel_state.set_virtual_pipeline_model_parallel_rank(recv_fwd_stage_idx)
+    recv_prev = not parallel_state.is_pipeline_first_stage()
+    print_debug(DEBUG_P2PCOMM, "fwd recv+" if recv_prev else "fwd noop+")
+    if pre_p2p_func: pre_p2p_func()
+    input_tensor = p2p_communication.recv_forward(tensor_shape, dtype, batch_p2p_comm, timers)
+    if post_p2p_async_func: post_p2p_async_func([])
+    fwd_recv = None
+    input_tensors.append((input_tensor, fwd_recv))
+    if len(input_tensors) > recv_fwd_offset:
+        input_tensor, fwd_recv = input_tensors.popleft()
+
+    while num_slices_flight or num_slices_target:
+        cuda_sync_and_record(sync_level=1)
+        """Forward"""
+        if num_slices_flight < num_slices_target:   # do forward to gain in-flight micro-batches.
+            if not batch_fwd:
+                cnt_microbatches, batch_fwd = make_cycled_batch(cnt_microbatches)
+                num_slices_target = max(num_slices_target, batch_fwd.num_slices_to_forward + num_slices_warmup)
+
+        if vocab_in_pp and cnt_pp_first < num_microbatches * num_stages * num_slices and \
+            cnt_pp_first % (num_stages * group_size) // group_size == 0:
+            if first_stage:
+                data = batch_fwd.curr_mbatch().pop_data()
+            else:
+                data = None
+            print_debug(DEBUG_P2PCOMM, "fwd pre+" , value=cnt_pp_first)
+            encoder_input, dummy_input, data = pre_process_forward(model[0], data, input_shape)
+            print_debug(DEBUG_P2PCOMM, "fwd pre-" , value=cnt_pp_first)
+            dummy_inputs[-1].append(dummy_input)
+            if len(dummy_inputs[-1]) == num_slices:
+                dummy_inputs.append([])
+            if first_stage:
+                batch_fwd.curr_mbatch().append_data(data)
+                assert input_tensor is None
+                input_tensor = encoder_input.detach().requires_grad_()
+            del encoder_input, data
+
+        if num_slices_flight < num_slices_target:
+            if fwd_recv:
+                fwd_recv.wait(); fwd_recv = None
+            print_debug(DEBUG_P2PCOMM, "fwd sendrecv-" if recv_prev else "fwd send-", value=input_tensor)
+            ctx_pair = attn_balancer.calc_ctx_pair(batch_fwd)
+            print_debug(DEBUG_CTXPAIR, "fwd ctx_pair", value=ctx_pair)
+            batch_fwd.curr_mbatch().update_kv_cache(ctx_pair)
+            print_debug(DEBUG_P2PCOMM or DEBUG_OFFLOAD, "forward+", value=cnt_fwd)
+            output_tensor = batch_fwd.forward(input_tensor); input_tensor = None
+            recv_fwd_stage_idx = batch_fwd.stage_idx(offset=recv_fwd_offset)
+            print_debug(DEBUG_P2PCOMM or DEBUG_OFFLOAD, "forward-", value=cnt_fwd); cnt_fwd += 1
+            num_slices_flight += 1
+
+            # output_tensors.append(output_tensor)
+            # output_tensor = output_tensors.popleft() if len(output_tensors) > send_fwd_offset else None
+            parallel_state.set_virtual_pipeline_model_parallel_rank(recv_fwd_stage_idx)
+            if (batch_fwd and batch_fwd.num_slices_to_forward > recv_fwd_offset) or cnt_microbatches < num_microbatches:
+                recv_prev = not parallel_state.is_pipeline_first_stage()
+            else:
+                recv_prev = False
+            print_debug(DEBUG_P2PCOMM, "fwd sendrecv+" if recv_prev else "fwd send+", value=output_tensor)
+            if pre_p2p_func: pre_p2p_func()
+            input_tensor, fwd_reqs = \
+                p2p_communication.send_forward_recv_forward(output_tensor,
+                                                            recv_prev,
+                                                            tensor_shape,
+                                                            dtype,
+                                                            batch_p2p_comm,
+                                                            overlap_p2p_comm,
+                                                            timers); output_tensor = None
+            if post_p2p_async_func: post_p2p_async_func(fwd_reqs)
+            fwd_recv = fwd_reqs[-1] if recv_prev else None
+            input_tensors.append((input_tensor, fwd_recv)); input_tensor, fwd_recv = None, None
+            input_tensor, fwd_recv = input_tensors.popleft() if len(input_tensors) > recv_fwd_offset else (None, None)
+
+        if offload_req:
+            offload_req.wait(); offload_req = None
+            print_debug(DEBUG_OFFLOAD, "offload-")
+
+        """Offload"""
+        prior_works = [torch.cuda.current_stream().record_event()]  # offload/onload waits for forward.
+        if num_slices_target: # before the cooldown
+            prior_works += fwd_reqs
+            curr_batch = batch_fwd or batch_queue[-1]
+            curr_om = curr_batch.prev_mbatch().curr_om()
+            if 2 * curr_batch.num_slices_to_forward + num_slices_warmup > 2:
+                # there are enough forward stages to overlap with offload and onload.
+                print_debug(DEBUG_OFFLOAD, "offload+")
+                offload_req = curr_om.offload(prior_works=prior_works)
+            else:
+                # never offload/onload acts. for this slice.
+                curr_om.reset()
+        else: # during the cooldown, no `fwd_reqs` are created.
+            prior_works += bwd_reqs
+
+        if vocab_offload_req:
+            vocab_offload_req.wait(); vocab_offload_req = None
+            print_debug(DEBUG_OFFLOAD, "vocab offload-")
+        if vocab_in_pp and \
+            cnt_pp_last >= 0 and cnt_pp_last < num_microbatches * num_stages * num_slices and \
+            cnt_pp_last % (num_stages * group_size) // group_size + 1 == num_stages:
+            if last_stage:
+                output = batch_fwd.prev_mbatch().pop_output()
+            else:
+                output = None
+            print_debug(DEBUG_P2PCOMM, "fwd post+" , value=cnt_pp_last)
+            dummy_output, loss, vocab_om = post_process_forward(
+                model[0], output, tensor_shape, input_shape, dtype, offload_ratio)
+            print_debug(DEBUG_P2PCOMM, "fwd post-" , value=cnt_pp_last)
+            dummy_outputs[-1].append((dummy_output, loss, vocab_om))
+            if len(dummy_outputs[-1]) + 2 <= num_slices:
+                print_debug(DEBUG_OFFLOAD, "vocab offload+")
+                vocab_offload_req = vocab_om.offload(
+                    prior_works=[torch.cuda.current_stream().record_event()] + (fwd_reqs or bwd_reqs))
+            else:
+                vocab_om.reset()
+            if len(dummy_outputs[-1]) == num_slices:
+                dummy_outputs.append([])
+            if last_stage:
+                batch_fwd.prev_mbatch().append_output(loss)
+            del output
+
+        if batch_fwd and batch_fwd.num_slices_to_forward == 0:
+            forward_data_store.append(batch_fwd.compute_loss(loss_div))
+            batch_queue.append(batch_fwd); batch_fwd = None
+
+        if forward_only:
+            num_slices_flight = 0
+            continue
+
+        """Backward"""
+        if num_slices_flight >= num_slices_target:  # do backward to consume in-flight micro-batches.
+            batch_bwd = batch_bwd or batch_queue.popleft()
+
+        if vocab_in_pp:
+            cnt_pp_first += 1
+            cnt_pp_last += 1
+
+        if vocab_onload_req:
+            vocab_onload_req.wait(); vocab_onload_req = None
+            print_debug(DEBUG_OFFLOAD, "vocab onload-")
+        if vocab_in_pp and \
+            cnt_pp_last >= num_stages * num_slices and \
+            cnt_pp_last < (num_microbatches + 1) * num_stages * num_slices and \
+            cnt_pp_last % (num_stages * group_size) // group_size == 0:
+            dummy_output, loss, vocab_om = dummy_outputs[0].pop()
+            assert vocab_om.is_complete()
+            if dummy_outputs[0]:
+                vocab_om = dummy_outputs[0][-1][-1]
+                vocab_onload_req = vocab_om.onload(
+                    prior_works=prior_works, buffer_name="vocab", buffer_idx=cnt_pp_last % 2)
+            if len(dummy_outputs[0]) == 0:
+                dummy_outputs.popleft()
+            if last_stage:
+                grad_loss = batch_bwd.curr_mbatch().pop_output_grad()
+            else:
+                grad_loss = None
+            print_debug(DEBUG_P2PCOMM, "bwd post+" , value=cnt_pp_last)
+            grad = post_process_backward(loss, grad_loss, dummy_output, tensor_shape)
+            print_debug(DEBUG_P2PCOMM, "bwd post-" , value=cnt_pp_last)
+            if last_stage:
+                assert output_tensor_grad is None
+                output_tensor_grad = grad
+            del dummy_output, loss, grad_loss, grad
+
+        if num_slices_flight >= num_slices_target:
+            if bwd_recv:
+                bwd_recv.wait(); bwd_recv = None
+            print_debug(DEBUG_P2PCOMM, "bwd sendrecv-" if recv_next else "bwd send-", value=output_tensor_grad)
+            if onload_req:
+                onload_req.wait(); onload_req = None
+                print_debug(DEBUG_OFFLOAD, "onload-")
+            print_debug(DEBUG_P2PCOMM or DEBUG_OFFLOAD, "backward+", value=cnt_bwd)
+            input_tensor_grad = batch_bwd.backward(output_tensor_grad); output_tensor_grad = None
+            recv_bwd_stage_idx = batch_bwd.stage_idx(offset=-recv_bwd_offset)
+            print_debug(DEBUG_P2PCOMM or DEBUG_OFFLOAD, "backward-", value=cnt_bwd); cnt_bwd += 1
+            if not batch_bwd.num_slices_to_backward:
+                batch_bwd = None
+            num_slices_flight -= 1
+            # input_tensor_grads.append(input_tensor_grad)
+            # input_tensor_grad = input_tensor_grads.popleft() if len(input_tensor_grads) > send_bwd_offset else None
+
+        # enter cooldown phase if no more forward pass
+        num_slices_target = (batch_fwd or cnt_microbatches < num_microbatches) and num_slices_target
+
+        """Onload"""
+        # NOTE(lizhouyang): `onload` should start after the forward, **NOT** the backward.
+        # `prior_works` are usually `fwd_reqs` except for cooldown.
+        if num_slices_flight and num_slices_flight + 1 >= num_slices_target:  # after the second last round of warmup.
+            next_om = (batch_bwd or (batch_queue[0] if batch_queue else batch_fwd)).curr_mbatch().curr_om()
+            print_debug(DEBUG_OFFLOAD, "onload+", cnt_onload)
+            onload_req = next_om.onload(prior_works=prior_works, buffer_name="onload", buffer_idx=cnt_onload % 2)
+            cnt_onload += 1
+
+        if vocab_in_pp and cnt_pp_first >= num_slices_preset + 2 * (pipeline_parallel_size - 1) and \
+            (cnt_pp_first - 2 * (pipeline_parallel_size - 1)) % (num_stages * group_size) \
+                // group_size + 1 == num_stages:
+            dummy_input = dummy_inputs[0].pop()
+            if len(dummy_inputs[0]) == 0:
+                dummy_inputs.popleft()
+            if first_stage:
+                assert input_tensor_grad is not None
+                encoder_input_grad = input_tensor_grad
+                input_tensor_grad = None
+            else:
+                encoder_input_grad = None
+            flag_vocab = True
+        else:
+            flag_vocab = False
+
+        if num_slices_flight + 1 >= num_slices_target:
+            parallel_state.set_virtual_pipeline_model_parallel_rank(recv_bwd_stage_idx)
+            if (batch_bwd and batch_bwd.num_slices_to_backward > recv_bwd_offset) or batch_queue or batch_fwd:
+                recv_next = not parallel_state.is_pipeline_last_stage()
+            else:
+                recv_next = False
+            print_debug(DEBUG_P2PCOMM, "bwd sendrecv+" if recv_next else "bwd send+", value=input_tensor_grad)
+            if pre_p2p_func: pre_p2p_func()
+            output_tensor_grad, bwd_reqs = \
+                p2p_communication.send_backward_recv_backward(input_tensor_grad,
+                                                              recv_next,
+                                                              tensor_shape,
+                                                              dtype,
+                                                              batch_p2p_comm,
+                                                              overlap_p2p_comm,
+                                                              timers=timers); input_tensor_grad = None
+            if post_p2p_async_func: post_p2p_async_func(bwd_reqs, num_slices_flight + pipeline_parallel_rank)
+            bwd_recv = bwd_reqs[-1] if recv_next else None
+            output_tensor_grads.append((output_tensor_grad, bwd_recv)); output_tensor_grad, bwd_recv = None, None
+            output_tensor_grad, bwd_recv = output_tensor_grads.popleft() if len(output_tensor_grads) > recv_bwd_offset else (None, None)
+
+        if flag_vocab:
+            print_debug(DEBUG_P2PCOMM, "bwd pre+" , value=cnt_pp_first)
+            pre_process_backward(dummy_input, encoder_input_grad)
+            print_debug(DEBUG_P2PCOMM, "bwd pre-" , value=cnt_pp_first)
+            del dummy_input, encoder_input_grad
+            del flag_vocab
+
+    if vocab_in_pp:
+        assert len(dummy_inputs[-1]) == 0
+        dummy_inputs.pop()
+        if pipeline_parallel_rank:
+            assert len(dummy_inputs[0]) == pipeline_parallel_rank
+        else:
+            assert not dummy_inputs
+        while dummy_inputs:
+            dummy_input = dummy_inputs[0].pop()
+            if len(dummy_inputs[0]) == 0:
+                dummy_inputs.popleft()
+            print_debug(DEBUG_P2PCOMM, "bwd pre+" , value=cnt_pp_first)
+            pre_process_backward(dummy_input, None)
+            print_debug(DEBUG_P2PCOMM, "bwd pre-" , value=cnt_pp_first)
+    cuda_sync_and_record(sync_level=1)
+    assert all(req.wait() for req in fwd_reqs); fwd_reqs = None
+    print_debug(DEBUG_P2PCOMM, "fwd send-")
+    if not forward_only:
+        assert all(req.wait() for req in bwd_reqs); bwd_reqs = None
+        print_debug(DEBUG_P2PCOMM, "bwd send-")
+    return forward_data_store
+
+
+def forward_backward_pipelining_with_interleaving(*,
+                                                  forward_step_func,
+                                                  get_batch_func,
+                                                  data_iterator: Union[Iterator, List[Iterator]],
+                                                  model: Union[torch.nn.Module, List[torch.nn.Module]],
+                                                  num_microbatches: int,
+                                                  micro_seq_length: int,
+                                                  dtype: torch.dtype,
+                                                  kv_cache_class: Type[Cache],
+                                                  tensor_shape: Shape,
+                                                  decoder_seq_length: Optional[int] = None,
+                                                  grad_scaler: Callable = None,
+                                                  sequence_parallel: bool = False,
+                                                  overlap_p2p_comm: bool = False,
+                                                  batch_p2p_comm: bool = True,
+                                                  attn_balance: int = 0, # unused
+                                                  vocab_in_pp: bool = False, # unused
+                                                  forward_only: bool = False,
+                                                  timers: Callable = None,
+                                                  collect_non_loss_data: bool = False,
+                                                  enable_autocast: bool = False,
+                                                  deallocate_pipeline_outputs: bool = False,
+                                                  no_sync_func: Optional[Callable] = None,
+                                                  grad_sync_func: Optional[Callable] = None,
+                                                  param_sync_func: Optional[Callable] = None,
+                                                  pre_p2p_func: Optional[Callable] = None,
+                                                  post_p2p_async_func: Optional[Callable] = None,
+                                                  offload_ratio: float = 0,
+                                                  offload_delay_to_next_stage: bool = False,
+                                                  ):
+    """Run interleaved 1F1B schedule (model split into model chunks), with
+    communication between pipeline stages as needed.
+
+    Returns dictionary with losses if the last stage, empty dict otherwise."""
+    assert isinstance(model, list), \
+        "interleaved pipeline parallelism expected model chunking"
+    assert all(isinstance(chunk, torch.nn.Module) for chunk in model), \
+        "invalid model chunking"
+    assert isinstance(data_iterator, list), \
+        "interleaved pipeline parallelism expected each model chunk to have a data iterator"
+    assert overlap_p2p_comm, \
+        "Slicing pipeline parallelism only supports overlapping p2p communication"
+    assert not batch_p2p_comm, \
+        "Slicing pipeline parallelism does not support using batched p2p communication"
+
+    assert not isinstance(model, torchDDP), "torchDDP is no longer supported."
+    model_type = get_model_type(model[0])
+    assert model_type != ModelType.encoder_and_decoder, \
+        "Interleaving is not supported with an encoder and decoder model."
+
+    assert not no_sync_func, "Not implemented!"
+    assert not grad_sync_func, "Not implemented!"
+    assert not param_sync_func, "Not implemented!"
+
+    pipeline_parallel_size = parallel_state.get_pipeline_model_parallel_world_size()
+    pipeline_parallel_rank = parallel_state.get_pipeline_model_parallel_rank()
+    first_stage = parallel_state.is_pipeline_first_stage(ignore_virtual=True)
+    last_stage = parallel_state.is_pipeline_last_stage(ignore_virtual=True)
+
+    tensor_shape = get_actual_tensor_shape(tensor_shape, sequence_parallel, micro_seq_length)
+
+    assert num_microbatches % pipeline_parallel_size == 0,"num_microbatches must be divisible by pipeline_parallel_size"
+
+    model_type = get_model_type(model[0])
+
+    num_stages = len(model)
+    loss_div = num_microbatches
+    num_batches_warmup = \
+        (pipeline_parallel_size -
+         pipeline_parallel_rank) * 2 - 1
+    num_batches_warmup += (num_stages - 1) * pipeline_parallel_size
+    num_batches_warmup = min(
+        num_batches_warmup,
+        num_microbatches * num_stages + 1)    # one extra fake forward to delay backward recv.
+    # in-flight slices need to gain.
+    num_batches_target = 4096 if forward_only else num_batches_warmup
+    # current in-flight slices.
+    num_batches_flight = 0
+    forward_data_store = []
+
+    # batches
+    batch_queue: Deque[GroupedBatch] = deque()
+    batch_fwd: Optional[GroupedBatch] = None
+    batch_bwd: Optional[GroupedBatch] = None
+
+    # recv tensors
+    fwd_stage_idx = 0
+    bwd_stage_idx = -1 % num_stages
+    input_tensor_grad = None
+    fwd_recv = None
+    # offload reqs
+    offload_req = None
+    onload_req = None
+    cnt_onload = 0
+
+    def make_microbatch(model, data_iterator, batch_idx=None):
+        forward_func = partial(forward_step, forward_step_func=forward_step_func, model=model,
+                               timers=timers, enable_autocast=enable_autocast)
+        backward_func = partial(backward_step, model_type=model_type,
+                                timers=timers, deallocate_pipeline_outputs=deallocate_pipeline_outputs) \
+                        if not forward_only else None
+        if timers is not None:
+            record_context = timers.is_recording_active()
+            if record_context:
+                timers.set_record_context(mb=batch_idx)
+            timers('batch-generator', log_level=2).start()
+        sliced_batch, loss_func = get_batch_func(data_iterator)
+        if timers is not None:
+            timers('batch-generator').stop()
+            if record_context:
+                timers.clear_record_context()
+        if not parallel_state.is_pipeline_last_stage():
+            loss_func = None
+        slices = sliced_batch(micro_seq_length)
+        assert len(slices) <= 1, "this function only supports one slice per microbatch."
+        kv_cache = kv_cache_class()
+        mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func,
+                        backward_func, loss_func, grad_scaler,
+                        batch_idx=batch_idx,
+                        timers=timers)
+        return mb
+
+    total_num_microbatches = num_microbatches
+    def make_grouped_batch(num_microbatches):
+        assert num_microbatches, "No more microbatches."
+        mbatches = []
+        for i in range(num_stages):
+            for j in range(pipeline_parallel_size):
+                parallel_state.set_virtual_pipeline_model_parallel_rank(i)
+                mbatches.append(make_microbatch(model[i], data_iterator[i],
+                                                total_num_microbatches - num_microbatches + j))
+        cbatch = GroupedBatch(mbatches, num_stages, pipeline_parallel_size)
+        return num_microbatches - pipeline_parallel_size, cbatch
+
+    # print messages for debug.
+    DEBUG_P2PCOMM = False
+    DEBUG_OFFLOAD = False
+    cnt_fwd = 0
+    cnt_bwd = 0
+    def print_debug(flag, msg, value=None):
+        if flag:
+            stage = parallel_state.get_virtual_pipeline_model_parallel_rank()
+            if isinstance(value, torch.Tensor):
+                value = (value.dtype, value.shape, value.abs().mean().item())
+            print(f"rank{pipeline_parallel_rank}, stage{stage}: {msg}: {value}", flush=True)
+
+    # receive the first input_tensor.
+    parallel_state.set_virtual_pipeline_model_parallel_rank(fwd_stage_idx)
+    recv_prev = not parallel_state.is_pipeline_first_stage()
+    print_debug(DEBUG_P2PCOMM, "fwd recv+" if recv_prev else "fwd noop+")
+    if pre_p2p_func: pre_p2p_func()
+    input_tensor = p2p_communication.recv_forward(tensor_shape, dtype, batch_p2p_comm, timers)
+    if post_p2p_async_func: post_p2p_async_func([])
+    fwd_recv = None
+
+    while num_batches_flight or num_batches_target:
+        cuda_sync_and_record(sync_level=1)
+        """Forward"""
+        if num_batches_flight < num_batches_target:   # do forward to gain in-flight micro-batches.
+            if fwd_recv:
+                fwd_recv.wait(); fwd_recv = None
+            if not batch_fwd:
+                if num_microbatches:
+                    num_microbatches, batch_fwd = make_grouped_batch(num_microbatches)
+                    assert num_microbatches >= 0, "number of microbatches is not enough."
+                    batch_queue.append(batch_fwd)
+                    print_debug(DEBUG_P2PCOMM, "make grad batch")
+                else:
+                    num_batches_target = 0
+                    continue
+            print_debug(DEBUG_P2PCOMM or DEBUG_OFFLOAD, "forward+", value=cnt_fwd)
+            output_tensor = batch_fwd.forward(input_tensor); input_tensor = None
+            fwd_stage_idx = batch_fwd.forward_stage_idx()
+            print_debug(DEBUG_P2PCOMM or DEBUG_OFFLOAD, "forward-", value=cnt_fwd); cnt_fwd += 1
+            if batch_fwd.forward_stage_idx(-1) + 1 == num_stages: # at last chunk of model
+                forward_data_store.append(batch_fwd.compute_loss(loss_div))
+            if batch_fwd.num_batches_to_forward == 0:
+                batch_fwd = None
+            num_batches_flight += 1
+
+            parallel_state.set_virtual_pipeline_model_parallel_rank(fwd_stage_idx)
+            if (batch_fwd) or num_microbatches:
+                recv_prev = not parallel_state.is_pipeline_first_stage()
+            else:
+                recv_prev = False
+            print_debug(DEBUG_P2PCOMM, "fwd sendrecv+" if recv_prev else "fwd send+", value=output_tensor)
+            if pre_p2p_func: pre_p2p_func()
+            input_tensor, fwd_reqs = \
+                p2p_communication.send_forward_recv_forward(output_tensor,
+                                                            recv_prev,
+                                                            tensor_shape,
+                                                            dtype,
+                                                            batch_p2p_comm,
+                                                            overlap_p2p_comm,
+                                                            timers); output_tensor = None
+            if post_p2p_async_func: post_p2p_async_func(fwd_reqs)
+            fwd_recv = fwd_reqs[-1] if recv_prev else None
+
+        if forward_only:
+            num_batches_flight = 0
+            continue
+
+        if offload_req:
+            offload_req.wait(); offload_req = None
+            print_debug(DEBUG_OFFLOAD, "offload-")
+
+        """Offload"""
+        prior_works = [torch.cuda.current_stream().record_event()]  # offload/onload waits for forward.
+        if num_batches_target: # before the cooldown
+            prior_works += fwd_reqs
+            curr_batch = batch_fwd or (batch_queue[-1] if batch_queue else batch_bwd)
+            curr_om = curr_batch.prev_mbatch().curr_om()
+            if pipeline_parallel_size - pipeline_parallel_rank <= 2 and \
+               curr_batch.forward_stage_idx(-1) + 1 == num_stages:
+                print_debug(DEBUG_OFFLOAD, "offload noop")
+                curr_om.reset()
+            else:
+                # there are enough forward stages to overlap with offload and onload.
+                print_debug(DEBUG_OFFLOAD, "offload+")
+                offload_req = curr_om.offload(prior_works=prior_works)
+        else: # during the cooldown, no `fwd_reqs` are created.
+            prior_works += bwd_reqs
+
+        """Backward"""
+        if num_batches_flight >= num_batches_target:  # do backward to consume in-flight micro-batches.
+            if bwd_recv:
+                bwd_recv.wait(); bwd_recv = None
+            batch_bwd = batch_bwd or batch_queue.popleft()
+            print_debug(DEBUG_P2PCOMM or DEBUG_OFFLOAD, "backward+", value=cnt_bwd)
+            if onload_req:
+                onload_req.wait(); onload_req = None
+                print_debug(DEBUG_OFFLOAD, "onload-")
+            input_tensor_grad = batch_bwd.backward(output_tensor_grad); output_tensor_grad = None
+            bwd_stage_idx = batch_bwd.backward_stage_idx()
+            print_debug(DEBUG_P2PCOMM or DEBUG_OFFLOAD, "backward-", value=cnt_bwd); cnt_bwd += 1
+            if not batch_bwd.num_batches_to_backward:
+                batch_bwd = None
+            num_batches_flight -= 1
+
+        if num_batches_flight + 1 >= num_batches_target:
+            parallel_state.set_virtual_pipeline_model_parallel_rank(bwd_stage_idx)
+            if batch_bwd or batch_queue:
+                recv_next = not parallel_state.is_pipeline_last_stage()
+            else:
+                recv_next = False
+            print_debug(DEBUG_P2PCOMM, "bwd sendrecv+" if recv_next else "bwd send+", value=input_tensor_grad)
+            if pre_p2p_func: pre_p2p_func()
+            output_tensor_grad, bwd_reqs = \
+                p2p_communication.send_backward_recv_backward(input_tensor_grad,
+                                                              recv_next,
+                                                              tensor_shape,
+                                                              dtype,
+                                                              batch_p2p_comm,
+                                                              overlap_p2p_comm,
+                                                              timers=timers); input_tensor_grad = None
+            if post_p2p_async_func:
+                post_p2p_async_func(bwd_reqs, num_batches_flight + pipeline_parallel_rank)
+            bwd_recv = bwd_reqs[-1] if recv_next else None
+
+        """Onload"""
+        # NOTE(lizhouyang): `onload` should start after the forward, **NOT** the backward.
+        # `prior_works` are usually `fwd_reqs` except for cooldown.
+        if num_batches_flight and num_batches_flight + 1 >= num_batches_target:  # after the second last round of warmup.
+            mbatch = (batch_bwd or batch_queue[0]).curr_bwd_mbatch()
+            if mbatch.num_slices_to_backward:
+                print_debug(DEBUG_OFFLOAD, "onload+", cnt_onload)
+                onload_req = mbatch.curr_om().onload(prior_works=prior_works, buffer_name="onload", buffer_idx=cnt_onload % 2)
+                cnt_onload += 1
+            else:
+                print_debug(DEBUG_OFFLOAD, "noop")
+
+    cuda_sync_and_record(sync_level=1)
+    assert all(req.wait() for req in fwd_reqs); fwd_reqs = None
+    print_debug(DEBUG_P2PCOMM, "fwd send-")
+    if not forward_only:
+        assert all(req.wait() for req in bwd_reqs); bwd_reqs = None
+        print_debug(DEBUG_P2PCOMM, "bwd send-")
+    assert not batch_fwd
+    assert not batch_bwd
+    assert not batch_queue
+    assert cnt_fwd == cnt_bwd, (cnt_fwd, cnt_bwd)
+    return forward_data_store
+
+def get_tensor_shapes(*,
+                      rank: int,
+                      model_type: ModelType,
+                      tensor_shape: Shape,
+                      decoder_seq_length: int,
+                      sequence_parallel: bool):
+    # Determine right tensor sizes (based on position of rank with respect to split
+    # rank) and model size.
+    # Send two tensors if model is T5 and rank is in decoder stage:
+    #     first tensor is decoder (pre-transpose),
+    #     second tensor is encoder (post-transpose).
+    # If model is T5 and rank is at the boundary:
+    #     send one tensor (post-transpose from encoder).
+    # Otherwise, send one tensor (pre-transpose).
+    tensor_shapes = []
+
+    assert (
+        len(tensor_shape) == 3
+    ), f"`tensor_shape` should be [sequence_length, micro_batch_size, hidden_size] but {tensor_shape}"
+
+    seq_length, micro_batch_size, hidden_size = tensor_shape
+
+    if sequence_parallel:
+        seq_length = seq_length // parallel_state.get_tensor_model_parallel_world_size()
+
+    if model_type == ModelType.encoder_and_decoder:
+        if sequence_parallel:
+            decoder_seq_length = decoder_seq_length // parallel_state.get_tensor_model_parallel_world_size()
+
+        if parallel_state.is_pipeline_stage_before_split(rank):
+            tensor_shapes.append((seq_length, micro_batch_size, hidden_size))
+        else:
+            tensor_shapes.append((decoder_seq_length, micro_batch_size, hidden_size))
+            tensor_shapes.append((seq_length, micro_batch_size, hidden_size))
+    else:
+        tensor_shapes.append((seq_length, micro_batch_size, hidden_size))
+    return tensor_shapes
+
+
+
+def forward_backward_pipelining_without_interleaving(*,
+                                                     forward_step_func,
+                                                     get_batch_func,
+                                                     data_iterator: Union[Iterator, List[Iterator]],
+                                                     model: Union[torch.nn.Module, List[torch.nn.Module]],
+                                                     num_microbatches: int,
+                                                     micro_seq_length: int,
+                                                     kv_cache_class: Type[Cache],
+                                                     dtype: Optional[torch.dtype] = None,
+                                                     tensor_shape: Optional[Shape] = None, # unused
+                                                     decoder_seq_length: Optional[int] = None, # unused
+                                                     grad_scaler: Callable = None,
+                                                     sequence_parallel: bool = False, # unused
+                                                     overlap_p2p_comm: bool = False, # unused
+                                                     batch_p2p_comm: bool = True, # unused
+                                                     attn_balance: int = 0, # unused
+                                                     vocab_in_pp: bool = False, # unused
+                                                     forward_only: bool = False,
+                                                     timers: Callable = None,
+                                                     collect_non_loss_data: bool = False,
+                                                     enable_autocast: bool = False,
+                                                     deallocate_pipeline_outputs: bool = False,
+                                                     no_sync_func: Optional[Callable] = None,
+                                                     grad_sync_func: Optional[Callable] = None, # unused
+                                                     param_sync_func: Optional[Callable] = None, # unused
+                                                     pre_p2p_func: Optional[Callable] = None, # unused
+                                                     post_p2p_async_func: Optional[Callable] = None, # unused
+                                                     offload_ratio: float = 0,
+                                                     offload_delay_to_next_stage: bool = False, # unused
+                                                     ):
+    """Run non-interleaved 1F1B schedule, with communication between pipeline
+    stages.
+
+    Returns dictionary with losses if the last stage, empty dict otherwise."""
+    if isinstance(model, list):
+        assert len(model) == 1, \
+            "non-interleaved pipeline parallelism does not support model chunking"
+        model = model[0]
+    if isinstance(data_iterator, list):
+        assert len(data_iterator) == 1, \
+            "non-pipeline-parallel schedule does not support model chunking"
+        data_iterator = data_iterator[0]
+
+    if overlap_p2p_comm:
+        raise ValueError("Non-interleaved pipeline parallelism does not support overlapping p2p communication")
+
+    if not batch_p2p_comm:
+        raise ValueError("Non-interleaved pipeline parallelism only supports using batched p2p communication")
+
+    if offload_delay_to_next_stage:
+        raise ValueError("Non-interleaved pipeline parallelism does not support offload_delay_to_next_stage")
+
+    pipeline_parallel_size = parallel_state.get_pipeline_model_parallel_world_size()
+    pipeline_parallel_rank = parallel_state.get_pipeline_model_parallel_rank()
+    first_stage = parallel_state.is_pipeline_first_stage()
+    last_stage = parallel_state.is_pipeline_last_stage()
+    tensor_shape = get_actual_tensor_shape(tensor_shape, sequence_parallel, micro_seq_length)
+
+    model_type = get_model_type(model)
+
+    # Input, output tensors only need to be saved when doing backward passes
+    input_tensors = None
+    output_tensors = None
+    if not forward_only:
+        input_tensors = []
+        output_tensors = []
+
+    forward_func = partial(forward_step, forward_step_func=forward_step_func, model=model,
+                           timers=timers, enable_autocast=enable_autocast)
+    backward_func = None if forward_only else partial(backward_step, model_type=model_type,
+                            timers=timers, deallocate_pipeline_outputs=deallocate_pipeline_outputs)
+
+    loss_div = num_microbatches
+    num_batches_preset = 0 # this method does not need preset batches
+    num_batches_warmup = \
+        (parallel_state.get_pipeline_model_parallel_world_size() -
+         parallel_state.get_pipeline_model_parallel_rank())
+    num_batches_warmup = min(
+        num_batches_warmup,
+        num_microbatches)
+    # in-flight batches need to gain.
+    num_batches_target = 4096 if forward_only else num_batches_preset + num_batches_warmup
+    # current in-flight batches.
+    num_batches_flight = 0
+    mb_queue = deque()
+    mb_fwd: Optional[MicroBatch] = None
+    mb_bwd: Optional[MicroBatch] = None
+    no_warmup = False
+    forward_data_store = []
+    offload_req = None
+    onload_req = None
+
+    def make_microbatch(num_mb):
+        assert num_mb
+        if timers is not None:
+            record_context = timers.is_recording_active()
+            if record_context:
+                timers.set_record_context(mb=num_microbatches - num_mb)
+            timers('batch-generator', log_level=2).start()
+        sliced_batch, loss_func = get_batch_func(data_iterator)
+        if timers is not None:
+            timers('batch-generator').stop()
+            if record_context:
+                timers.clear_record_context()
+        if not last_stage:
+            loss_func = None
+        slices = sliced_batch(micro_seq_length)
+        num_total_batches = num_batches_flight + num_mb * len(slices) + 1
+        assert  num_total_batches >= num_batches_target, "number of total slices is not enough."
+        kv_cache = kv_cache_class()
+        mb = MicroBatch(slices, kv_cache, offload_ratio, forward_func,
+                        backward_func, loss_func, grad_scaler,
+                        batch_idx=num_microbatches - num_mb,
+                        timers=timers)
+        return num_mb - 1, mb
+
+    # print messages for debug.
+    DEBUG_P2PCOMM = False
+    DEBUG_OFFLOAD = False
+    cnt_fwd = 0
+    cnt_bwd = 0
+    def print_debug(flag, msg, value=None):
+        if flag:
+            stage = parallel_state.get_virtual_pipeline_model_parallel_rank()
+            if isinstance(value, torch.Tensor):
+                value = (value.dtype, value.shape, value.abs().mean().item())
+            print(f"rank{pipeline_parallel_rank}: {msg}: {value}", flush=True)
+
+    while num_batches_flight or num_batches_target:
+        cuda_sync_and_record(sync_level=1)
+        """Forward"""
+        if num_batches_flight < num_batches_target:   # do forward to gain in-flight micro-batches.
+            if not mb_fwd:
+                if num_microbatches:
+                    print_debug(DEBUG_P2PCOMM, "num_microbatches", num_microbatches)
+                    num_microbatches, mb_fwd = make_microbatch(num_microbatches)
+                    num_batches_target = max(num_batches_target, num_batches_warmup)
+                else:
+                    print_debug(DEBUG_P2PCOMM, "over", num_batches_flight)
+                    num_batches_target = 0
+                    continue
+            if num_batches_flight + 1 != num_batches_target or len(input_tensors) == 0:
+                input_tensor = p2p_communication.recv_forward(tensor_shape, dtype, timers=timers)
+            else:
+                input_tensor = input_tensors.pop(0)
+            output_tensor = mb_fwd.forward(input_tensor); input_tensor = None
+            num_batches_flight += 1
+            loss = mb_fwd.compute_loss(loss_div)
+            forward_data_store.append(loss)
+            mb_queue.append(mb_fwd); mb_fwd = None
+            if last_stage:
+                output_tensor = None
+            if num_batches_flight == num_batches_target:
+                output_tensor_grad = \
+                    p2p_communication.send_forward_recv_backward(output_tensor,
+                                            tensor_shape, dtype,
+                                            timers=timers)
+                output_tensors.append(output_tensor_grad); output_tensor_grad = None
+            else:
+                p2p_communication.send_forward(output_tensor, timers=timers)
+            deallocate_output_tensor(output_tensor, deallocate_pipeline_outputs)
+            output_tensor = None
+
+        if forward_only:
+            num_batches_flight = 0
+            continue
+
+        """Backward"""
+        if num_batches_flight >= num_batches_target:  # do backward to consume in-flight micro-batches.
+            print_debug(DEBUG_P2PCOMM, "num_batches_flight", num_batches_flight)
+            print_debug(DEBUG_P2PCOMM, "num_batches_target", num_batches_target)
+            mb_bwd = mb_bwd or mb_queue.popleft()
+            bwd = False
+            if num_batches_flight != num_batches_target or len(output_tensors) == 0:
+                output_tensor_grad = p2p_communication.recv_backward(tensor_shape, dtype, timers=timers)
+            else:
+                output_tensor_grad = output_tensors.pop(0)
+                bwd = True
+            input_tensor_grad = mb_bwd.backward(output_tensor_grad); output_tensor_grad = None
+
+            num_batches_flight -= 1
+            if not mb_bwd.num_slices_to_backward:
+                mb_bwd = None
+            if first_stage:
+                input_tensor_grad = None
+            if bwd and num_microbatches:
+                print_debug(DEBUG_P2PCOMM, "input_tensor_grad", input_tensor_grad)
+                input_tensor = \
+                    p2p_communication.send_backward_recv_forward(
+                        input_tensor_grad, tensor_shape, dtype, timers=timers)
+                input_tensors.append(input_tensor); input_tensor = None
+            else:
+                p2p_communication.send_backward(input_tensor_grad, timers=timers)
+            input_tensor_grad = None
+    return forward_data_store

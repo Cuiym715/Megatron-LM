@@ -1,0 +1,43 @@
+{
+  "commit": "9b9fc8f966c043c1621fb79851f0609f3405bf61",
+  "source_hashes": {
+    "megatron/arguments.py": "5463d73a1ddadc47b73f0efebc6c492d54eb370cb6398f8d82bbf4668ab70f61",
+    "megatron/core/pipeline_parallel/dspp_timeline.py": "5696912d10ab998d8d6140841b6cb77e146c2115d88a2114b1085686e2d93016",
+    "megatron/core/pipeline_parallel/schedules.py": "ca61880a34dea59c208ef28d3ab1f83f57b2f581b35bc78df9dc8481c1079319",
+    "megatron/core/kv_cache/dspp_packed_attention.py": "1ae5b835891fd8d4f3be6dbb4f1effa7f29d5a253bd7382622a366b51cf19770",
+    "megatron/core/kv_cache/fa_split.py": "762422f97a80532376378a0c9d054e17e15b0ad9c2fa46d73911a9df0a6780f7",
+    "megatron/core/kv_cache/fa_split_src/backward.cu": "05cbf597ce381af2fbbbf0817cbdd9a72dcedce5d3dc316a3a3623e49df1953e",
+    "examples/run_dspp_b23_l40.sh": "7fe9a9d8987aefc30f8c9907beea3758a9c3b4acc5f1b3d9da2713c0cab42187",
+    "examples/collect_dspp_schedule_data.sh": "3e01add5c0d6608c7a4ba59336c98aae0af7db2dc9edf0d9e0cf3a6081ad78c4",
+    "tools/collect_dspp_schedule_data.py": "7c11f3cc82fdbc445f64c74f68e4a603378bcb444baea99d60779cdb97dc3933"
+  },
+  "input_lengths": [
+    14336,
+    4097,
+    1537,
+    257,
+    2048
+  ],
+  "config": {
+    "hidden": 4096,
+    "ffn": 8192,
+    "q_heads": 32,
+    "kv_heads": 16,
+    "layers": 6,
+    "pp": 3,
+    "vpp": 2,
+    "tp": 1,
+    "cp": 1,
+    "dp": 1,
+    "chunk": 2048,
+    "micro_batch": 5,
+    "global_batch": 10,
+    "lr": 0
+  },
+  "protocol": {
+    "formal": "two modes x30; warmup1-5; e2e6-25; F/B/W/H26-30",
+    "diagnostic": "after_dx input26 replay x3; profile only3",
+    "raw_root": "/home/cuiym/.cache/dspp-fa-split/collection016-20261016/runs",
+    "no_old_performance_data_used": true
+  }
+}

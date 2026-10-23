@@ -1,0 +1,530 @@
+
+*****************************************
+Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+*****************************************
+/workspace/src/Megatron-LM-kwai/megatron/core/utils.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import packaging
+/workspace/src/Megatron-LM-kwai/megatron/core/utils.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import packaging
+/workspace/src/Megatron-LM-kwai/megatron/core/utils.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import packaging
+/usr/local/lib/python3.12/dist-packages/torch/library.py:357: UserWarning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: flash_attn::_flash_attn_backward(Tensor dout, Tensor q, Tensor k, Tensor v, Tensor out, Tensor softmax_lse, Tensor(a6!)? dq, Tensor(a7!)? dk, Tensor(a8!)? dv, float dropout_p, float softmax_scale, bool causal, SymInt window_size_left, SymInt window_size_right, float softcap, Tensor? alibi_slopes, bool deterministic, Tensor? rng_state=None) -> Tensor
+    registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926
+  dispatch key: ADInplaceOrView
+  previous kernel: no debug info
+       new kernel: registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926 (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/core/dispatch/OperatorEntry.cpp:208.)
+  self.m.impl(
+/usr/local/lib/python3.12/dist-packages/torch/library.py:357: UserWarning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: flash_attn::_flash_attn_backward(Tensor dout, Tensor q, Tensor k, Tensor v, Tensor out, Tensor softmax_lse, Tensor(a6!)? dq, Tensor(a7!)? dk, Tensor(a8!)? dv, float dropout_p, float softmax_scale, bool causal, SymInt window_size_left, SymInt window_size_right, float softcap, Tensor? alibi_slopes, bool deterministic, Tensor? rng_state=None) -> Tensor
+    registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926
+  dispatch key: ADInplaceOrView
+  previous kernel: no debug info
+       new kernel: registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926 (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/core/dispatch/OperatorEntry.cpp:208.)
+  self.m.impl(
+/usr/local/lib/python3.12/dist-packages/torch/library.py:357: UserWarning: Warning only once for all operators,  other operators may also be overridden.
+  Overriding a previously registered kernel for the same operator and the same dispatch key
+  operator: flash_attn::_flash_attn_backward(Tensor dout, Tensor q, Tensor k, Tensor v, Tensor out, Tensor softmax_lse, Tensor(a6!)? dq, Tensor(a7!)? dk, Tensor(a8!)? dv, float dropout_p, float softmax_scale, bool causal, SymInt window_size_left, SymInt window_size_right, float softcap, Tensor? alibi_slopes, bool deterministic, Tensor? rng_state=None) -> Tensor
+    registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926
+  dispatch key: ADInplaceOrView
+  previous kernel: no debug info
+       new kernel: registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926 (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/core/dispatch/OperatorEntry.cpp:208.)
+  self.m.impl(
+using world size: 3, data-parallel-size: 1, tensor-model-parallel size: 1, pipeline-model-parallel size: 3, context-parallel size: 1
+WARNING: overriding default arguments for tokenizer_type:GPT2BPETokenizer                        with tokenizer_type:SentencePieceTokenizer
+accumulate and all-reduce gradients in fp32 for bfloat16 data type.
+using torch.bfloat16 for parameters ...
+------------------------ arguments ------------------------
+  accumulate_allreduce_grads_in_fp32 .............. True
+  adam_beta1 ...................................... 0.9
+  adam_beta2 ...................................... 0.999
+  adam_eps ........................................ 1e-08
+  add_bias_linear ................................. False
+  add_position_embedding .......................... False
+  adlr_autoresume ................................. False
+  adlr_autoresume_interval ........................ 1000
+  alibi_bias_max .................................. 0
+  anomaly_times ................................... 1.1
+  apply_layernorm_1p .............................. False
+  apply_query_key_layer_scaling ................... False
+  apply_residual_connection_post_layernorm ........ False
+  async_tensor_model_parallel_allreduce ........... True
+  attention_dropout ............................... 0.0
+  attention_softmax_in_fp32 ....................... False
+  barrier_with_L1_time ............................ True
+  bert_binary_head ................................ True
+  bert_embedder_type .............................. megatron
+  bert_load ....................................... None
+  bf16 ............................................ True
+  bias_dropout_fusion ............................. True
+  bias_gelu_fusion ................................ False
+  bias_swiglu_fusion .............................. True
+  biencoder_projection_dim ........................ 0
+  biencoder_shared_query_context_model ............ False
+  block_data_path ................................. None
+  classes_fraction ................................ 1.0
+  clip_grad ....................................... 1.0
+  clone_scatter_output_in_embedding ............... True
+  consecutive_anomalies_steps ..................... 3
+  consumed_train_samples .......................... 0
+  consumed_valid_samples .......................... 0
+  context_parallel_comm_overlap_gemm .............. True
+  context_parallel_size ........................... 1
+  custom_lr_scheduler ............................. False
+  data_cache_path ................................. None
+  data_impl ....................................... mmap
+  data_parallel_random_init ....................... False
+  data_parallel_size .............................. 1
+  data_path ....................................... ['/workspace/.cache/dspp-fa-split/workload-scaling-20261016/long-data']
+  data_per_class_fraction ......................... 1.0
+  data_sharding ................................... True
+  dataloader_type ................................. cyclic
+  DDP_impl ........................................ local
+  decoder_num_layers .............................. None
+  decoder_seq_length .............................. None
+  dino_bottleneck_size ............................ 256
+  dino_freeze_last_layer .......................... 1
+  dino_head_hidden_size ........................... 2048
+  dino_local_crops_number ......................... 10
+  dino_local_img_size ............................. 96
+  dino_norm_last_layer ............................ False
+  dino_teacher_temp ............................... 0.07
+  dino_warmup_teacher_temp ........................ 0.04
+  dino_warmup_teacher_temp_epochs ................. 30
+  disable_output_scale_init ....................... False
+  distribute_saved_activations .................... False
+  distributed_backend ............................. nccl
+  distributed_timeout_minutes ..................... 10
+  dspp ............................................ True
+  dspp_activation_bytes_per_token ................. 0.0
+  dspp_auto_chunk_size ............................ False
+  dspp_chunk_alignment ............................ 256
+  dspp_chunk_menu ................................. None
+  dspp_chunk_selection ............................ memory
+  dspp_dag_communication_cost ..................... profile
+  dspp_disable_residual_packing ................... False
+  dspp_efficiency_slack ........................... 0.05
+  dspp_efficiency_top_k ........................... 4
+  dspp_execution_profile .......................... None
+  dspp_history_dkv_after_dx ....................... True
+  dspp_max_chunk_size ............................. 0
+  dspp_max_p2p_bytes .............................. 0
+  dspp_memory_reserve_mib ......................... 1024
+  dspp_memory_safety_factor ....................... 1.05
+  dspp_memory_utilization ......................... 0.9
+  dspp_metrics_path ............................... None
+  dspp_microbatch_order ........................... warmup-short-steady-long
+  dspp_min_chunk_size ............................. 256
+  dspp_order_profile .............................. None
+  dspp_p2p_bandwidth_gbps ......................... 25.0
+  dspp_p2p_latency_us ............................. 20.0
+  dspp_p2p_profile ................................ None
+  dspp_packing_strategy ........................... baseline
+  dspp_recv_lookahead ............................. 2
+  dspp_saturation_chunk_size ...................... 0
+  dspp_saturation_slack ........................... 0.2
+  dspp_send_inflight_depth ........................ 2
+  dspp_share_directional_p2p ...................... False
+  dspp_split_attention_backward ................... True
+  dspp_task_timing_only ........................... True
+  dspp_timeline_dir ............................... None
+  dspp_timeline_iteration ......................... 0
+  dspp_torch_profiler_dir ......................... None
+  dspp_torch_profiler_iteration ................... 0
+  dspp_v_layer_layout ............................. balanced
+  embedding_path .................................. None
+  embedding_weights_in_fp32 ....................... False
+  empty_unused_memory_level ....................... 0
+  encoder_num_layers .............................. 6
+  encoder_seq_length .............................. 16384
+  end_weight_decay ................................ 0.1
+  eod_mask_loss ................................... False
+  eval_interval ................................... 1000
+  eval_iters ...................................... 0
+  evidence_data_path .............................. None
+  exit_duration_in_mins ........................... None
+  exit_interval ................................... None
+  exit_on_missing_checkpoint ...................... False
+  exit_signal_handler ............................. False
+  expert_hidden_size .............................. None
+  expert_model_parallel_size ...................... 1
+  ffn_hidden_size ................................. 8192
+  finetune ........................................ False
+  fp16 ............................................ False
+  fp16_lm_cross_entropy ........................... False
+  fp32_residual_connection ........................ False
+  fp8_amax_compute_algo ........................... most_recent
+  fp8_amax_history_len ............................ 1
+  fp8_e4m3 ........................................ False
+  fp8_hybrid ...................................... False
+  fp8_interval .................................... 1
+  fp8_margin ...................................... 0
+  fp8_wgrad ....................................... True
+  gate_mlp ........................................ False
+  global_batch_size ............................... 8
+  gradient_accumulation_fusion .................... True
+  group_query_attention ........................... True
+  head_lr_mult .................................... 1.0
+  hidden_dropout .................................. 0.0
+  hidden_size ..................................... 4096
+  hysteresis ...................................... 2
+  ict_head_size ................................... None
+  ict_load ........................................ None
+  ignore_index .................................... -100
+  img_h ........................................... 224
+  img_w ........................................... 224
+  indexer_batch_size .............................. 128
+  indexer_log_interval ............................ 1000
+  inference_batch_times_seqlen_threshold .......... 512
+  init_method_beta ................................ 1.0
+  init_method_std ................................. 0.02
+  init_method_std_emb ............................. None
+  init_method_xavier_normal ....................... False
+  init_method_xavier_uniform ...................... False
+  initial_loss_scale .............................. 4294967296
+  iter_per_epoch .................................. 1250
+  kaimm_async_dataloader .......................... False
+  kaimm_context_parallel_impl ..................... key-value
+  kaimm_cuda_synchronize_level .................... 0
+  kaimm_gc_interval ............................... 0
+  kaimm_kv_cache_impl ............................. chunked
+  kaimm_num_layers_padding_back ................... 0
+  kaimm_num_layers_padding_front .................. 0
+  kaimm_offload_activation_ratio .................. 0.0
+  kaimm_offload_delay_to_next_stage ............... False
+  kaimm_overlap_cp_slow_ctas ...................... None
+  kaimm_overlap_gather_ratio ...................... 0.2
+  kaimm_overlap_optimizer_communication ........... False
+  kaimm_overlap_optimizer_no_barrier .............. False
+  kaimm_overlap_optimizer_slow_ctas ............... 4
+  kaimm_overlap_reduce_ratio ...................... 0.2
+  kaimm_overlap_tune_ratio ........................ False
+  kaimm_overlap_tuning_target_time_ratio .......... 0.85
+  kaimm_pipeline_attn_balance ..................... 0
+  kaimm_post_lm_processing_slice_size ............. None
+  kaimm_profile_analysis .......................... False
+  kaimm_recompute_mlp_activation_func ............. False
+  kaimm_recompute_mlp_fc1 ......................... False
+  kaimm_recompute_norm ............................ False
+  kaimm_recompute_token_dispatcher ................ False
+  kaimm_vocab_in_pipeline_parallel ................ False
+  kaimm_warmup_iters .............................. 0
+  kv_channels ..................................... 128
+  layernorm_epsilon ............................... 1e-05
+  lazy_mpu_init ................................... None
+  load ............................................ None
+  local_rank ...................................... None
+  log_batch_size_to_tensorboard ................... False
+  log_interval .................................... 1
+  log_learning_rate_to_tensorboard ................ True
+  log_loss_scale_to_tensorboard ................... True
+  log_memory_to_tensorboard ....................... False
+  log_num_zeros_in_grad ........................... False
+  log_params_norm ................................. False
+  log_timers_to_tensorboard ....................... False
+  log_validation_ppl_to_tensorboard ............... False
+  log_world_size_to_tensorboard ................... False
+  loss_median_window .............................. 10
+  loss_scale ...................................... None
+  loss_scale_window ............................... 1000
+  lr .............................................. 0.0
+  lr_decay_iters .................................. None
+  lr_decay_samples ................................ None
+  lr_decay_style .................................. cosine
+  lr_warmup_fraction .............................. None
+  lr_warmup_iters ................................. 0
+  lr_warmup_samples ............................... 0
+  make_main_grad_addresss_divisible_by ............ 1
+  make_vocab_size_divisible_by .................... 128
+  mask_factor ..................................... 1.0
+  mask_padded_vocab_in_ce_loss .................... False
+  mask_prob ....................................... 0.15
+  mask_type ....................................... random
+  masked_softmax_fusion ........................... True
+  master_addr ..................................... 127.0.0.1:8389
+  max_position_embeddings ......................... 16384
+  max_tokens_to_oom ............................... 12000
+  merge_file ...................................... None
+  micro_batch_size ................................ 4
+  micro_seq_length ................................ 2048
+  min_loss_scale .................................. 1.0
+  min_lr .......................................... 0.0
+  mmap_warmup ..................................... False
+  moe_aux_loss_coeff .............................. 0.0
+  moe_expert_capacity_factor ...................... None
+  moe_first ....................................... False
+  moe_grouped_gemm ................................ False
+  moe_input_jitter_eps ............................ None
+  moe_layer_interval .............................. 1
+  moe_layer_recompute ............................. False
+  moe_pad_expert_input_to_capacity ................ False
+  moe_per_layer_logging ........................... False
+  moe_router_force_load_balancing ................. False
+  moe_router_load_balancing_type .................. aux_loss
+  moe_router_topk ................................. 2
+  moe_te_grouped_gemm ............................. False
+  moe_token_dispatcher_type ....................... allgather
+  moe_token_drop_policy ........................... probs
+  moe_z_loss_coeff ................................ None
+  nccl_communicator_config_path ................... None
+  no_load_optim ................................... None
+  no_load_rng ..................................... None
+  no_persist_layer_norm ........................... False
+  no_save_optim ................................... None
+  no_save_rng ..................................... None
+  num_attention_heads ............................. 32
+  num_channels .................................... 3
+  num_classes ..................................... 1000
+  num_experts ..................................... None
+  num_layers ...................................... 6
+  num_layers_per_virtual_pipeline_stage ........... 1
+  num_query_groups ................................ 16
+  num_workers ..................................... 2
+  onnx_safe ....................................... None
+  openai_gelu ..................................... False
+  optimizer ....................................... adam
+  output_bert_embeddings .......................... False
+  overlap_p2p_comm ................................ False
+  overlap_sp_ag ................................... False
+  overlap_sp_rs ................................... False
+  override_opt_param_scheduler .................... False
+  pad_token_id .................................... None
+  padding_side .................................... right
+  params_dtype .................................... torch.bfloat16
+  patch_dim ....................................... 16
+  perform_initialization .......................... True
+  pipeline_model_parallel_size .................... 3
+  pipeline_model_parallel_split_rank .............. None
+  prefetch_factor ................................. 2
+  profile ......................................... False
+  profile_ranks ................................... [0]
+  profile_step_end ................................ 12
+  profile_step_start .............................. 10
+  query_in_block_prob ............................. 0.1
+  rampup_batch_size ............................... None
+  rank ............................................ 0
+  recompute_granularity ........................... None
+  recompute_method ................................ None
+  recompute_num_layers ............................ 1
+  reset_attention_mask ............................ False
+  reset_position_ids .............................. False
+  restart_skip_counter ............................ 0
+  retriever_report_topk_accuracies ................ []
+  retriever_score_scaling ......................... False
+  retriever_seq_length ............................ 256
+  retro_add_retriever ............................. False
+  retro_cyclic_train_iters ........................ None
+  retro_encoder_attention_dropout ................. 0.1
+  retro_encoder_hidden_dropout .................... 0.1
+  retro_encoder_layers ............................ 2
+  retro_num_neighbors ............................. 2
+  retro_num_retrieved_chunks ...................... 2
+  retro_return_doc_ids ............................ False
+  retro_workdir ................................... None
+  rms_norm ........................................ True
+  rope_theta ...................................... 10000.0
+  rotary_percent .................................. 1.0
+  sample_rate ..................................... 1.0
+  save ............................................ None
+  save_interval ................................... None
+  scatter_gather_tensors_in_pipeline .............. True
+  seed ............................................ 1234
+  seq_length ...................................... 16384
+  sequence_parallel ............................... False
+  sgd_momentum .................................... 0.9
+  shared_expert_combine_method .................... add
+  shared_expert_hidden_size ....................... None
+  short_seq_prob .................................. 0.1
+  skip_steps ...................................... 5
+  spec ............................................ None
+  split ........................................... 100,0,0
+  squared_relu .................................... False
+  stability_protection ............................ False
+  standalone_embedding_stage ...................... False
+  start_weight_decay .............................. 0.1
+  swiglu .......................................... True
+  swin_backbone_type .............................. tiny
+  tensor_model_parallel_size ...................... 1
+  tensorboard_dir ................................. None
+  tensorboard_log_interval ........................ 1
+  tensorboard_queue_size .......................... 1000
+  test_data_path .................................. None
+  timer_record_dir ................................ None
+  timer_record_end_iter ........................... -1
+  timer_record_start_iter ......................... 0
+  timing_log_level ................................ 0
+  timing_log_option ............................... minmax
+  titles_data_path ................................ None
+  tokenizer_model ................................. /workspace/src/tokenizers/Mistral-7B-v0.1/tokenizer.model
+  tokenizer_type .................................. SentencePieceTokenizer
+  train_data_path ................................. None
+  train_golden_model .............................. False
+  train_iters ..................................... 6
+  train_samples ................................... None
+  transformer_impl ................................ local
+  transformer_pipeline_model_parallel_size ........ 3
+  untie_embeddings_and_output_weights ............. False
+  use_alibi ....................................... False
+  use_checkpoint_args ............................. False
+  use_checkpoint_opt_param_scheduler .............. False
+  use_contiguous_buffers_in_local_ddp ............. True
+  use_cpu_initialization .......................... None
+  use_distributed_optimizer ....................... False
+  use_fast ........................................ False
+  use_fast_rms_norm ............................... False
+  use_fast_rope ................................... False
+  use_flash_attn .................................. True
+  use_memory_efficient_norm ....................... False
+  use_one_sent_docs ............................... False
+  use_ring_exchange_p2p ........................... False
+  use_rotary_position_embeddings .................. True
+  valid_data_path ................................. None
+  variable_seq_debug_num_batches .................. 0
+  variable_seq_lengths ............................ True
+  variable_seq_pad_to_pipeline_size ............... False
+  variable_seq_pad_token_id ....................... 0
+  variable_seq_schedule ........................... 1f1b
+  variable_seq_slicing ............................ False
+  virtual_pipeline_model_parallel_size ............ 2
+  vision_backbone_type ............................ vit
+  vision_pretraining .............................. False
+  vision_pretraining_type ......................... classify
+  vocab_extra_ids ................................. 0
+  vocab_file ...................................... None
+  vocab_size ...................................... None
+  warmup_init_lr .................................. 0.0
+  weight_decay .................................... 0.1
+  weight_decay_incr_style ......................... constant
+  world_size ...................................... 3
+-------------------- end of arguments ---------------------
+setting number of micro-batches to constant 2
+> building SentencePieceTokenizer tokenizer ...
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+ > padded vocab (size: 32005) with 123 dummy tokens (new size: 32128)
+> initializing torch distributed ...
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 2 is connected to 2 peer ranks. Expected number of connected peer ranks is : 2
+[Gloo] Rank 1 is connected to 2 peer ranks. [Gloo] Rank Expected number of connected peer ranks is : 2
+0 is connected to 2 peer ranks. Expected number of connected peer ranks is : 2
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+> initialized tensor model parallel with size 1
+> initialized pipeline model parallel with size 3
+> setting random seeds to 1234 ...
+> compiling dataset index builder ...
+make: Entering directory '/workspace/src/Megatron-LM-kwai/megatron/data'
+make: Nothing to be done for 'default'.
+make: Leaving directory '/workspace/src/Megatron-LM-kwai/megatron/data'
+>>> done with dataset index builder. Compilation time: 0.003 seconds
+> compiling and loading fused kernels ...
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+ninja: no work to do.
+ninja: no work to do.
+ninja: no work to do.
+ninja: no work to do.
+ninja: no work to do.
+ninja: no work to do.
+/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py:83: UserWarning: barrier(): using the device under current context. You can specify `device_id` in `init_process_group` to mute this warning.
+  return func(*args, **kwargs)
+[rank0]:[W1016 12:23:40.266414367 ProcessGroupNCCL.cpp:5163] Guessing device ID based on global rank. This can cause a hang if rank to GPU mapping is heterogeneous. You can specify device_id in init_process_group()
+[rank1]:[W1016 12:23:41.935035410 init.cpp:774] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank2]:[W1016 12:23:41.935117359 init.cpp:774] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+[rank0]:[W1016 12:23:41.935178747 init.cpp:774] Warning: nvfuser is no longer supported in torch script, use _jit_set_nvfuser_enabled is deprecated and a no-op (function operator())
+>>> done with compiling and loading fused kernels. Compilation time: 2.331 seconds
+> compiling swiglu ...
+/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py:83: UserWarning: barrier(): using the device under current context. You can specify `device_id` in `init_process_group` to mute this warning.
+  return func(*args, **kwargs)
+>>> done with compiling swiglu. Compilation time: 2.102 seconds
+> creating cuDNN SDPA execution ...
+/workspace/src/Megatron-LM-kwai/megatron/initialize.py:417: UserWarning: [Rank 2] The conditions of buliding `cudnn_attn' are not being met.
+  warnings.warn(f"[Rank {torch.distributed.get_rank()}] "
+/workspace/src/Megatron-LM-kwai/megatron/initialize.py:417: UserWarning: [Rank 0] The conditions of buliding `cudnn_attn' are not being met.
+  warnings.warn(f"[Rank {torch.distributed.get_rank()}] "
+/workspace/src/Megatron-LM-kwai/megatron/initialize.py:417: UserWarning: [Rank 1] The conditions of buliding `cudnn_attn' are not being met.
+  warnings.warn(f"[Rank {torch.distributed.get_rank()}] "
+>>> done with creating cuDNN SDPA execution. Creation time: 0.001 seconds
+time to initialize megatron (seconds): 5.373
+[after megatron is initialized] datetime: 2026-10-16 12:23:44 
+building GPT model ...
+ > number of parameters on (tensor, pipeline) model parallel rank (0, 2): 302006272
+ > number of parameters on (tensor, pipeline) model parallel rank (0, 1): 302006272
+/workspace/src/Megatron-LM-kwai/megatron/optimizer/optimizer.py:477: UserWarning: The torch.cuda.*DtypeTensor constructors are no longer recommended. It's best to use methods such as torch.tensor(data, dtype=*, device='cuda') to create tensors. (Triggered internally at /opt/pytorch/pytorch/torch/csrc/tensor/python_tensor.cpp:78.)
+  self._scale_one = torch.cuda.FloatTensor([1.0])
+/workspace/src/Megatron-LM-kwai/megatron/optimizer/optimizer.py:477: UserWarning: The torch.cuda.*DtypeTensor constructors are no longer recommended. It's best to use methods such as torch.tensor(data, dtype=*, device='cuda') to create tensors. (Triggered internally at /opt/pytorch/pytorch/torch/csrc/tensor/python_tensor.cpp:78.)
+  self._scale_one = torch.cuda.FloatTensor([1.0])
+building GPT model ...
+ > number of parameters on (tensor, pipeline) model parallel rank (0, 0): 565202944
+/workspace/src/Megatron-LM-kwai/megatron/optimizer/optimizer.py:477: UserWarning: The torch.cuda.*DtypeTensor constructors are no longer recommended. It's best to use methods such as torch.tensor(data, dtype=*, device='cuda') to create tensors. (Triggered internally at /opt/pytorch/pytorch/torch/csrc/tensor/python_tensor.cpp:78.)
+  self._scale_one = torch.cuda.FloatTensor([1.0])
+> learning rate decay style: cosine
+[after model, optimizer, and learning rate scheduler are built] datetime: 2026-10-16 12:23:44 
+> building train, validation, and test datasets ...
+ > datasets target sizes (minimum size):
+    train:      48
+    validation: 0
+    test:       0
+> building train, validation, and test datasets for GPT ...
+Single data path provided for train, valid & test
+ > building dataset index ...
+    reading sizes...
+    reading pointers...
+    reading document index...
+    creating numpy buffer of mmap...
+    creating memory view of numpy buffer...
+ > finished creating indexed dataset in 0.000231 seconds
+    number of documents: 128
+ > dataset split:
+    train:
+     document indices in [0, 128) total of 128 documents
+    validation:
+     document indices in [128, 128) total of 0 documents
+    test:
+     document indices in [128, 128) total of 0 documents
+ > using document-level GPT dataset for variable sequence slicing: train, documents=128, samples=128, max_sequence_length=16384
+> finished creating GPT datasets ...
+> building train, validation, and test datasets ...
+ > datasets target sizes (minimum size):
+    train:      48
+    validation: 0
+    test:       0
+> building train, validation, and test datasets for GPT ...
+Single data path provided for train, valid & test
+ > building dataset index ...
+    reading sizes...
+    reading pointers...
+    reading document index...
+    creating numpy buffer of mmap...
+    creating memory view of numpy buffer...
+ > finished creating indexed dataset in 0.000214 seconds
+    number of documents: 128
+ > dataset split:
+    train:
+     document indices in [0, 128) total of 128 documents
+    validation:
+     document indices in [128, 128) total of 0 documents
+    test:
+     document indices in [128, 128) total of 0 documents
+ > using document-level GPT dataset for variable sequence slicing: train, documents=128, samples=128, max_sequence_length=16384
+> finished creating GPT datasets ...
+[after dataloaders are built] datetime: 2026-10-16 12:23:44 
+done with setup ...
+(min, max) time across ranks (ms):
+    model-and-optimizer-setup ......................: (19.57, 43.63)
+    train/valid/test-data-iterators-setup ..........: (30.69, 32.63)
+training ...
+[before the start of training step] datetime: 2026-10-16 12:23:44 
+/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py:83: UserWarning: barrier(): using the device under current context. You can specify `device_id` in `init_process_group` to mute this warning.
+  return func(*args, **kwargs)
+ iteration        1/       6 | consumed samples:            8 | elapsed time per iteration (ms): 3910.8 | samples per second: 2.046 | tokens per sec per replica: 11171.75014 | effective tokens/s: 9037.244 | iteration median/P95 (ms): 3909.8/3909.8 | packing utilization: 0.9080 | schedule padding ratio: 0.0000 | peak memory rank0 alloc/reserved (MiB): 12774.2/16192.0 | learning rate: 0.00000000E+00 | global batch size:     8 | lm loss: 1.121495E+01 | loss scale: 1.0 | grad norm: 9.378 | number of skipped iterations:   0 | number of nan iterations:   0 |
+ iteration        2/       6 | consumed samples:           16 | elapsed time per iteration (ms): 1434.9 | samples per second: 5.575 | tokens per sec per replica: 30449.01866 | effective tokens/s: 19302.992 | iteration median/P95 (ms): 1432.7/1432.7 | packing utilization: 0.9002 | schedule padding ratio: 0.0000 | peak memory rank0 alloc/reserved (MiB): 16889.3/17564.0 | learning rate: 0.00000000E+00 | global batch size:     8 | lm loss: 1.122208E+01 | loss scale: 1.0 | grad norm: 11.412 | number of skipped iterations:   0 | number of nan iterations:   0 |
+ iteration        3/       6 | consumed samples:           24 | elapsed time per iteration (ms): 1740.5 | samples per second: 4.596 | tokens per sec per replica: 25101.77074 | effective tokens/s: 19587.111 | iteration median/P95 (ms): 1738.6/1738.6 | packing utilization: 0.9238 | schedule padding ratio: 0.0000 | peak memory rank0 alloc/reserved (MiB): 17088.8/17564.0 | learning rate: 0.00000000E+00 | global batch size:     8 | lm loss: 1.121561E+01 | loss scale: 1.0 | grad norm: 9.030 | number of skipped iterations:   0 | number of nan iterations:   0 |
+ iteration        4/       6 | consumed samples:           32 | elapsed time per iteration (ms): 3079.0 | samples per second: 2.598 | tokens per sec per replica: 14190.02915 | effective tokens/s: 21050.723 | iteration median/P95 (ms): 3076.9/3076.9 | packing utilization: 0.9883 | schedule padding ratio: 0.0000 | peak memory rank0 alloc/reserved (MiB): 17127.2/17676.0 | learning rate: 0.00000000E+00 | global batch size:     8 | lm loss: 1.121735E+01 | loss scale: 1.0 | grad norm: 8.060 | number of skipped iterations:   0 | number of nan iterations:   0 |
+ iteration        5/       6 | consumed samples:           40 | elapsed time per iteration (ms): 2094.6 | samples per second: 3.819 | tokens per sec per replica: 20858.75680 | effective tokens/s: 19331.126 | iteration median/P95 (ms): 2092.7/2092.7 | packing utilization: 0.8979 | schedule padding ratio: 0.0000 | peak memory rank0 alloc/reserved (MiB): 17127.2/17676.0 | learning rate: 0.00000000E+00 | global batch size:     8 | lm loss: 1.122068E+01 | loss scale: 1.0 | grad norm: 9.200 | number of skipped iterations:   0 | number of nan iterations:   0 |
+ iteration        6/       6 | consumed samples:           48 | elapsed time per iteration (ms): 696.1 | samples per second: 11.493 | tokens per sec per replica: 62766.11110 | effective tokens/s: 19563.500 | iteration median/P95 (ms): 693.9/693.9 | packing utilization: 0.7365 | schedule padding ratio: 0.0000 | peak memory rank0 alloc/reserved (MiB): 17127.2/17676.0 | learning rate: 0.00000000E+00 | global batch size:     8 | lm loss: 1.124032E+01 | loss scale: 1.0 | grad norm: 17.038 | number of skipped iterations:   0 | number of nan iterations:   0 |
+[after training is done] datetime: 2026-10-16 12:23:57 
+[rank2]:[W1016 12:23:58.542906958 ProcessGroupNCCL.cpp:1565] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank0]:[W1016 12:23:58.619686834 ProcessGroupNCCL.cpp:1565] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank1]:[W1016 12:23:58.800506812 ProcessGroupNCCL.cpp:1565] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())

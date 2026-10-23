@@ -192,6 +192,8 @@ def validate_args(args, defaults={}):
     else:
         args.virtual_pipeline_model_parallel_size = None
 
+    if args.dspp_timeline_iterations is not None:
+        assert all(i > 0 for i in args.dspp_timeline_iterations), 'timeline iterations must be positive'
     if args.dspp_task_timing_only:
         assert args.dspp, '--dspp-task-timing-only requires --dspp'
         assert args.timing_log_level == 0, 'task-only timing requires --timing-log-level 0'
@@ -1517,6 +1519,10 @@ def _add_distributed_args(parser):
                        'per direction so forward and reverse traffic progress independently.')
     group.add_argument('--dspp-timeline-dir', type=str, default=None,
                        help='Directory for opt-in per-rank DSPP timeline JSON and merged SVG.')
+    group.add_argument('--dspp-timeline-iterations', type=int, nargs='+', default=None,
+                       help='One-based iterations to sample; overrides the single-iteration selector.')
+    group.add_argument('--dspp-task-timing-scope', choices=['bh', 'all'], default='bh',
+                       help='Pure boundary timing scope: B/H (default) or F/B/W/H.')
     group.add_argument('--dspp-timeline-iteration', type=int, default=0,
                        help='One-based training iteration to trace; 0 disables CUDA-event tracing.')
     group.add_argument('--dspp-torch-profiler-dir', type=str, default=None,

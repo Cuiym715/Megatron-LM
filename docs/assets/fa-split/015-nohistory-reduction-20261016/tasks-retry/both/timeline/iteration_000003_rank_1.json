@@ -1,0 +1,1583 @@
+{
+  "iteration": 3,
+  "rank": 1,
+  "stage": 1,
+  "anchor_cpu_ns": 15910212680963242,
+  "backward_mode": "after_dx",
+  "task_timing_only": true,
+  "peak_allocated_bytes": 11398599680,
+  "peak_reserved_bytes": 12102664192,
+  "ordering": {
+    "mode": "warmup-short-steady-long",
+    "v_layer_layout": "balanced",
+    "cost_source": "metadata-proxy",
+    "warmup_count": 11,
+    "warmup_task_count": 11,
+    "warmup_short_only_count": 4,
+    "entrance_order": [
+      [
+        1,
+        8
+      ],
+      [
+        0,
+        8
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        0,
+        7
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        6
+      ]
+    ],
+    "schedule_group_sizes": [
+      1,
+      1,
+      1,
+      1,
+      7,
+      7
+    ],
+    "schedule_group_sizes_with_padding": [
+      1,
+      1,
+      1,
+      1,
+      7,
+      7
+    ]
+  },
+  "measurement": "CUDA-event compute-stream wall-time envelope; P2P calls are outside task ranges",
+  "events": [
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 8,
+      "microbatch_id": 0,
+      "signature": "c2048|257:257;257:257",
+      "valid_tokens": 514,
+      "items": [
+        {
+          "sequence_id": 0,
+          "segment_id": 0,
+          "segment_count": 1,
+          "token_offset": 0,
+          "token_length": 257,
+          "sequence_length": 257
+        },
+        {
+          "sequence_id": 1,
+          "segment_id": 0,
+          "segment_count": 1,
+          "token_offset": 0,
+          "token_length": 257,
+          "sequence_length": 257
+        }
+      ],
+      "start_ms": 248.56576538085938,
+      "end_ms": 253.13177490234375,
+      "duration_ms": 4.56601619720459
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 8,
+      "microbatch_id": 1,
+      "signature": "c2048|1537:1537",
+      "valid_tokens": 1537,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 0,
+          "segment_count": 1,
+          "token_offset": 0,
+          "token_length": 1537,
+          "sequence_length": 1537
+        }
+      ],
+      "start_ms": 271.4142761230469,
+      "end_ms": 276.6991271972656,
+      "duration_ms": 5.2848639488220215
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 8,
+      "microbatch_id": 0,
+      "signature": "c2048|257:257;257:257",
+      "valid_tokens": 514,
+      "items": [
+        {
+          "sequence_id": 0,
+          "segment_id": 0,
+          "segment_count": 1,
+          "token_offset": 0,
+          "token_length": 257,
+          "sequence_length": 257
+        },
+        {
+          "sequence_id": 1,
+          "segment_id": 0,
+          "segment_count": 1,
+          "token_offset": 0,
+          "token_length": 257,
+          "sequence_length": 257
+        }
+      ],
+      "start_ms": 290.49957275390625,
+      "end_ms": 295.488525390625,
+      "duration_ms": 4.988927841186523
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 7,
+      "microbatch_id": 2,
+      "signature": "c2048|1537:1537",
+      "valid_tokens": 1537,
+      "items": [
+        {
+          "sequence_id": 3,
+          "segment_id": 0,
+          "segment_count": 1,
+          "token_offset": 0,
+          "token_length": 1537,
+          "sequence_length": 1537
+        }
+      ],
+      "start_ms": 321.7530822753906,
+      "end_ms": 327.3021545410156,
+      "duration_ms": 5.549056053161621
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 8,
+      "microbatch_id": 1,
+      "signature": "c2048|1537:1537",
+      "valid_tokens": 1537,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 0,
+          "segment_count": 1,
+          "token_offset": 0,
+          "token_length": 1537,
+          "sequence_length": 1537
+        }
+      ],
+      "start_ms": 339.1611022949219,
+      "end_ms": 344.60980224609375,
+      "duration_ms": 5.448703765869141
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 7,
+      "microbatch_id": 3,
+      "signature": "c2048|1537:1537;257:257",
+      "valid_tokens": 1794,
+      "items": [
+        {
+          "sequence_id": 0,
+          "segment_id": 0,
+          "segment_count": 1,
+          "token_offset": 0,
+          "token_length": 1537,
+          "sequence_length": 1537
+        },
+        {
+          "sequence_id": 3,
+          "segment_id": 0,
+          "segment_count": 1,
+          "token_offset": 0,
+          "token_length": 257,
+          "sequence_length": 257
+        }
+      ],
+      "start_ms": 386.5169982910156,
+      "end_ms": 392.0097351074219,
+      "duration_ms": 5.492735862731934
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 7,
+      "microbatch_id": 2,
+      "signature": "c2048|1537:1537",
+      "valid_tokens": 1537,
+      "items": [
+        {
+          "sequence_id": 3,
+          "segment_id": 0,
+          "segment_count": 1,
+          "token_offset": 0,
+          "token_length": 1537,
+          "sequence_length": 1537
+        }
+      ],
+      "start_ms": 404.2352600097656,
+      "end_ms": 409.533447265625,
+      "duration_ms": 5.298175811767578
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 6,
+      "microbatch_id": 10,
+      "signature": "c2048|2048:14336",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 6,
+          "segment_count": 7,
+          "token_offset": 12288,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 474.30145263671875,
+      "end_ms": 484.77490234375,
+      "duration_ms": 10.473471641540527
+    },
+    {
+      "kind": "H1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 6,
+      "microbatch_id": 10,
+      "signature": "c2048|2048:14336",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 6,
+          "segment_count": 7,
+          "token_offset": 12288,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 484.77593994140625,
+      "end_ms": 490.6885070800781,
+      "duration_ms": 5.912576198577881
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 7,
+      "microbatch_id": 3,
+      "signature": "c2048|1537:1537;257:257",
+      "valid_tokens": 1794,
+      "items": [
+        {
+          "sequence_id": 0,
+          "segment_id": 0,
+          "segment_count": 1,
+          "token_offset": 0,
+          "token_length": 1537,
+          "sequence_length": 1537
+        },
+        {
+          "sequence_id": 3,
+          "segment_id": 0,
+          "segment_count": 1,
+          "token_offset": 0,
+          "token_length": 257,
+          "sequence_length": 257
+        }
+      ],
+      "start_ms": 501.4866027832031,
+      "end_ms": 507.12884521484375,
+      "duration_ms": 5.642240047454834
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 5,
+      "microbatch_id": 9,
+      "signature": "c2048|2048:12288",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 5,
+          "segment_count": 7,
+          "token_offset": 10240,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 553.4157104492188,
+      "end_ms": 563.2819213867188,
+      "duration_ms": 9.866239547729492
+    },
+    {
+      "kind": "H1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 5,
+      "microbatch_id": 9,
+      "signature": "c2048|2048:12288",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 5,
+          "segment_count": 7,
+          "token_offset": 10240,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 563.2839965820312,
+      "end_ms": 568.858642578125,
+      "duration_ms": 5.574656009674072
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 6,
+      "microbatch_id": 10,
+      "signature": "c2048|2048:14336",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 6,
+          "segment_count": 7,
+          "token_offset": 12288,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 582.8392944335938,
+      "end_ms": 593.3834228515625,
+      "duration_ms": 10.54412841796875
+    },
+    {
+      "kind": "H0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 6,
+      "microbatch_id": 10,
+      "signature": "c2048|2048:14336",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 6,
+          "segment_count": 7,
+          "token_offset": 12288,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 593.385498046875,
+      "end_ms": 600.7736206054688,
+      "duration_ms": 7.388160228729248
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 4,
+      "microbatch_id": 8,
+      "signature": "c2048|2048:10240",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 4,
+          "segment_count": 7,
+          "token_offset": 8192,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 645.275634765625,
+      "end_ms": 654.61865234375,
+      "duration_ms": 9.342975616455078
+    },
+    {
+      "kind": "H1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 4,
+      "microbatch_id": 8,
+      "signature": "c2048|2048:10240",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 4,
+          "segment_count": 7,
+          "token_offset": 8192,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 654.61962890625,
+      "end_ms": 659.0791625976562,
+      "duration_ms": 4.459519863128662
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 5,
+      "microbatch_id": 9,
+      "signature": "c2048|2048:12288",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 5,
+          "segment_count": 7,
+          "token_offset": 10240,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 680.9569091796875,
+      "end_ms": 690.703369140625,
+      "duration_ms": 9.746432304382324
+    },
+    {
+      "kind": "H0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 5,
+      "microbatch_id": 9,
+      "signature": "c2048|2048:12288",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 5,
+          "segment_count": 7,
+          "token_offset": 10240,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 690.7053833007812,
+      "end_ms": 696.2861938476562,
+      "duration_ms": 5.5808000564575195
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 3,
+      "microbatch_id": 7,
+      "signature": "c2048|2048:8192",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 3,
+          "segment_count": 7,
+          "token_offset": 6144,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 735.4542236328125,
+      "end_ms": 743.9196166992188,
+      "duration_ms": 8.465408325195312
+    },
+    {
+      "kind": "H1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 3,
+      "microbatch_id": 7,
+      "signature": "c2048|2048:8192",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 3,
+          "segment_count": 7,
+          "token_offset": 6144,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 743.9216918945312,
+      "end_ms": 747.3449096679688,
+      "duration_ms": 3.423232078552246
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 4,
+      "microbatch_id": 8,
+      "signature": "c2048|2048:10240",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 4,
+          "segment_count": 7,
+          "token_offset": 8192,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 767.02001953125,
+      "end_ms": 776.0137939453125,
+      "duration_ms": 8.993791580200195
+    },
+    {
+      "kind": "H0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 4,
+      "microbatch_id": 8,
+      "signature": "c2048|2048:10240",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 4,
+          "segment_count": 7,
+          "token_offset": 8192,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 776.015869140625,
+      "end_ms": 780.2562255859375,
+      "duration_ms": 4.240384101867676
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 2,
+      "microbatch_id": 6,
+      "signature": "c2048|2048:6144",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 2,
+          "segment_count": 7,
+          "token_offset": 4096,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 823.9667358398438,
+      "end_ms": 831.6272583007812,
+      "duration_ms": 7.660543918609619
+    },
+    {
+      "kind": "H1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 2,
+      "microbatch_id": 6,
+      "signature": "c2048|2048:6144",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 2,
+          "segment_count": 7,
+          "token_offset": 4096,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 831.6293334960938,
+      "end_ms": 833.9015502929688,
+      "duration_ms": 2.2722558975219727
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 3,
+      "microbatch_id": 7,
+      "signature": "c2048|2048:8192",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 3,
+          "segment_count": 7,
+          "token_offset": 6144,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 855.1177978515625,
+      "end_ms": 863.18798828125,
+      "duration_ms": 8.070143699645996
+    },
+    {
+      "kind": "H0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 3,
+      "microbatch_id": 7,
+      "signature": "c2048|2048:8192",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 3,
+          "segment_count": 7,
+          "token_offset": 6144,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 863.1900024414062,
+      "end_ms": 866.356201171875,
+      "duration_ms": 3.166208028793335
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 1,
+      "microbatch_id": 5,
+      "signature": "c2048|2048:4096",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 1,
+          "segment_count": 7,
+          "token_offset": 2048,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 917.53369140625,
+      "end_ms": 924.1180419921875,
+      "duration_ms": 6.584320068359375
+    },
+    {
+      "kind": "H1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 1,
+      "microbatch_id": 5,
+      "signature": "c2048|2048:4096",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 1,
+          "segment_count": 7,
+          "token_offset": 2048,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 924.1200561523438,
+      "end_ms": 925.222900390625,
+      "duration_ms": 1.1028480529785156
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 2,
+      "microbatch_id": 6,
+      "signature": "c2048|2048:6144",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 2,
+          "segment_count": 7,
+          "token_offset": 4096,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 929.4725341796875,
+      "end_ms": 936.8514404296875,
+      "duration_ms": 7.378943920135498
+    },
+    {
+      "kind": "H0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 2,
+      "microbatch_id": 6,
+      "signature": "c2048|2048:6144",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 2,
+          "segment_count": 7,
+          "token_offset": 4096,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 936.853515625,
+      "end_ms": 938.9526977539062,
+      "duration_ms": 2.0992000102996826
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 0,
+      "microbatch_id": 4,
+      "signature": "c2048|2048:2048",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 0,
+          "segment_count": 7,
+          "token_offset": 0,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 972.0617065429688,
+      "end_ms": 977.9036254882812,
+      "duration_ms": 5.841919898986816
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 1,
+      "microbatch_id": 5,
+      "signature": "c2048|2048:4096",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 1,
+          "segment_count": 7,
+          "token_offset": 2048,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 977.9056396484375,
+      "end_ms": 984.648681640625,
+      "duration_ms": 6.743040084838867
+    },
+    {
+      "kind": "H0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 1,
+      "microbatch_id": 5,
+      "signature": "c2048|2048:4096",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 1,
+          "segment_count": 7,
+          "token_offset": 2048,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 984.6497192382812,
+      "end_ms": 985.79150390625,
+      "duration_ms": 1.141759991645813
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 6,
+      "microbatch_id": 17,
+      "signature": "c2048|2048:14336",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 6,
+          "segment_count": 7,
+          "token_offset": 12288,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1069.64990234375,
+      "end_ms": 1079.8079833984375,
+      "duration_ms": 10.158080101013184
+    },
+    {
+      "kind": "H1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 6,
+      "microbatch_id": 17,
+      "signature": "c2048|2048:14336",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 6,
+          "segment_count": 7,
+          "token_offset": 12288,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1079.81005859375,
+      "end_ms": 1085.6356201171875,
+      "duration_ms": 5.825535774230957
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 0,
+      "physical_microbatch": 0,
+      "microbatch_id": 4,
+      "signature": "c2048|2048:2048",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 1,
+          "segment_id": 0,
+          "segment_count": 7,
+          "token_offset": 0,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1085.6375732421875,
+      "end_ms": 1091.42626953125,
+      "duration_ms": 5.788671970367432
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 5,
+      "microbatch_id": 16,
+      "signature": "c2048|2048:12288",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 5,
+          "segment_count": 7,
+          "token_offset": 10240,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1095.8070068359375,
+      "end_ms": 1105.365966796875,
+      "duration_ms": 9.559040069580078
+    },
+    {
+      "kind": "H1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 5,
+      "microbatch_id": 16,
+      "signature": "c2048|2048:12288",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 5,
+          "segment_count": 7,
+          "token_offset": 10240,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1105.3670654296875,
+      "end_ms": 1110.67236328125,
+      "duration_ms": 5.305344104766846
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 6,
+      "microbatch_id": 17,
+      "signature": "c2048|2048:14336",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 6,
+          "segment_count": 7,
+          "token_offset": 12288,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1120.0860595703125,
+      "end_ms": 1130.9219970703125,
+      "duration_ms": 10.835968017578125
+    },
+    {
+      "kind": "H0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 6,
+      "microbatch_id": 17,
+      "signature": "c2048|2048:14336",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 6,
+          "segment_count": 7,
+          "token_offset": 12288,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1130.924072265625,
+      "end_ms": 1137.2216796875,
+      "duration_ms": 6.297599792480469
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 4,
+      "microbatch_id": 15,
+      "signature": "c2048|2048:10240",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 4,
+          "segment_count": 7,
+          "token_offset": 8192,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1184.66455078125,
+      "end_ms": 1193.4207763671875,
+      "duration_ms": 8.756223678588867
+    },
+    {
+      "kind": "H1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 4,
+      "microbatch_id": 15,
+      "signature": "c2048|2048:10240",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 4,
+          "segment_count": 7,
+          "token_offset": 8192,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1193.421875,
+      "end_ms": 1197.5751953125,
+      "duration_ms": 4.15334415435791
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 5,
+      "microbatch_id": 16,
+      "signature": "c2048|2048:12288",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 5,
+          "segment_count": 7,
+          "token_offset": 10240,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1197.5772705078125,
+      "end_ms": 1207.08203125,
+      "duration_ms": 9.504768371582031
+    },
+    {
+      "kind": "H0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 5,
+      "microbatch_id": 16,
+      "signature": "c2048|2048:12288",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 5,
+          "segment_count": 7,
+          "token_offset": 10240,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1207.083984375,
+      "end_ms": 1212.3330078125,
+      "duration_ms": 5.249023914337158
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 3,
+      "microbatch_id": 14,
+      "signature": "c2048|2048:8192",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 3,
+          "segment_count": 7,
+          "token_offset": 6144,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1212.3350830078125,
+      "end_ms": 1220.726806640625,
+      "duration_ms": 8.391679763793945
+    },
+    {
+      "kind": "H1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 3,
+      "microbatch_id": 14,
+      "signature": "c2048|2048:8192",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 3,
+          "segment_count": 7,
+          "token_offset": 6144,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1220.727783203125,
+      "end_ms": 1224.0823974609375,
+      "duration_ms": 3.354624032974243
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 4,
+      "microbatch_id": 15,
+      "signature": "c2048|2048:10240",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 4,
+          "segment_count": 7,
+          "token_offset": 8192,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1240.9764404296875,
+      "end_ms": 1250.7904052734375,
+      "duration_ms": 9.814016342163086
+    },
+    {
+      "kind": "H0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 4,
+      "microbatch_id": 15,
+      "signature": "c2048|2048:10240",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 4,
+          "segment_count": 7,
+          "token_offset": 8192,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1250.7913818359375,
+      "end_ms": 1255.3564453125,
+      "duration_ms": 4.5649919509887695
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 2,
+      "microbatch_id": 13,
+      "signature": "c2048|2048:6144",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 2,
+          "segment_count": 7,
+          "token_offset": 4096,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1291.9981689453125,
+      "end_ms": 1299.3228759765625,
+      "duration_ms": 7.324672222137451
+    },
+    {
+      "kind": "H1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 2,
+      "microbatch_id": 13,
+      "signature": "c2048|2048:6144",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 2,
+          "segment_count": 7,
+          "token_offset": 4096,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1299.325927734375,
+      "end_ms": 1301.40673828125,
+      "duration_ms": 2.08076810836792
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 3,
+      "microbatch_id": 14,
+      "signature": "c2048|2048:8192",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 3,
+          "segment_count": 7,
+          "token_offset": 6144,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1301.4088134765625,
+      "end_ms": 1309.475830078125,
+      "duration_ms": 8.067071914672852
+    },
+    {
+      "kind": "H0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 3,
+      "microbatch_id": 14,
+      "signature": "c2048|2048:8192",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 3,
+          "segment_count": 7,
+          "token_offset": 6144,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1309.4779052734375,
+      "end_ms": 1312.6328125,
+      "duration_ms": 3.1549439430236816
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 1,
+      "microbatch_id": 12,
+      "signature": "c2048|2048:4096",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 1,
+          "segment_count": 7,
+          "token_offset": 2048,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1312.6348876953125,
+      "end_ms": 1319.3082275390625,
+      "duration_ms": 6.673408031463623
+    },
+    {
+      "kind": "H1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 1,
+      "microbatch_id": 12,
+      "signature": "c2048|2048:4096",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 1,
+          "segment_count": 7,
+          "token_offset": 2048,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1319.3114013671875,
+      "end_ms": 1320.395751953125,
+      "duration_ms": 1.0844160318374634
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 2,
+      "microbatch_id": 13,
+      "signature": "c2048|2048:6144",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 2,
+          "segment_count": 7,
+          "token_offset": 4096,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1343.1131591796875,
+      "end_ms": 1350.5054931640625,
+      "duration_ms": 7.392255783081055
+    },
+    {
+      "kind": "H0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 2,
+      "microbatch_id": 13,
+      "signature": "c2048|2048:6144",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 2,
+          "segment_count": 7,
+          "token_offset": 4096,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1350.5064697265625,
+      "end_ms": 1352.623046875,
+      "duration_ms": 2.116607904434204
+    },
+    {
+      "kind": "B1",
+      "stage": 1,
+      "chunk": 1,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 0,
+      "microbatch_id": 11,
+      "signature": "c2048|2048:2048",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 0,
+          "segment_count": 7,
+          "token_offset": 0,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1374.688232421875,
+      "end_ms": 1380.3243408203125,
+      "duration_ms": 5.636096000671387
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 1,
+      "microbatch_id": 12,
+      "signature": "c2048|2048:4096",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 1,
+          "segment_count": 7,
+          "token_offset": 2048,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1380.3253173828125,
+      "end_ms": 1386.82470703125,
+      "duration_ms": 6.499328136444092
+    },
+    {
+      "kind": "H0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 1,
+      "microbatch_id": 12,
+      "signature": "c2048|2048:4096",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 1,
+          "segment_count": 7,
+          "token_offset": 2048,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1386.8267822265625,
+      "end_ms": 1387.87841796875,
+      "duration_ms": 1.0516480207443237
+    },
+    {
+      "kind": "B0",
+      "stage": 1,
+      "chunk": 0,
+      "sequence_chunk_size": 2048,
+      "logical_microbatch": 1,
+      "physical_microbatch": 0,
+      "microbatch_id": 11,
+      "signature": "c2048|2048:2048",
+      "valid_tokens": 2048,
+      "items": [
+        {
+          "sequence_id": 2,
+          "segment_id": 0,
+          "segment_count": 7,
+          "token_offset": 0,
+          "token_length": 2048,
+          "sequence_length": 14336
+        }
+      ],
+      "start_ms": 1511.224365234375,
+      "end_ms": 1516.8153076171875,
+      "duration_ms": 5.591040134429932
+    }
+  ]
+}

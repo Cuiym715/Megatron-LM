@@ -1,0 +1,175 @@
+diff --git a/megatron/core/kv_cache/dspp_packed_attention.py b/megatron/core/kv_cache/dspp_packed_attention.py
+index 7cc2bbe90..9e830ce4e 100644
+--- a/megatron/core/kv_cache/dspp_packed_attention.py
++++ b/megatron/core/kv_cache/dspp_packed_attention.py
+@@ -528,6 +528,7 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
+         ctx.state = state
+         ctx.meta = meta
+         ctx.layouts = layouts
++        ctx.has_history = any(layout.history for layout in layouts)
+         ctx.layer_idx = int(layer_idx)
+         ctx.scale = scale
+         ctx.original_head_dim = original_head_dim
+@@ -565,7 +566,12 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
+             or ctx.state._history_task_ready
+         ):
+             raise RuntimeError("after-dx backward requires its active physical task")
+-        if ctx.split_attention_backward:
++        # In after-dx mode an entirely history-free physical task needs no H.
++        # Its full KV output has exactly the compact-current layout expected by
++        # the route below. Keep task ownership/consumer handling unchanged.
++        if ctx.split_attention_backward and not (
++            ctx.history_dkv_after_dx and not ctx.has_history
++        ):
+             from .fa_split import prepare_backward, backward_dq, backward_dkv, backward_dq_current
+ 
+             # Frozen forward metadata: never consult the state's currently
+@@ -582,7 +588,7 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
+             )
+             if ctx.history_dkv_after_dx:
+                 query_grad, key_grad, value_grad = backward_dq_current(split_state)
+-                if any(layout.history for layout in ctx.layouts):
++                if ctx.has_history:
+                     ctx.state._history_jobs.append(
+                         (split_state, ctx.layer_idx, ctx.layouts, ctx.current_shape)
+                     )
+diff --git a/megatron/core/kv_cache/fa_split_src/backward.cu b/megatron/core/kv_cache/fa_split_src/backward.cu
+index 22a65cd43..510545d94 100644
+--- a/megatron/core/kv_cache/fa_split_src/backward.cu
++++ b/megatron/core/kv_cache/fa_split_src/backward.cu
+@@ -4,6 +4,7 @@
+ #include <ATen/cuda/CUDAContext.h>
+ #include <c10/cuda/CUDAGuard.h>
+ #include <c10/cuda/CUDAException.h>
++#include <algorithm>
+ #include <cmath>
+ #include <limits>
+ 
+@@ -52,6 +53,51 @@ __global__ void convert_dq_kernel(const Flash_bwd_params p) {
+     dspp_flash_split::convert_dQ<Traits>(p, 1);
+ }
+ 
++// Joint K/V output pass. Each thread owns one [token, KV-head, dim]
++// element and sums the Q-head group's BF16 partials in FP32, casting once.
++// The source remains full-address; begin/rows exclude boundary-tile surplus.
++__global__ void reduce_dkv_output_kernel(
++    const cutlass::bfloat16_t* __restrict__ partial_k,
++    const cutlass::bfloat16_t* __restrict__ partial_v,
++    cutlass::bfloat16_t* __restrict__ dk,
++    cutlass::bfloat16_t* __restrict__ dv,
++    int64_t elements, int64_t begin, int kv_heads, int ratio) {
++    for (int64_t index = int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
++         index < elements; index += int64_t(blockDim.x) * gridDim.x) {
++        const int dim = index % 128;
++        const int64_t token_head = index / 128;
++        const int64_t token = token_head / kv_heads;
++        const int head = token_head % kv_heads;
++        const int64_t source = ((begin + token) * kv_heads + head) * ratio * 128 + dim;
++        if (ratio == 1) {
++            dk[index] = partial_k[source];
++            dv[index] = partial_v[source];
++        } else {
++            float sum_k = 0.f, sum_v = 0.f;
++            for (int qhead = 0; qhead < ratio; ++qhead) {
++                sum_k += float(partial_k[source + qhead * 128]);
++                sum_v += float(partial_v[source + qhead * 128]);
++            }
++            dk[index] = cutlass::bfloat16_t(sum_k);
++            dv[index] = cutlass::bfloat16_t(sum_v);
++        }
++    }
++}
++
++void write_dkv_output(const at::Tensor& partial_k, const at::Tensor& partial_v,
++                      at::Tensor& dk, at::Tensor& dv, int64_t begin, int ratio) {
++    const int64_t elements = dk.numel();
++    if (!elements) { return; }
++    const int blocks = int(std::min<int64_t>((elements + 255) / 256, 65535));
++    reduce_dkv_output_kernel<<<blocks, 256, 0, at::cuda::getCurrentCUDAStream()>>>(
++        reinterpret_cast<const cutlass::bfloat16_t*>(partial_k.data_ptr()),
++        reinterpret_cast<const cutlass::bfloat16_t*>(partial_v.data_ptr()),
++        reinterpret_cast<cutlass::bfloat16_t*>(dk.data_ptr()),
++        reinterpret_cast<cutlass::bfloat16_t*>(dv.data_ptr()),
++        elements, begin, dk.size(1), ratio);
++    C10_CUDA_KERNEL_LAUNCH_CHECK();
++}
++
+ void check_inputs(const at::Tensor& q, const at::Tensor& k, const at::Tensor& v,
+                   const at::Tensor& o, const at::Tensor& dout, const at::Tensor& lse,
+                   double scale) {
+@@ -206,17 +252,7 @@ std::vector<at::Tensor> split_dkv(const at::Tensor& q, const at::Tensor& k, cons
+     // Boundary-tile surplus is never returned or included in the reduction.
+     auto dk_region = compact ? dk : dk.slice(0, begin, end);
+     auto dv_region = compact ? dv : dv.slice(0, begin, end);
+-    if (p.h_h_k_ratio == 1) {
+-        dk_region.copy_(partial_k.slice(0, begin, end));
+-        dv_region.copy_(partial_v.slice(0, begin, end));
+-    } else {
+-        // ATen CUDA BF16 sum uses FP32 accumulation and casts once to BF16,
+-        // matching the original FA2 API's GQA reduction/rounding contract.
+-        at::sum_out(dk_region, partial_k.slice(0, begin, end).view(
+-            {end - begin, p.h_k, p.h_h_k_ratio, 128}), {2});
+-        at::sum_out(dv_region, partial_v.slice(0, begin, end).view(
+-            {end - begin, p.h_k, p.h_h_k_ratio, 128}), {2});
+-    }
++    write_dkv_output(partial_k, partial_v, dk_region, dv_region, begin, p.h_h_k_ratio);
+     return {dk, dv};
+ }
+ 
+@@ -252,14 +288,6 @@ std::vector<at::Tensor> split_dq_current(
+     convert_dq_kernel<<<dim3((p.seqlen_q + 63) / 64, 1, p.h), Traits::kNThreads,
+         Traits::kSmemdQSize, stream>>>(p);
+     C10_CUDA_KERNEL_LAUNCH_CHECK();
+-    if (p.h_h_k_ratio == 1) {
+-        dk.copy_(partial_k.slice(0, history));
+-        dv.copy_(partial_v.slice(0, history));
+-    } else {
+-        at::sum_out(dk, partial_k.slice(0, history).view(
+-            {q.size(0), p.h_k, p.h_h_k_ratio, 128}), {2});
+-        at::sum_out(dv, partial_v.slice(0, history).view(
+-            {q.size(0), p.h_k, p.h_h_k_ratio, 128}), {2});
+-    }
++    write_dkv_output(partial_k, partial_v, dk, dv, history, p.h_h_k_ratio);
+     return {dq, dk, dv};
+ }
+diff --git a/tools/validate_dspp_split_training.py b/tools/validate_dspp_split_training.py
+index c823ce42b..96f1874c7 100644
+--- a/tools/validate_dspp_split_training.py
++++ b/tools/validate_dspp_split_training.py
+@@ -46,7 +46,9 @@ def backward(*args,**kwargs):
+ def attention_backward(ctx,grad):
+     if active is not None:
+         active['attention_calls']+=1
+-        active['split_calls']+=int(ctx.split_attention_backward)
++        fallback = (ctx.split_attention_backward and ctx.history_dkv_after_dx and not ctx.has_history)
++        active['split_calls'] += int(ctx.split_attention_backward and not fallback)
++        active['nohistory_fused_calls'] += int(fallback)
+         active['shapes'].add((tuple(ctx.saved_tensors[0].shape),tuple(ctx.saved_tensors[1].shape)))
+         active['mixed_packs']+=int(len(ctx.layouts)>1 and any(x.history for x in ctx.layouts))
+     return original_attn(ctx,grad)
+@@ -92,7 +94,7 @@ def train_step(*args,**kwargs):
+     optimizer=kwargs.get('optimizer',args[4] if len(args)>4 else None)
+     config=get_args();iteration=config.curr_iteration+1;rank=dist.get_rank()
+     split=config.dspp_split_attention_backward
+-    active={'dx':[],'attention_calls':0,'split_calls':0,'drained_states':0,'shapes':set(),'mixed_packs':0,
++    active={'dx':[],'attention_calls':0,'split_calls':0,'nohistory_fused_calls':0,'drained_states':0,'shapes':set(),'mixed_packs':0,
+             'history_tasks':0,'history_layers':0}
+     base_path=SNAPSHOTS/f'iteration{iteration}-rank{rank}.pt'
+     reference=torch.load(base_path,map_location='cpu',weights_only=True) if split else None
+@@ -116,7 +118,7 @@ def train_step(*args,**kwargs):
+     dx_checks=compare(dx,reference['dx']) if split else {}
+     loss={k:float(v) if isinstance(v,(float,int,torch.Tensor)) else str(v) for k,v in result[0].items()}
+     if split:
+-        assert active['attention_calls']>0 and active['split_calls']==active['attention_calls']
++        assert active['attention_calls']>0 and active['split_calls']+active['nohistory_fused_calls']==active['attention_calls']
+         compare({k:torch.tensor(v) for k,v in loss.items()}, {k:torch.tensor(v) for k,v in reference['loss'].items()})
+     else:
+         assert active['attention_calls']>0 and active['split_calls']==0
+@@ -129,6 +131,7 @@ def train_step(*args,**kwargs):
+             'after_dx':config.dspp_history_dkv_after_dx,
+             'history_tasks':active['history_tasks'],'history_layers':active['history_layers'],
+             'attention_calls':active['attention_calls'],'split_calls':active['split_calls'],
++            'nohistory_fused_calls':active['nohistory_fused_calls'],
+             'drained_states':active['drained_states'],'mixed_pack_calls':active['mixed_packs'],
+             'attention_shapes':sorted(active['shapes']),'stage_dx_count':len(dx),
+             'parameter_tensor_count':len(params),'gradient_tensor_count':len(snapshot),

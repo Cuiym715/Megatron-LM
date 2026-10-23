@@ -1,0 +1,322 @@
+{
+  "rank": 0,
+  "iteration": 2,
+  "split": true,
+  "loss": {
+    "lm loss": 9.979818344116211
+  },
+  "after_dx": true,
+  "history_tasks": 14,
+  "history_layers": 14,
+  "attention_calls": 22,
+  "split_calls": 14,
+  "nohistory_fused_calls": 8,
+  "drained_states": 4,
+  "mixed_pack_calls": 6,
+  "attention_shapes": [
+    [
+      [
+        18,
+        4,
+        128
+      ],
+      [
+        146,
+        2,
+        128
+      ]
+    ],
+    [
+      [
+        34,
+        4,
+        128
+      ],
+      [
+        162,
+        2,
+        128
+      ]
+    ],
+    [
+      [
+        34,
+        4,
+        128
+      ],
+      [
+        226,
+        2,
+        128
+      ]
+    ],
+    [
+      [
+        50,
+        4,
+        128
+      ],
+      [
+        50,
+        2,
+        128
+      ]
+    ],
+    [
+      [
+        64,
+        4,
+        128
+      ],
+      [
+        64,
+        2,
+        128
+      ]
+    ],
+    [
+      [
+        64,
+        4,
+        128
+      ],
+      [
+        128,
+        2,
+        128
+      ]
+    ],
+    [
+      [
+        64,
+        4,
+        128
+      ],
+      [
+        192,
+        2,
+        128
+      ]
+    ]
+  ],
+  "stage_dx_count": 11,
+  "parameter_tensor_count": 15,
+  "gradient_tensor_count": 15,
+  "parameter_checks": {
+    "0:module.module.language_model.embedding.word_embeddings.weight": {
+      "max_abs": 0.001953125,
+      "relative_l2": 0.00012689226298155063,
+      "numel": 16449536
+    },
+    "0:module.module.language_model.encoder.layers.0.input_layernorm.weight": {
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "numel": 512
+    },
+    "0:module.module.language_model.encoder.layers.0.self_attention.query_key_value.weight": {
+      "max_abs": 0.00201416015625,
+      "relative_l2": 0.0016232206101115894,
+      "numel": 524288
+    },
+    "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight": {
+      "max_abs": 0.001953125,
+      "relative_l2": 0.003218003808992817,
+      "numel": 262144
+    },
+    "0:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight": {
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "numel": 512
+    },
+    "0:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight": {
+      "max_abs": 0.0018463134765625,
+      "relative_l2": 0.0011607513770663153,
+      "numel": 1048576
+    },
+    "0:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight": {
+      "max_abs": 0.001953125,
+      "relative_l2": 0.0024682351792086285,
+      "numel": 524288
+    },
+    "1:module.module.language_model.encoder.layers.0.input_layernorm.weight": {
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "numel": 512
+    },
+    "1:module.module.language_model.encoder.layers.0.self_attention.query_key_value.weight": {
+      "max_abs": 5.960464477539063e-08,
+      "relative_l2": 4.672128182883715e-09,
+      "numel": 524288
+    },
+    "1:module.module.language_model.encoder.layers.0.self_attention.dense.weight": {
+      "max_abs": 7.62939453125e-06,
+      "relative_l2": 3.616123710955072e-06,
+      "numel": 262144
+    },
+    "1:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight": {
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "numel": 512
+    },
+    "1:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight": {
+      "max_abs": 1.52587890625e-05,
+      "relative_l2": 1.0530148335604868e-06,
+      "numel": 1048576
+    },
+    "1:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight": {
+      "max_abs": 1.52587890625e-05,
+      "relative_l2": 5.404170504677454e-06,
+      "numel": 524288
+    },
+    "1:module.module.language_model.encoder.final_layernorm.weight": {
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "numel": 512
+    },
+    "1:module.module.word_embeddings.weight": {
+      "max_abs": 0.001953125,
+      "relative_l2": 0.00012689226298155063,
+      "numel": 16449536
+    }
+  },
+  "gradient_checks": {
+    "0:module.module.language_model.embedding.word_embeddings.weight": {
+      "max_abs": 0.0007286109030246735,
+      "relative_l2": 0.005533215673916666,
+      "numel": 16449536
+    },
+    "0:module.module.language_model.encoder.layers.0.input_layernorm.weight": {
+      "max_abs": 1.638755202293396e-05,
+      "relative_l2": 0.003817034150120161,
+      "numel": 512
+    },
+    "0:module.module.language_model.encoder.layers.0.self_attention.query_key_value.weight": {
+      "max_abs": 0.00020321551710367203,
+      "relative_l2": 0.00425954697924365,
+      "numel": 524288
+    },
+    "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight": {
+      "max_abs": 0.00027641095221042633,
+      "relative_l2": 0.0036260687350704998,
+      "numel": 262144
+    },
+    "0:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight": {
+      "max_abs": 1.4543533325195312e-05,
+      "relative_l2": 0.004187340884294341,
+      "numel": 512
+    },
+    "0:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight": {
+      "max_abs": 0.00011068664025515318,
+      "relative_l2": 0.004999143034697398,
+      "numel": 1048576
+    },
+    "0:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight": {
+      "max_abs": 0.0003339014947414398,
+      "relative_l2": 0.004161221644727511,
+      "numel": 524288
+    },
+    "1:module.module.language_model.encoder.layers.0.input_layernorm.weight": {
+      "max_abs": 1.9371509552001953e-05,
+      "relative_l2": 0.0021096424866093523,
+      "numel": 512
+    },
+    "1:module.module.language_model.encoder.layers.0.self_attention.query_key_value.weight": {
+      "max_abs": 9.711459279060364e-05,
+      "relative_l2": 0.002192386298743698,
+      "numel": 524288
+    },
+    "1:module.module.language_model.encoder.layers.0.self_attention.dense.weight": {
+      "max_abs": 0.0001964746043086052,
+      "relative_l2": 0.0031527477393401087,
+      "numel": 262144
+    },
+    "1:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight": {
+      "max_abs": 1.0967254638671875e-05,
+      "relative_l2": 0.006271674638357959,
+      "numel": 512
+    },
+    "1:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight": {
+      "max_abs": 5.0053466111421585e-05,
+      "relative_l2": 0.005360926721750203,
+      "numel": 1048576
+    },
+    "1:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight": {
+      "max_abs": 0.00010648195166140795,
+      "relative_l2": 0.00722370229603911,
+      "numel": 524288
+    },
+    "1:module.module.language_model.encoder.final_layernorm.weight": {
+      "max_abs": 5.233287811279297e-05,
+      "relative_l2": 0.004889478432148487,
+      "numel": 512
+    },
+    "1:module.module.word_embeddings.weight": {
+      "max_abs": 0.0007286109030246735,
+      "relative_l2": 0.005533215673916666,
+      "numel": 16449536
+    }
+  },
+  "stage_dx_checks": {
+    "0": {
+      "max_abs": 1.33514404296875e-05,
+      "relative_l2": 0.003550398579780516,
+      "numel": 32768
+    },
+    "1": {
+      "max_abs": 1.33514404296875e-05,
+      "relative_l2": 0.0033606687754196723,
+      "numel": 32768
+    },
+    "2": {
+      "max_abs": 1.52587890625e-05,
+      "relative_l2": 0.003285804276436899,
+      "numel": 32768
+    },
+    "3": {
+      "max_abs": 1.52587890625e-05,
+      "relative_l2": 0.003535138262085843,
+      "numel": 32768
+    },
+    "4": {
+      "max_abs": 1.33514404296875e-05,
+      "relative_l2": 0.003755575340877047,
+      "numel": 32768
+    },
+    "5": {
+      "max_abs": 1.52587890625e-05,
+      "relative_l2": 0.003285804276436899,
+      "numel": 32768
+    },
+    "6": {
+      "max_abs": 1.52587890625e-05,
+      "relative_l2": 0.003535138262085843,
+      "numel": 32768
+    },
+    "7": {
+      "max_abs": 1.33514404296875e-05,
+      "relative_l2": 0.0033678656864467695,
+      "numel": 32768
+    },
+    "8": {
+      "max_abs": 1.621246337890625e-05,
+      "relative_l2": 0.002874553425426234,
+      "numel": 32768
+    },
+    "9": {
+      "max_abs": 1.52587890625e-05,
+      "relative_l2": 0.003345888702820949,
+      "numel": 32768
+    },
+    "10": {
+      "max_abs": 1.52587890625e-05,
+      "relative_l2": 0.0035528649198182443,
+      "numel": 32768
+    }
+  },
+  "criteria": {
+    "atol": 0.004,
+    "rtol": 0.01,
+    "relative_l2_max": 0.02,
+    "initial_parameters": "exact"
+  }
+}

@@ -1,0 +1,46 @@
+Running 5 items in this shard
+.....                                                                    [100%]
+=============================== warnings summary ===============================
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute
+
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute
+
+megatron/core/utils.py:5
+  /workspace/src/Megatron-LM-kwai/megatron/core/utils.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+    from pkg_resources import packaging
+
+../../../usr/local/lib/python3.12/dist-packages/torch/jit/_script.py:1480: 11 warnings
+  /usr/local/lib/python3.12/dist-packages/torch/jit/_script.py:1480: DeprecationWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+../../../usr/local/lib/python3.12/dist-packages/torch/library.py:357
+  /usr/local/lib/python3.12/dist-packages/torch/library.py:357: UserWarning: Warning only once for all operators,  other operators may also be overridden.
+    Overriding a previously registered kernel for the same operator and the same dispatch key
+    operator: flash_attn::_flash_attn_backward(Tensor dout, Tensor q, Tensor k, Tensor v, Tensor out, Tensor softmax_lse, Tensor(a6!)? dq, Tensor(a7!)? dk, Tensor(a8!)? dv, float dropout_p, float softmax_scale, bool causal, SymInt window_size_left, SymInt window_size_right, float softcap, Tensor? alibi_slopes, bool deterministic, Tensor? rng_state=None) -> Tensor
+      registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926
+    dispatch key: ADInplaceOrView
+    previous kernel: no debug info
+         new kernel: registered at /usr/local/lib/python3.12/dist-packages/torch/_library/custom_ops.py:926 (Triggered internally at /opt/pytorch/pytorch/aten/src/ATen/core/dispatch/OperatorEntry.cpp:208.)
+    self.m.impl(
+
+megatron/arguments.py:1055
+  /workspace/src/Megatron-LM-kwai/megatron/arguments.py:1055: SyntaxWarning: invalid escape sequence '\ '
+    '   --rampup-batch-size 16 8 300000 \ '
+
+../../../usr/local/lib/python3.12/dist-packages/torch/jit/_script.py:362: 14 warnings
+  /usr/local/lib/python3.12/dist-packages/torch/jit/_script.py:362: DeprecationWarning: `torch.jit.script_method` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+../../../usr/local/lib/python3.12/dist-packages/_pytest/cacheprovider.py:446
+  /usr/local/lib/python3.12/dist-packages/_pytest/cacheprovider.py:446: PytestCacheWarning: cache could not write path /workspace/src/Megatron-LM-kwai/.pytest_cache/v/cache/nodeids: [Errno 13] Permission denied: '/workspace/src/Megatron-LM-kwai/.pytest_cache/v/cache/nodeids'
+    config.cache.set("cache/nodeids", sorted(self.cached_nodeids))
+
+../../../usr/local/lib/python3.12/dist-packages/_pytest/stepwise.py:57
+  /usr/local/lib/python3.12/dist-packages/_pytest/stepwise.py:57: PytestCacheWarning: cache could not write path /workspace/src/Megatron-LM-kwai/.pytest_cache/v/cache/stepwise: [Errno 13] Permission denied: '/workspace/src/Megatron-LM-kwai/.pytest_cache/v/cache/stepwise'
+    session.config.cache.set(STEPWISE_CACHE_DIR, [])
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+5 passed, 10 deselected, 32 warnings in 5.27s
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute

@@ -1,0 +1,105 @@
+{
+  "baseline_commit": "9b9fc8f966c043c1621fb79851f0609f3405bf61",
+  "hardware": {
+    "gpu": "3 x NVIDIA L40",
+    "compute_capability": "8.9",
+    "driver": "550.120",
+    "memory_mib_per_gpu": 46068
+  },
+  "environment": {
+    "image": "nvcr.io/nvidia/pytorch:26.01-py3",
+    "container": "dspp-opt015",
+    "python": "/workspace/src/venvs/megatron/bin/python",
+    "torch": "2.10.0a0+a36e1d39eb.nv26.01.42222806",
+    "cuda_toolkit": "13.1",
+    "flash_attn": "2.7.4.post1",
+    "TORCH_CUDA_ARCH_LIST": "8.9"
+  },
+  "extension_cache_keys": {
+    "baseline": "51ac35cd4a46e186",
+    "nohistory": "51ac35cd4a46e186",
+    "both": "c9f0ca7564470d9e"
+  },
+  "frozen_source_hashes": {
+    "baseline": {
+      "megatron/core/kv_cache/dspp_packed_attention.py": "8789e68453bceeef3ce689b5e15e45f4a71756979177842dd72c0f5a4979d875",
+      "megatron/core/kv_cache/fa_split_src/backward.cu": "63a3c390099a23b75ac82d614cffbba2b10a28aa0f8f671b41df63d021cca953",
+      "megatron/core/kv_cache/fa_split.py": "762422f97a80532376378a0c9d054e17e15b0ad9c2fa46d73911a9df0a6780f7",
+      "megatron/core/pipeline_parallel/schedules.py": "ca61880a34dea59c208ef28d3ab1f83f57b2f581b35bc78df9dc8481c1079319",
+      "megatron/core/pipeline_parallel/dspp_timeline.py": "0da8f40344ed860ca7b529fae6ee6d44c275deb817aef7b61ee7f08288097724"
+    },
+    "nohistory": {
+      "megatron/core/kv_cache/dspp_packed_attention.py": "1ae5b835891fd8d4f3be6dbb4f1effa7f29d5a253bd7382622a366b51cf19770",
+      "megatron/core/kv_cache/fa_split_src/backward.cu": "63a3c390099a23b75ac82d614cffbba2b10a28aa0f8f671b41df63d021cca953",
+      "megatron/core/kv_cache/fa_split.py": "762422f97a80532376378a0c9d054e17e15b0ad9c2fa46d73911a9df0a6780f7",
+      "megatron/core/pipeline_parallel/schedules.py": "ca61880a34dea59c208ef28d3ab1f83f57b2f581b35bc78df9dc8481c1079319",
+      "megatron/core/pipeline_parallel/dspp_timeline.py": "0da8f40344ed860ca7b529fae6ee6d44c275deb817aef7b61ee7f08288097724"
+    },
+    "both": {
+      "megatron/core/kv_cache/dspp_packed_attention.py": "1ae5b835891fd8d4f3be6dbb4f1effa7f29d5a253bd7382622a366b51cf19770",
+      "megatron/core/kv_cache/fa_split_src/backward.cu": "05cbf597ce381af2fbbbf0817cbdd9a72dcedce5d3dc316a3a3623e49df1953e",
+      "megatron/core/kv_cache/fa_split.py": "762422f97a80532376378a0c9d054e17e15b0ad9c2fa46d73911a9df0a6780f7",
+      "megatron/core/pipeline_parallel/schedules.py": "ca61880a34dea59c208ef28d3ab1f83f57b2f581b35bc78df9dc8481c1079319",
+      "megatron/core/pipeline_parallel/dspp_timeline.py": "0da8f40344ed860ca7b529fae6ee6d44c275deb817aef7b61ee7f08288097724"
+    }
+  },
+  "measurement_scope": {
+    "task": "B/H boundary CUDA events, selected iteration3",
+    "end_to_end": "separate runs, no timeline/profiler/hooks, compare paired iterations3-6",
+    "versions": "all after-dx split; baseline is user commit, not unsplit FA",
+    "production_changes": "no scheduler/timeline/weights/packing changes",
+    "loss_precision_tolerance": 0.0001
+  },
+  "correctness": {
+    "units": "243 passed plus3 corrected profiler assertions passed; original failure retained",
+    "memcheck": "32 passed,0 errors; dspp_split_detail filter",
+    "pp3_vpp2": "MHA/GQA/MQA,351 parameter-gradient tensors and495 complete dx; original tolerance unchanged",
+    "continued_turn": "no repeated correctness experiments"
+  },
+  "source_snapshots": {
+    "tests/unit_tests/dspp/test_split_output_optimizations.py": "18cb29362ed3336e9daaca4b12039c787f9ae40ce70fff97394a61e64b90ccad",
+    "megatron/core/kv_cache/dspp_packed_attention.py": "1ae5b835891fd8d4f3be6dbb4f1effa7f29d5a253bd7382622a366b51cf19770",
+    "megatron/core/kv_cache/fa_split_src/backward.cu": "05cbf597ce381af2fbbbf0817cbdd9a72dcedce5d3dc316a3a3623e49df1953e",
+    "tools/validate_dspp_split_training.py": "dae2366186c806094785a44a86ddaaa7f32e7b0e1be3c81480d23ebc69b6400a",
+    "tools/summarize_dspp_split_optimizations.py": "c92b137f99d4f8d3d21fd2c2034a2cdb1c4c96608f01b66d53291473aaf910f5"
+  },
+  "failures_excluded": [
+    "tasks/: first-time multi-architecture compile timeout before usable iterations"
+  ],
+  "data_files": {
+    "/home/cuiym/.cache/dspp-fa-split/workload-scaling-20261016/long-data.json": {
+      "bytes": 345,
+      "sha256": "f7fbb1f0bf98140891e19be72ef4190ccbf4327eb316e15623df97285a7fdacf"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/workload-scaling-20261016/long-data.idx": {
+      "bytes": 2602,
+      "sha256": "a48dd1f9bb41c2b218d2a346fbbc7c6e0ddb9a4c7ecc802d48ea884fbb67cd2f"
+    },
+    "/home/cuiym/.cache/dspp-fa-split/workload-scaling-20261016/long-data.bin": {
+      "bytes": 2589568,
+      "sha256": "dbea6a46793e9f6009c8aa3a443397ff1beb8e32f98212378426336767baaa3f"
+    }
+  },
+  "completed_performance_runs": {
+    "tasks": [
+      "tasks-retry",
+      "tasks-reverse"
+    ],
+    "end_to_end": [
+      "e2e"
+    ],
+    "samples_per_version": {
+      "B": 216,
+      "H": 144,
+      "e2e_paired_iterations": [
+        3,
+        4,
+        5,
+        6
+      ]
+    }
+  },
+  "conclusion": "Correctness passed. Mixed shape-dependent B/H changes; repeated long-history H regression. E2E mean +0.438% vs prior split in one paired run; no observed speedup and no claim of stable E2E regression.",
+  "repeat_reason": "One reverse task run because first run had conflicting shape directions; no further correctness or performance repetitions after that.",
+  "summary_sha256": "a145a5e9359f88f4fd4c944250f024a1a00414dc987c615e2f96fa19a4719368"
+}

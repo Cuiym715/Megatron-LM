@@ -46,7 +46,9 @@ def backward(*args,**kwargs):
 def attention_backward(ctx,grad):
     if active is not None:
         active['attention_calls']+=1
-        active['split_calls']+=int(ctx.split_attention_backward)
+        fallback = (ctx.split_attention_backward and ctx.history_dkv_after_dx and not ctx.has_history)
+        active['split_calls'] += int(ctx.split_attention_backward and not fallback)
+        active['nohistory_fused_calls'] += int(fallback)
         active['shapes'].add((tuple(ctx.saved_tensors[0].shape),tuple(ctx.saved_tensors[1].shape)))
         active['mixed_packs']+=int(len(ctx.layouts)>1 and any(x.history for x in ctx.layouts))
     return original_attn(ctx,grad)
@@ -92,7 +94,7 @@ def train_step(*args,**kwargs):
     optimizer=kwargs.get('optimizer',args[4] if len(args)>4 else None)
     config=get_args();iteration=config.curr_iteration+1;rank=dist.get_rank()
     split=config.dspp_split_attention_backward
-    active={'dx':[],'attention_calls':0,'split_calls':0,'drained_states':0,'shapes':set(),'mixed_packs':0,
+    active={'dx':[],'attention_calls':0,'split_calls':0,'nohistory_fused_calls':0,'drained_states':0,'shapes':set(),'mixed_packs':0,
             'history_tasks':0,'history_layers':0}
     base_path=SNAPSHOTS/f'iteration{iteration}-rank{rank}.pt'
     reference=torch.load(base_path,map_location='cpu',weights_only=True) if split else None
@@ -116,7 +118,7 @@ def train_step(*args,**kwargs):
     dx_checks=compare(dx,reference['dx']) if split else {}
     loss={k:float(v) if isinstance(v,(float,int,torch.Tensor)) else str(v) for k,v in result[0].items()}
     if split:
-        assert active['attention_calls']>0 and active['split_calls']==active['attention_calls']
+        assert active['attention_calls']>0 and active['split_calls']+active['nohistory_fused_calls']==active['attention_calls']
         compare({k:torch.tensor(v) for k,v in loss.items()}, {k:torch.tensor(v) for k,v in reference['loss'].items()})
     else:
         assert active['attention_calls']>0 and active['split_calls']==0
@@ -129,6 +131,7 @@ def train_step(*args,**kwargs):
             'after_dx':config.dspp_history_dkv_after_dx,
             'history_tasks':active['history_tasks'],'history_layers':active['history_layers'],
             'attention_calls':active['attention_calls'],'split_calls':active['split_calls'],
+            'nohistory_fused_calls':active['nohistory_fused_calls'],
             'drained_states':active['drained_states'],'mixed_pack_calls':active['mixed_packs'],
             'attention_shapes':sorted(active['shapes']),'stage_dx_count':len(dx),
             'parameter_tensor_count':len(params),'gradient_tensor_count':len(snapshot),

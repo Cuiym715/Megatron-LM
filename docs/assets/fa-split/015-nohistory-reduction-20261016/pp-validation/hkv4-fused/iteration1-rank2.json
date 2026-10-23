@@ -1,0 +1,88 @@
+{
+  "rank": 2,
+  "iteration": 1,
+  "split": false,
+  "loss": {},
+  "after_dx": false,
+  "history_tasks": 0,
+  "history_layers": 0,
+  "attention_calls": 24,
+  "split_calls": 0,
+  "nohistory_fused_calls": 0,
+  "drained_states": 4,
+  "mixed_pack_calls": 4,
+  "attention_shapes": [
+    [
+      [
+        18,
+        4,
+        128
+      ],
+      [
+        210,
+        4,
+        128
+      ]
+    ],
+    [
+      [
+        33,
+        4,
+        128
+      ],
+      [
+        33,
+        4,
+        128
+      ]
+    ],
+    [
+      [
+        64,
+        4,
+        128
+      ],
+      [
+        64,
+        4,
+        128
+      ]
+    ],
+    [
+      [
+        64,
+        4,
+        128
+      ],
+      [
+        128,
+        4,
+        128
+      ]
+    ],
+    [
+      [
+        64,
+        4,
+        128
+      ],
+      [
+        192,
+        4,
+        128
+      ]
+    ]
+  ],
+  "stage_dx_count": 24,
+  "parameter_tensor_count": 12,
+  "gradient_tensor_count": 12,
+  "parameter_checks": {},
+  "gradient_checks": {},
+  "stage_dx_checks": {},
+  "criteria": {
+    "atol": 0.004,
+    "rtol": 0.01,
+    "relative_l2_max": 0.02,
+    "initial_parameters": "exact"
+  }
+}

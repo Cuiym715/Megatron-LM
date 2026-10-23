@@ -208,7 +208,8 @@ class DsppTimelineRecorder:
         selected = int(getattr(args, "dspp_timeline_iteration", 0) or 0)
         current = int(getattr(args, "curr_iteration", -1)) + 1
         output_dir = getattr(args, "dspp_timeline_dir", None)
-        self.enabled = bool(output_dir and selected == current)
+        selected_many = getattr(args, 'dspp_timeline_iterations', None)
+        self.enabled = bool(output_dir and (current in selected_many if selected_many is not None else selected == current))
         torch_profile_selected = int(
             getattr(args, "dspp_torch_profiler_iteration", 0) or 0
         )
@@ -218,6 +219,8 @@ class DsppTimelineRecorder:
         )
         self.recording = self.enabled or self.torch_profile_enabled
         self.task_timing_only = bool(getattr(args, 'dspp_task_timing_only', False))
+        self.task_timing_scope = getattr(args, 'dspp_task_timing_scope', 'bh')
+        self._timed_kinds = ('F', 'B', 'W', 'H') if self.task_timing_scope == 'all' else ('B', 'H')
         self.stage = stage
         self.iteration = current
         self.backward_mode = (
@@ -240,9 +243,9 @@ class DsppTimelineRecorder:
         self._boundary_records = []
         if self.enabled:
             if self.task_timing_only:
-                # Two VPP B tasks and at most two H tasks per physical item.
+                # Two VPP chunks, one event pair per selected task kind.
                 # Materialize lazy CUDA event handles BEFORE the measured work.
-                for _ in range(4 * len(self.microbatch_ids)):
+                for _ in range(2 * len(self._timed_kinds) * len(self.microbatch_ids)):
                     pair = (torch.cuda.Event(enable_timing=True),
                             torch.cuda.Event(enable_timing=True))
                     for event in pair:
@@ -264,7 +267,7 @@ class DsppTimelineRecorder:
         chunk: int,
     ):
         if self.task_timing_only:
-            if not self.enabled or not kind.startswith(('B', 'H')):
+            if not self.enabled or not kind.startswith(self._timed_kinds):
                 yield
                 return
             begin, end = self._boundary_pairs[self._boundary_cursor]
@@ -383,6 +386,7 @@ class DsppTimelineRecorder:
                     "anchor_cpu_ns": self.anchor_cpu_ns,
                     "backward_mode": self.backward_mode,
                     "task_timing_only": self.task_timing_only,
+                    "task_timing_scope": self.task_timing_scope,
                     "peak_allocated_bytes": torch.cuda.max_memory_allocated(),
                     "peak_reserved_bytes": torch.cuda.max_memory_reserved(),
                     "ordering": self.ordering,
@@ -416,13 +420,15 @@ class DsppTimelineRecorder:
             all_records.sort(key=lambda item: (item["start_ms"], item["stage"]))
             stem = self.output_dir / f"iteration_{self.iteration:06d}"
             with stem.with_suffix(".svg").open("w", encoding="utf-8") as stream:
-                scope = 'B/H intervals only' if self.task_timing_only else 'all compute tasks'
+                scope = 'B/H intervals only' if self.task_timing_only and self.task_timing_scope == 'bh' else 'all compute tasks'
                 stream.write(render_timeline_svg(all_records, f"DSPP iteration {self.iteration}: {scope}"))
             with Path(f"{stem}_summary.json").open("w", encoding="utf-8") as stream:
                 summary = summarize_timeline(all_records)
                 summary["memory_by_stage"] = memory_by_stage
                 if self.task_timing_only:
-                    summary['task_scope'] = 'B/H only; missing F/W intervals are not pipeline bubbles'
+                    summary['task_scope'] = ('B/H only; missing F/W intervals are not pipeline bubbles'
+                                             if self.task_timing_scope == 'bh' else
+                                             'F/B/W/H boundaries; uncovered time is not certified schedulable slack')
                     for stage_summary in summary['stages'].values():
                         stage_summary.pop('bubble_ms', None)
                         stage_summary.pop('compute_utilization', None)

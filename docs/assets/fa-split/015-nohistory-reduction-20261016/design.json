@@ -1,0 +1,39 @@
+{
+  "baseline_commit": "9b9fc8f96",
+  "variants": {
+    "baseline": "/home/cuiym/.cache/dspp-fa-split/opt015-baseline",
+    "nohistory": "/home/cuiym/.cache/dspp-fa-split/opt015-nohistory",
+    "both": "/home/cuiym/src/Megatron-LM-kwai"
+  },
+  "source_hashes": {
+    "baseline": {
+      "megatron/core/kv_cache/dspp_packed_attention.py": "8789e68453bceeef3ce689b5e15e45f4a71756979177842dd72c0f5a4979d875",
+      "megatron/core/kv_cache/fa_split_src/backward.cu": "63a3c390099a23b75ac82d614cffbba2b10a28aa0f8f671b41df63d021cca953",
+      "megatron/core/kv_cache/fa_split.py": "762422f97a80532376378a0c9d054e17e15b0ad9c2fa46d73911a9df0a6780f7",
+      "megatron/core/pipeline_parallel/schedules.py": "ca61880a34dea59c208ef28d3ab1f83f57b2f581b35bc78df9dc8481c1079319",
+      "megatron/core/pipeline_parallel/dspp_timeline.py": "0da8f40344ed860ca7b529fae6ee6d44c275deb817aef7b61ee7f08288097724"
+    },
+    "nohistory": {
+      "megatron/core/kv_cache/dspp_packed_attention.py": "1ae5b835891fd8d4f3be6dbb4f1effa7f29d5a253bd7382622a366b51cf19770",
+      "megatron/core/kv_cache/fa_split_src/backward.cu": "63a3c390099a23b75ac82d614cffbba2b10a28aa0f8f671b41df63d021cca953",
+      "megatron/core/kv_cache/fa_split.py": "762422f97a80532376378a0c9d054e17e15b0ad9c2fa46d73911a9df0a6780f7",
+      "megatron/core/pipeline_parallel/schedules.py": "ca61880a34dea59c208ef28d3ab1f83f57b2f581b35bc78df9dc8481c1079319",
+      "megatron/core/pipeline_parallel/dspp_timeline.py": "0da8f40344ed860ca7b529fae6ee6d44c275deb817aef7b61ee7f08288097724"
+    },
+    "both": {
+      "megatron/core/kv_cache/dspp_packed_attention.py": "1ae5b835891fd8d4f3be6dbb4f1effa7f29d5a253bd7382622a366b51cf19770",
+      "megatron/core/kv_cache/fa_split_src/backward.cu": "05cbf597ce381af2fbbbf0817cbdd9a72dcedce5d3dc316a3a3623e49df1953e",
+      "megatron/core/kv_cache/fa_split.py": "762422f97a80532376378a0c9d054e17e15b0ad9c2fa46d73911a9df0a6780f7",
+      "megatron/core/pipeline_parallel/schedules.py": "ca61880a34dea59c208ef28d3ab1f83f57b2f581b35bc78df9dc8481c1079319",
+      "megatron/core/pipeline_parallel/dspp_timeline.py": "0da8f40344ed860ca7b529fae6ee6d44c275deb817aef7b61ee7f08288097724"
+    }
+  },
+  "primary_comparison": "previous split -> no-history fused branch -> joint K/V output; all use after-dx B/H schedule",
+  "changes": [
+    "Only entirely no-history physical tasks use full fused backward in after-dx mode; mixed/history tasks retain split.",
+    "Joint K/V FP32 grouped sum and BF16 output; MHA paired copy. No change to partial workspace allocation or historical cache accumulation."
+  ],
+  "timing": "hidden4096/FFN8192/GQA32:16, PP3/VPP2, lengths14336,4097,1537,257, chunk2048; tasks iteration3; separate e2e no timeline iterations3-6.",
+  "correctness": "Original numerical thresholds unchanged; numerical/profiler hooks outside formal timings.",
+  "repeat_policy": "One ordered comparison initially. Reverse only on sign conflict or uncertainty material to conclusion."
+}

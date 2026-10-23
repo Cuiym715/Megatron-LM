@@ -1,0 +1,258 @@
+{
+  "accepted": true,
+  "counts": {
+    "fused": {
+      "F": 594,
+      "B": 594,
+      "W": 594
+    },
+    "after_dx": {
+      "F": 594,
+      "B": 594,
+      "H": 360,
+      "W": 594
+    }
+  },
+  "completed_iterations": 63,
+  "paired_e2e": [
+    {
+      "iteration": 6,
+      "valid_tokens": 66566,
+      "fused_ms": 2896.3,
+      "after_dx_ms": 3201.7,
+      "change_percent": 10.544487794772618
+    },
+    {
+      "iteration": 7,
+      "valid_tokens": 53509,
+      "fused_ms": 2352.6,
+      "after_dx_ms": 2435.1,
+      "change_percent": 3.506758479979588
+    },
+    {
+      "iteration": 8,
+      "valid_tokens": 49670,
+      "fused_ms": 2083.6,
+      "after_dx_ms": 2171.7,
+      "change_percent": 4.228258782875782
+    },
+    {
+      "iteration": 9,
+      "valid_tokens": 26632,
+      "fused_ms": 1020.0,
+      "after_dx_ms": 1117.9,
+      "change_percent": 9.598039215686294
+    },
+    {
+      "iteration": 10,
+      "valid_tokens": 65028,
+      "fused_ms": 2827.6,
+      "after_dx_ms": 3020.1,
+      "change_percent": 6.8078936200311135
+    },
+    {
+      "iteration": 11,
+      "valid_tokens": 32773,
+      "fused_ms": 1380.9,
+      "after_dx_ms": 1548.9,
+      "change_percent": 12.165978709537262
+    },
+    {
+      "iteration": 12,
+      "valid_tokens": 47879,
+      "fused_ms": 2302.3,
+      "after_dx_ms": 2403.3,
+      "change_percent": 4.386917430395698
+    },
+    {
+      "iteration": 13,
+      "valid_tokens": 25605,
+      "fused_ms": 1071.1,
+      "after_dx_ms": 1143.2,
+      "change_percent": 6.731397628606128
+    },
+    {
+      "iteration": 14,
+      "valid_tokens": 69637,
+      "fused_ms": 3091.2,
+      "after_dx_ms": 3368.5,
+      "change_percent": 8.970626293995876
+    },
+    {
+      "iteration": 15,
+      "valid_tokens": 30471,
+      "fused_ms": 1389.5,
+      "after_dx_ms": 1414.1,
+      "change_percent": 1.7704210147535093
+    },
+    {
+      "iteration": 16,
+      "valid_tokens": 42502,
+      "fused_ms": 1944.3,
+      "after_dx_ms": 2105.2,
+      "change_percent": 8.275471892197706
+    },
+    {
+      "iteration": 17,
+      "valid_tokens": 68868,
+      "fused_ms": 3048.2,
+      "after_dx_ms": 3245.2,
+      "change_percent": 6.462830522931573
+    },
+    {
+      "iteration": 18,
+      "valid_tokens": 52998,
+      "fused_ms": 2409.8,
+      "after_dx_ms": 2598.7,
+      "change_percent": 7.838824798738475
+    },
+    {
+      "iteration": 19,
+      "valid_tokens": 23303,
+      "fused_ms": 1048.2,
+      "after_dx_ms": 1077.3,
+      "change_percent": 2.776187750429293
+    },
+    {
+      "iteration": 20,
+      "valid_tokens": 43270,
+      "fused_ms": 1978.9,
+      "after_dx_ms": 2021.2,
+      "change_percent": 2.1375511647885093
+    },
+    {
+      "iteration": 21,
+      "valid_tokens": 57602,
+      "fused_ms": 2460.4,
+      "after_dx_ms": 2710.2,
+      "change_percent": 10.15282067956429
+    },
+    {
+      "iteration": 22,
+      "valid_tokens": 37892,
+      "fused_ms": 1761.1,
+      "after_dx_ms": 1911.2,
+      "change_percent": 8.52308216455626
+    },
+    {
+      "iteration": 23,
+      "valid_tokens": 51718,
+      "fused_ms": 2387.9,
+      "after_dx_ms": 2527.4,
+      "change_percent": 5.841953180618953
+    },
+    {
+      "iteration": 24,
+      "valid_tokens": 31240,
+      "fused_ms": 1503.9,
+      "after_dx_ms": 1553.7,
+      "change_percent": 3.311390384998991
+    },
+    {
+      "iteration": 25,
+      "valid_tokens": 29191,
+      "fused_ms": 1426.8,
+      "after_dx_ms": 1426.3,
+      "change_percent": -0.03504345388281038
+    }
+  ],
+  "mean_iteration_log_ms": {
+    "fused": 2019.23,
+    "after_dx": 2150.045
+  },
+  "mean_change_percent": 6.478459610841769,
+  "total_tokens": 906354,
+  "throughput_tokens_per_second": {
+    "fused": 22443.05997830856,
+    "after_dx": 21077.558841791688
+  },
+  "per_rank_device_step_ms": {
+    "fused": {
+      "0": {
+        "n": 20,
+        "mean": 2016.442318725586,
+        "median": 2028.1170043945312,
+        "minimum": 1016.9446411132812,
+        "maximum": 3089.154052734375
+      },
+      "1": {
+        "n": 20,
+        "mean": 1996.7208190917968,
+        "median": 2008.6815185546875,
+        "minimum": 997.339111328125,
+        "maximum": 3068.857421875
+      },
+      "2": {
+        "n": 20,
+        "mean": 1996.8346618652345,
+        "median": 2008.6378784179688,
+        "minimum": 997.5357666015625,
+        "maximum": 3069.389892578125
+      }
+    },
+    "after_dx": {
+      "0": {
+        "n": 20,
+        "mean": 2147.0367919921873,
+        "median": 2135.4420166015625,
+        "minimum": 1074.2957763671875,
+        "maximum": 3365.453857421875
+      },
+      "1": {
+        "n": 20,
+        "mean": 2127.2763549804686,
+        "median": 2114.9803466796875,
+        "minimum": 1054.741455078125,
+        "maximum": 3346.318359375
+      },
+      "2": {
+        "n": 20,
+        "mean": 2127.4009521484377,
+        "median": 2115.1488037109375,
+        "minimum": 1054.8060302734375,
+        "maximum": 3345.903564453125
+      }
+    }
+  },
+  "peak_memory_bytes": {
+    "fused": {
+      "0": {
+        "allocated": 18016665600,
+        "reserved": 18889048064
+      },
+      "1": {
+        "allocated": 11507045376,
+        "reserved": 12272533504
+      },
+      "2": {
+        "allocated": 11389224960,
+        "reserved": 12184453120
+      }
+    },
+    "after_dx": {
+      "0": {
+        "allocated": 17976014336,
+        "reserved": 18616418304
+      },
+      "1": {
+        "allocated": 11418939904,
+        "reserved": 12203327488
+      },
+      "2": {
+        "allocated": 11284851200,
+        "reserved": 12085886976
+      }
+    }
+  },
+  "exact_2048_nohistory_B_samples": 90,
+  "mixed_history_B_samples": 48,
+  "diagnostic_counts": {
+    "p2p_protocol": 1560,
+    "task_host_enter": 462,
+    "task_host_return": 462,
+    "gradient_route_begin": 210,
+    "gradient_route_end": 210,
+    "complete_dx_stream_boundary": 126
+  },
+  "scope": "Current working tree only. Rank0 iteration log is wall-clock training-loop measurement; per-rank device train-step boundaries are separate. No exact global GPU clock claimed. Batch variation is not repeated-sample noise. No replay/makespan prediction performed."
+}

@@ -1,0 +1,110 @@
+{
+  "measurement": "CUDA-event compute-stream wall-time envelope. P2P API calls are outside task ranges; concurrent communication may still contend for GPU resources.",
+  "critical_span_ms": 1323.0858306884766,
+  "stages": {
+    "0": {
+      "first_compute_ms": 210.30718660839844,
+      "last_compute_ms": 1533.393017296875,
+      "busy_ms": 603.6265106201173
+    },
+    "1": {
+      "first_compute_ms": 252.05657958984375,
+      "last_compute_ms": 1470.123046875,
+      "busy_ms": 363.79461669921875
+    },
+    "2": {
+      "first_compute_ms": 261.23353541796877,
+      "last_compute_ms": 1374.2591091484376,
+      "busy_ms": 377.4435729980469
+    }
+  },
+  "task_duration_ms": {
+    "B0": {
+      "median": 8.925201416015625,
+      "p95": 14.53247680664062
+    },
+    "B1": {
+      "median": 9.513458251953125,
+      "p95": 19.36696624755859
+    },
+    "H0": {
+      "median": 4.163116455078125,
+      "p95": 7.2570953369140625
+    },
+    "H1": {
+      "median": 4.14202880859375,
+      "p95": 7.8512725830078125
+    }
+  },
+  "task_duration_ms_by_stage": {
+    "0": {
+      "B0": {
+        "median": 11.37457275390625,
+        "p95": 15.54737854003906
+      },
+      "B1": {
+        "median": 14.66876220703125,
+        "p95": 21.044783020019526
+      },
+      "H0": {
+        "median": 4.729827880859375,
+        "p95": 7.664303588867186
+      },
+      "H1": {
+        "median": 4.4927978515625,
+        "p95": 9.330755615234427
+      }
+    },
+    "1": {
+      "B0": {
+        "median": 7.62213134765625,
+        "p95": 10.73663330078125
+      },
+      "B1": {
+        "median": 7.44085693359375,
+        "p95": 10.286354064941406
+      },
+      "H0": {
+        "median": 3.65313720703125,
+        "p95": 6.347848510742187
+      },
+      "H1": {
+        "median": 3.691497802734375,
+        "p95": 5.824105834960937
+      }
+    },
+    "2": {
+      "B0": {
+        "median": 7.4915771484375,
+        "p95": 10.842965698242187
+      },
+      "B1": {
+        "median": 7.5960235595703125,
+        "p95": 10.33822021484375
+      },
+      "H0": {
+        "median": 3.73199462890625,
+        "p95": 6.697982788085937
+      },
+      "H1": {
+        "median": 3.89483642578125,
+        "p95": 6.018759155273438
+      }
+    }
+  },
+  "memory_by_stage": {
+    "0": {
+      "peak_allocated_bytes": 17918921216,
+      "peak_reserved_bytes": 18270388224
+    },
+    "1": {
+      "peak_allocated_bytes": 11400714752,
+      "peak_reserved_bytes": 11985223680
+    },
+    "2": {
+      "peak_allocated_bytes": 11283274240,
+      "peak_reserved_bytes": 12010389504
+    }
+  },
+  "task_scope": "B/H only; missing F/W intervals are not pipeline bubbles"
+}

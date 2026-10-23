@@ -42,9 +42,11 @@ def test_disabled_debug_sync_adds_no_autograd_node(monkeypatch):
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(),reason='CUDA required')
-def test_boundary_events_preallocated_and_metadata_deferred(monkeypatch,tmp_path):
+@pytest.mark.parametrize('scope', ['bh', 'all'])
+def test_boundary_events_preallocated_and_metadata_deferred(monkeypatch,tmp_path,scope):
     args=SimpleNamespace(dspp_task_timing_only=True,dspp_timeline_iteration=1,
-                         curr_iteration=0,dspp_timeline_dir=str(tmp_path))
+                         curr_iteration=0,dspp_timeline_dir=str(tmp_path),dspp_task_timing_scope=scope,
+                         dspp_timeline_iterations=[1,3])
     monkeypatch.setattr(dspp_timeline.dist,'barrier',lambda:None)
     monkeypatch.setattr(dspp_timeline.dist,'get_rank',lambda:0)
     recorder=dspp_timeline.DsppTimelineRecorder(args,stage=0,ordering={'entrance_order':[(0,0)]})
@@ -60,14 +62,14 @@ def test_boundary_events_preallocated_and_metadata_deferred(monkeypatch,tmp_path
             with recorder.task(kind,(0,0),meta,chunk=0):x.add_(1)
         with recorder.communication('test'):pass
     assert not recorder.records
-    assert len(recorder._boundary_records)==2
+    assert len(recorder._boundary_records)==(2 if scope=='bh' else 4)
     recorder.finish()
     payload=json.loads(next(tmp_path.glob('iteration_*_rank_*.json')).read_text())
-    assert [r['kind'] for r in payload['events']]==['B0','H0']
+    assert [r['kind'] for r in payload['events']]==(['B0','H0'] if scope=='bh' else ['F0','B0','H0','W0'])
     assert payload['events'][0]['end_ms']<=payload['events'][1]['start_ms']
     assert not list(tmp_path.glob('*_costs.json'))
     summary=json.loads(next(tmp_path.glob('*_summary.json')).read_text())
-    assert 'B/H only' in summary['task_scope']
+    assert ('B/H only' if scope=='bh' else 'F/B/W/H boundaries') in summary['task_scope']
     assert 'bubble_ms' not in summary['stages']['0']
 
 
@@ -90,3 +92,24 @@ def test_compact_region_matches_full_without_unselected_rows(hk,qlens,klens):
             reference=torch.cat([b[start:end] for start,end in slices])
             torch.testing.assert_close(a,reference,atol=0,rtol=0)
             assert a.shape[0]==sum(end-start for start,end in slices)
+
+
+@pytest.mark.parametrize('current,selected,enabled', [(0,[1,3],True),(1,[1,3],False),(2,[1,3],True)])
+def test_iteration_list_and_disabled_no_events(monkeypatch,current,selected,enabled):
+    args=SimpleNamespace(dspp_task_timing_only=True,dspp_timeline_iteration=2,
+                         dspp_timeline_iterations=selected,curr_iteration=current,
+                         dspp_timeline_dir='/unused',dspp_task_timing_scope='all')
+    class Event:
+        def record(self):pass
+    monkeypatch.setattr(torch.cuda,'Event',lambda **kw:Event())
+    monkeypatch.setattr(torch.cuda,'synchronize',lambda:None)
+    monkeypatch.setattr(dspp_timeline.dist,'barrier',lambda:None)
+    recorder=dspp_timeline.DsppTimelineRecorder(args,stage=0,ordering={'entrance_order':[(0,0)]})
+    assert recorder.enabled is enabled
+    assert len(recorder._boundary_pairs)==(8 if enabled else 0)
+    if not enabled:
+        def forbidden(*a,**kw):raise AssertionError('disabled sampling emitted event')
+        monkeypatch.setattr(torch.cuda,'Event',forbidden)
+        for kind in ('F0','B0','W0','H0'):
+            with recorder.task(kind,(0,0),None,chunk=0):pass
+        assert not recorder._boundary_records

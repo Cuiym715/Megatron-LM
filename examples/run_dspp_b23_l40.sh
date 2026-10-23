@@ -104,6 +104,11 @@ if [[ -n "$DSPP_GLOBAL_FIXED_TRACE" ]]; then
 fi
 
 EXTRA_ARGS=()
+if [[ -n "${DSPP_TIMELINE_ITERATIONS:-}" ]]; then
+  read -ra timeline_iterations <<< "$DSPP_TIMELINE_ITERATIONS"
+  EXTRA_ARGS+=(--dspp-timeline-iterations "${timeline_iterations[@]}")
+fi
+EXTRA_ARGS+=(--dspp-task-timing-scope "${DSPP_TASK_TIMING_SCOPE:-bh}")
 if [[ "${DSPP_TASK_TIMING_ONLY:-0}" == 1 ]]; then
   EXTRA_ARGS+=(--dspp-task-timing-only --timing-log-level 0)
 fi

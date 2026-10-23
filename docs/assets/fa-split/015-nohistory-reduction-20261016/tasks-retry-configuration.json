@@ -1,0 +1,37 @@
+{
+  "phase": "tasks",
+  "order": [
+    "baseline",
+    "nohistory",
+    "both"
+  ],
+  "versions": {
+    "baseline": "/workspace/.cache/dspp-fa-split/opt015-baseline",
+    "nohistory": "/workspace/.cache/dspp-fa-split/opt015-nohistory",
+    "both": "/workspace/src/Megatron-LM-kwai"
+  },
+  "settings": {
+    "TORCH_CUDA_ARCH_LIST": "8.9",
+    "TRAIN_ITERS": "3",
+    "HIDDEN_SIZE": "4096",
+    "FFN_HIDDEN_SIZE": "8192",
+    "NUM_ATTENTION_HEADS": "32",
+    "NUM_QUERY_GROUPS": "16",
+    "NUM_LAYERS": "6",
+    "LAYERS_PER_VPP": "1",
+    "SEQ_LENGTH": "16384",
+    "MICRO_SEQ_LENGTH": "2048",
+    "MICRO_BATCH_SIZE": "4",
+    "GLOBAL_BATCH_SIZE": "8",
+    "DSPP_DEBUG_BATCHES": "0",
+    "LEARNING_RATE": "0",
+    "MIN_LEARNING_RATE": "0",
+    "DATA_PATH": "/workspace/.cache/dspp-fa-split/workload-scaling-20261016/long-data",
+    "DSPP_TASK_TIMING_ONLY": "1",
+    "DSPP_SPLIT_ATTENTION_BACKWARD": "1",
+    "DSPP_HISTORY_DKV_AFTER_DX": "1",
+    "DSPP_TIMELINE_ITERATION": "3",
+    "PYTHON_BIN": "/workspace/src/venvs/megatron/bin/python",
+    "TRAIN_ENTRYPOINT": "pretrain_llama.py"
+  }
+}

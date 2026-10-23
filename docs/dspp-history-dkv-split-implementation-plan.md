@@ -1,10 +1,10 @@
 # DSPP 历史 dKV 拆分：当前实现与后续优化
 
-更新日期：2026-10-16。本文描述当前代码，不再按开发轮次追加阶段报告。
+更新日期：2026-10-17。本文描述当前代码，不再按开发轮次追加阶段报告。
 
-**当前已实现一个可运行、可独立测量 B/H 的重计算版本。** 它在 DSPP 训练中先完成当前 physical microbatch 的完整 stage 输入反向 B，发布 dx，再立即执行历史 dKV 任务 H。FA、GQA/MQA、变长与 packing 已在限定配置下通过正确性验证；较大负载上已经测到完整 B 缩短，但尚未获得稳定的端到端加速，也没有实现跨其他计算任务延后 H 的调度。
+**当前已实现一个可运行、可独立测量 B/H 的重计算版本。** 它在 DSPP 训练中先完成当前 physical microbatch 的完整 stage 输入反向 B，发布 dx，再立即执行历史 dKV 任务 H。FA、GQA/MQA、变长与 packing 已在限定配置下通过正确性验证；较大负载上已经测到完整 B 缩短，但尚未证明相对原融合FA路径的稳定端到端加速，也没有实现跨其他计算任务延后 H 的调度。
 
-本文只说明四件事：[当前实现](#1-当前是怎么实现的)、[代码改动](#2-改了哪些代码)、[困难与已做优化](#3-实现中遇到的困难与已做优化)、[下一步](#4-下一步准备做什么优化)。原始实验材料保留在编号归档001–013；重组前的完整过程记录保存在[014归档](assets/fa-split/014-implementation-doc-reorganization-20261016/implementation-plan-before.md)，不作为当前功能说明。项目外层研究设计与收益验证计划未在本次整理中修改。
+本文只说明四件事：[当前实现](#1-当前是怎么实现的)、[代码改动](#2-改了哪些代码)、[困难与已做优化](#3-实现中遇到的困难与已做优化)、[下一步](#4-下一步准备做什么优化)。实验摘要与正确性证据保留在编号归档001–013和015，新采集见016；旧大体积性能trace的清理清单见[016](assets/fa-split/016-fresh-schedule-20261016/cleanup.json)。重组前的完整过程记录保存在[014归档](assets/fa-split/014-implementation-doc-reorganization-20261016/implementation-plan-before.md)，不作为当前功能说明。研究进展和调度分析计划集中维护在[外层plan](/home/cuiym/docs/v4/design/history-dkv/plan.md#6-2026-10-17当前实现的新采集已完成转入-cpu-调度分析)。
 
 ## 1. 当前是怎么实现的
 
@@ -35,7 +35,7 @@ B：每层 attention 的完整 dQ + 当前 dKV → 其余 stage 输入反向 →
 
 前向仍使用安装环境中的 FA varlen forward。反向使用基于 **FA2 v2.7.4.post1** 的独立 CUDA 扩展；源码、补丁与 CUTLASS 版本被锁定，不覆盖环境中的默认 FA。
 
-当前 after-dx 路径的接口为：
+当前 after-dx 路径先判断整个 physical task 是否含历史：无历史时直接使用原融合 FA varlen backward，不创建拆分状态；含历史时使用以下接口（混装任务整体仍走拆分）：
 
 ```text
 prepare_backward(Q, K, V, O, dO, LSE, 序列边界) → 保存状态，计算一次 FP32 delta
@@ -47,7 +47,7 @@ backward_dkv(state, "history", compact=True)    → 紧凑历史 dK/dV（H 内�
 
 `backward_dq_current` 已经合并为一次主 kernel 扫描：完全在历史区的 KV tile 只算 dQ，与当前区相交的 tile 同时算 dQ/dK/dV。非对齐边界 tile 可以产生被丢弃的历史临时值，但 B 只返回当前行；历史贡献由 H 计算并累加一次。dQ 仍使用全部合法历史和当前 KV。
 
-GQA 不复制 K/V heads。令 `r=Hq/Hkv`，Q head q 使用 KV head `floor(q/r)`；各 Q head 的 dQ 独立保留，对共享 KV head 的 dK/dV 贡献求和。当前沿用每 Q-head 部分梯度工作区、FP32 归约及 BF16 输出的数值合同。packed 中各序列使用独立边界，当前由 Python 逐序列分派，**还不是原生批量 varlen launcher**。
+GQA 不复制 K/V heads。令 `r=Hq/Hkv`，Q head q 使用 KV head `floor(q/r)`；各 Q head 的 dQ 独立保留，对共享 KV head 的 dK/dV 贡献求和。当前沿用每 Q-head 部分梯度工作区、FP32 归约及 BF16 输出的数值合同。独立 `reduce_dkv_output_kernel` 在一次发射中完成 dK、dV 两组归约并直接写紧凑输出；MHA 的同一入口完成两组拷贝。它取代两次独立 ATen 归约/拷贝，不与主 attention kernel 或历史缓存累加合并。packed 中各序列使用独立边界，当前由 Python 逐序列分派，**还不是原生批量 varlen launcher**。
 
 ### 1.3 历史梯度和状态生命周期
 
@@ -55,7 +55,7 @@ GQA 不复制 K/V heads。令 `r=Hq/Hkv`，Q head q 使用 KV head `floor(q/r)`�
 
 每个 H 保存当前 physical task 各层的 tensor 引用和冻结布局，不读取后来切换的 microbatch metadata。tensor 使用 detach 引用保留数据，不保留完整 autograd 图；版本和 stream 检查防止状态被修改或误用。B/H 在同一计算 stream 上依次提交，当前 schedule 在 H 后才进入下一计算任务，因此消费者按流依赖看到完整历史梯度；这不意味着每个 H 都做主机侧同步等待。
 
-无历史时不发射 H kernel，也没有 H 计时事件，但 **B 目前仍走拆分入口**。跨其他 F/B/W 任务延后 H 所需的独立队列、消费者期限及更长生命周期尚未实现。
+无历史 physical task 的 B **已改走原融合 backward**，不发射 H kernel，也没有 H 计时事件；它仍须消费后续 chunks 已累加给当前 chunk 的梯度。跨其他 F/B/W 任务延后 H 所需的独立队列、消费者期限及更长生命周期尚未实现。
 
 ### 1.4 支持范围、开关与验证结论
 
@@ -68,9 +68,9 @@ GQA 不复制 K/V heads。令 `r=Hq/Hkv`，Q head q 使用 KV head `floor(q/r)`�
 
 | CLI 开关 | 实际行为 |
 | --- | --- |
-| 均不启用 | 原融合 FA backward，作为默认和正确性/性能基线 |
+| 均不启用 | 原融合 FA backward，保留为默认路径与数值参考；015优化的性能基线是此前拆分版本 |
 | 仅 `--dspp-split-attention-backward` | 旧的对照路径：在 attention backward 内依次完成独立 dQ、当前/历史 dKV，再返回 |
-| 再启用 `--dspp-history-dkv-after-dx` | 当前研究路径：B 内合并 dQ/current，交付完整 dx 后运行独立 H |
+| 再启用 `--dspp-history-dkv-after-dx` | 当前研究路径：含历史任务的 B 内合并 dQ/current，交付完整 dx 后运行独立 H；整个任务无历史时 B 用融合 FA |
 | `--dspp-task-timing-only --timing-log-level 0` | 仅记录 B/H 边界事件，关闭内部标注与诊断；实际采集迭代还由 timeline 配置选择 |
 
 正确性依据不是只有“训练能跑通”：
@@ -81,6 +81,10 @@ GQA 不复制 K/V heads。令 `r=Hq/Hkv`，Q head q 使用 KV head `floor(q/r)`�
 | 完整 dx 与历史消费者 | 1/3层 block、chunk63/64：H 前完整 dx 与参考一致，H 后当前 dx/参数梯度不变，后续历史消费者得到正确累加，见[测试代码](../tests/unit_tests/dspp/test_history_after_dx.py) |
 | DSPP 真实训练梯度 | MHA/GQA/MQA 分别进行融合/拆分3轮对照，共比较351个参数梯度张量和495个stage dx；通过预设 `atol=.004, rtol=.01`、相对L2≤.02，见[009](assets/fa-split/009-combined-current-20261016/validation.json)。计数跨rank/iteration，不是独立参数数量 |
 | 更大性能形状 | 32/16 heads、Q2048/K6144或K14336：当前与历史dKV对融合逐位一致，dQ最大相对L2约2.905e-5，见[012](assets/fa-split/012-width4096-theory-20261016/shape-correctness.log)。这些形状的独立梯度检查与训练计时分开；loss一致不替代全模型梯度对照 |
+
+本次两项优化的验收另存[015](assets/fa-split/015-nohistory-reduction-20261016/unit-evidence.json)：无历史/混装分支、非零 padding dO、后续历史贡献消费、GQA 比例3/5/16/32均有针对性检查；32项数值/路由用例通过扩展 kernel 的 memcheck，0错误。原回归与新增用例共246项最终通过：首次243项通过，另外3项因 profiler 测试误把必需的 dQ 清零识别为多余归约而失败；修正测试判据后仅重跑这3项并通过，未为此更改生产数值代码。
+
+[015三卡训练对照](assets/fa-split/015-nohistory-reduction-20261016/validation-summary.json)再次检查351个参数梯度张量和495个完整stage dx，全部通过原阈值；最大相对L2分别为1.281%和1.308%。每种结构三轮中84次无历史attention走融合、114次含历史调用保持拆分并产生H。独立32/16 heads长形状检查中当前/历史dKV仍与融合逐位一致，dQ最大相对L2约3.021e-5。融合版本只用于这里的数值参考，本次性能比较使用提交前的拆分版本。
 
 上述为归档运行结果，不表示每次改文档都重跑了整套测试，也不外推到未验证硬件和模型组合。
 
@@ -93,9 +97,9 @@ GQA 不复制 K/V heads。令 `r=Hq/Hkv`，Q head q 使用 KV head `floor(q/r)`�
 | 文件 | 当前职责/改动 |
 | --- | --- |
 | [fa_split.py](../megatron/core/kv_cache/fa_split.py) | 新增状态与独立 dQ/dKV API、合并 dQ/current API；区域选择、逐序列 varlen 分派、版本与 stream 检查 |
-| [backward.cu](../megatron/core/kv_cache/fa_split_src/backward.cu)、[bindings.cpp](../megatron/core/kv_cache/fa_split_src/bindings.cpp)、[FA补丁](../megatron/core/kv_cache/fa_split_src/flash_bwd_split.patch) | 新增 prepare、dQ-only、dKV-only、合并 dQ/current CUDA 入口；工作区、输出转换及 GQA 归约；真正裁掉不用的梯度矩阵乘 |
+| [backward.cu](../megatron/core/kv_cache/fa_split_src/backward.cu)、[bindings.cpp](../megatron/core/kv_cache/fa_split_src/bindings.cpp)、[FA补丁](../megatron/core/kv_cache/fa_split_src/flash_bwd_split.patch) | 新增 prepare、dQ-only、dKV-only、合并 dQ/current CUDA 入口；工作区、dQ转换及联合dK/dV归约/输出；真正裁掉不用的梯度矩阵乘 |
 | [fa_split_build.py](../megatron/core/kv_cache/fa_split_build.py)、[upstream.json](../megatron/core/kv_cache/fa_split_src/upstream.json)、[THIRD_PARTY.md](../megatron/core/kv_cache/fa_split_src/THIRD_PARTY.md) | 独立扩展构建、固定 FA/CUTLASS revision、源码校验与许可证；仅显式 `--fetch` 下载依赖 |
-| [dspp_packed_attention.py](../megatron/core/kv_cache/dspp_packed_attention.py) | 接入开关；保存前向布局；B/H状态生命周期；当前/历史紧凑梯度分别路由，保留后续chunk梯度累加 |
+| [dspp_packed_attention.py](../megatron/core/kv_cache/dspp_packed_attention.py) | 接入开关；保存前向布局；B/H状态生命周期；当前/历史紧凑梯度分别路由，保留后续chunk梯度累加；after-dx下整项无历史任务走融合分支 |
 | [schedules.py](../megatron/core/pipeline_parallel/schedules.py) | 向KV state传递模式；完整B返回后先发布dx，再执行H；保留原F/B/W顺序及通信credit协议 |
 | [arguments.py](../megatron/arguments.py)、[run_dspp_b23_l40.sh](../examples/run_dspp_b23_l40.sh) | 新增拆分、after-dx、纯任务计时开关与非法组合校验；launcher支持对应环境变量和GQA配置 |
 | [dspp_timeline.py](../megatron/core/pipeline_parallel/dspp_timeline.py) | 增加H事件、纯B/H边界采样、事件预初始化及延后输出；纯B/H模式不把未采集区间算作bubble |
@@ -108,9 +112,16 @@ GQA 不复制 K/V heads。令 `r=Hq/Hkv`，Q head q 使用 KV head `floor(q/r)`�
 | [build_dspp_fa_split.py](../tools/build_dspp_fa_split.py) | 构建固定版本扩展；依赖未缓存时才使用 `--fetch` |
 | [test_fa_split.py](../tests/unit_tests/dspp/test_fa_split.py)、[test_fa_split_regions.py](../tests/unit_tests/dspp/test_fa_split_regions.py)、[test_fa_combined_current.py](../tests/unit_tests/dspp/test_fa_combined_current.py) | 基础拆分、区域/GQA与合并入口的数学和融合对照 |
 | [test_packed_split.py](../tests/unit_tests/dspp/test_packed_split.py)、[test_history_after_dx.py](../tests/unit_tests/dspp/test_history_after_dx.py)、[test_clean_task_timing.py](../tests/unit_tests/dspp/test_clean_task_timing.py) | packed路由、完整dx/H合同、状态隔离、CLI限制和计时清理回归 |
+| [test_split_output_optimizations.py](../tests/unit_tests/dspp/test_split_output_optimizations.py) | 无历史分支、混装与padding、后续历史贡献、非标准GQA比例；独立profiler确认B/H各一次联合输出kernel |
+| [summarize_dspp_split_optimizations.py](../tools/summarize_dspp_split_optimizations.py)、[015运行脚本](assets/fa-split/015-nohistory-reduction-20261016/run_comparison.py) | 优化前拆分/仅无历史优化/两项优化三组对照；分开统计B/H与无采样端到端，匹配同一任务和迭代 |
 | [validate_dspp_split_training.sh](../examples/validate_dspp_split_training.sh)、[validate_dspp_split_training.py](../tools/validate_dspp_split_training.py) | 真实PP训练参数梯度和dx对照；含快照/检查，不能用其日志报告性能 |
 | [measure_dspp_combined_tasks.sh](../examples/measure_dspp_combined_tasks.sh)、[summarize_dspp_history_tasks.py](../tools/summarize_dspp_history_tasks.py) | 当前融合/after-dx成对B/H计时，按stage、VPP和相同layout比较；支持宽度/head/序列长度参数 |
 | [audit_dspp_task_timing.py](../tools/audit_dspp_task_timing.py)、[diagnose_dspp_attention_cost.py](../tools/diagnose_dspp_attention_cost.py)、[diagnose_dspp_training_cost.py](../tools/diagnose_dspp_training_cost.py) | 独立计时审计和profiler诊断；不加载到正式性能运行。`dspp_cost_probe.*`仅为历史诊断代码，不是生产入口 |
+
+
+当前研究采集入口为 [collect_dspp_schedule_data.sh](../examples/collect_dspp_schedule_data.sh) → [collect_dspp_schedule_data.py](../tools/collect_dspp_schedule_data.py)。新增 `--dspp-timeline-iterations` 可选多轮（覆盖旧单轮选择），`--dspp-task-timing-scope all` 扩展为F/B/W/H，默认仍为bh；关闭采样不记录任务事件。正式运行只使用预初始化的任务边界events；输入/显存/迭代边界另存。诊断回放第26轮保存的CPU输入，仅诊断启用路由标记、通信日志及一个profiler；不包装distributed的isend/irecv，避免破坏P2POp检查。
+
+[summarize_dspp_schedule_collection.py](../tools/summarize_dspp_schedule_collection.py) 验收完整任务、同输入/布局、E无H、H位置和端到端口径，导出分形状成本和保守依赖图；[link_dspp_schedule_diagnostics.py](../tools/link_dspp_schedule_diagnostics.py) 离线关联消费者和NCCL实际kernel，不执行调度模拟。多轮选择、bh/all任务数量和关闭路径的轻量检查5项通过，未重跑完整数值套件。当前结果及原始材料位置见[016](assets/fa-split/016-fresh-schedule-20261016/README.md)。
 
 在现有容器环境中，`/home/cuiym` 挂载为 `/workspace`，Python为 `/workspace/src/venvs/megatron/bin/python`。依赖已缓存时的基本入口：
 
@@ -142,6 +153,8 @@ DSPP_COMBINED_MEASURE_ROOT=/tmp/dspp-measure-new \
 | 历史贡献容易漏加、重加，GQA还需要跨Q heads求和 | 当前/历史分开路由；冻结每次前向布局；保持KV-head缓存及一次组内归约 | 覆盖多源累加、packed隔离、短尾和非对齐边界；不能删掉消费者与生命周期检查 |
 | dQ与当前dKV分开扫描导致重复计算和启动 | **已合并全部dQ与当前dKV主kernel**，历史tile只算dQ，当前tile共享中间量 | 独立同轮消融支持局部收益；已接入训练。跨轮完整B差值不当作严格合并消融 |
 | 完整长度区域输出和拼接产生无效工作 | 改为当前/历史紧凑最终输出；单序列直接返回，减少无意义拼接及重复状态检查 | 最终输出已紧凑，但每Q-head中间dKV工作区仍按全部KV长度分配，二者不要混淆 |
+| 无历史任务没有可移出的H，却付出拆分分派成本 | **整项无历史physical task使用原融合backward**，继续原有当前梯度路由与历史贡献消费 | 只用于after-dx；有/无历史序列混装的任务仍整体拆分，尚未逐序列选择入口 |
+| dK/dV各自调用归约/拷贝，增加启动和输出处理 | **联合dK/dV归约与紧凑输出kernel**，每个输出元素由一个线程负责，两份FP32累加各舍入一次 | B/H均使用；主kernel、中间工作区和缓存累加未改，不能称为H计算与缓存写入融合 |
 | 测量路径中的标注和初始化影响B/H | 纯任务计时模式关闭内部标注节点及两次纯标注backward，预初始化边界events，metadata/写文件移到末尾 | 独立Python入口审计60个B/24个H无违规。原同步Timer本就未启用，不能把此前回退归因于它 |
 | attention局部更快，但小模型完整B仍慢 | 分开比较eager/Graph、Python/native、MHA/GQA及真实模型宽度/历史长度 | 包装/分派有独立对照证据；工作规模会改变结果。尚未精确拆分完整B中的各项成本 |
 | 少做矩阵乘，kernel其他成本没有同比下降 | 核实仍沿用原FA的tile、较重共享内存和搬运/同步结构 | **尚未逐项优化或消融**；没有实际occupancy/Tensor Core/stall数据，不把“不饱和”作为唯一已证实原因 |
@@ -150,9 +163,32 @@ DSPP_COMBINED_MEASURE_ROOT=/tmp/dspp-measure-new \
 
 ### 3.2 当前性能结论及其范围
 
+**本次两项局部优化：以已提交的拆分版本 `9b9fc8f96` 为基线，不是与关闭拆分比较。** 形状为hidden4096、FFN8192、GQA32:16、PP3/VPP2、chunk2048，变长数据14336/4097/1537/257；权重、batch、chunk及ordering相同。三组分别为优化前拆分、仅无历史任务走融合、再加联合dK/dV输出。
+
+B/H正序和反序各一组；每组108个B、72个H。下表固定stage1/VPP chunk0、Q2048，各格为4个样本的中位数，单位ms；`B / H`分列含义，不是两个主kernel时间。
+
+| 历史长度 | 优化前拆分 B / H | 仅无历史优化 B / H | 两项优化 B / H |
+| --- | ---: | ---: | ---: |
+| 0 | 5.741 / 0.000 | 5.686 / 0.000 | 5.693 / 0.000 |
+| 4096 | 7.577 / 2.201 | 7.477 / 2.159 | 7.368 / 2.094 |
+| 12288 | 10.634 / 6.173 | 10.375 / 6.310 | 10.825 / 6.735 |
+
+无历史样本的B耗时和变化：仅无历史优化相对基线-0.12%，两项优化-1.69%，说明单项收益很小，不能把两者差值归因于无历史路径中的联合归约（该路径根本不调用它）。全216个B、144个H的跨rank样本耗时和，两项优化分别变化+0.77%、+2.74%；这些和不是iteration time。历史12288的选定H中位数增加9.1%，正反序均出现回退，尚未单独分离输出kernel耗时与计算流等待。
+
+独立端到端运行关闭timeline/profiler及梯度检查，按相同变长batch配对第3–6轮，排除首次编译/初始化：
+
+| 指标 | 优化前拆分 | 仅无历史优化 | 两项优化 |
+| --- | ---: | ---: | ---: |
+| 平均iteration time（ms） | 1894.25 | 1911.17 | 1902.55 |
+| 相对优化前变化 | — | +0.89% | +0.44% |
+
+**结论：实现与正确性验证已完成，但本负载没有观察到端到端加速，长历史H还有可重复的局部回退。减少发射次数不等于性能收益成立。** 端到端只有一组匹配运行，不能把+0.44%写成已证明的稳定回退幅度；也不能宣称这版已优于原拆分版。未继续扩大正确性/性能实验范围，该局部问题先保留，按当前研究决策不继续追查，下一步转入新采集后的CPU调度分析。完整原始样本、逐轮结果、范围和源码校验和见[015统计](assets/fa-split/015-nohistory-reduction-20261016/summary.json)及[复现记录](assets/fa-split/015-nohistory-reduction-20261016/manifest.json)。
+
+**拆分方案相对原融合的已有证据（早于本次局部优化）：**
+
 小模型曾出现完整B回退：hidden512、GQA4:2、Q2048/history4096的同轮融合/拆分为5.914/6.201 ms，约慢4.9%；关闭GQA也没有消除该回退。扩大真实负载后，hidden2048的长历史任务已出现B缩短，但部分短历史任务复测方向反转，因此不能说所有形状都受益。原因诊断和规模对照见[008](assets/fa-split/008-b-cost-diagnosis-20261016/)、[010](assets/fa-split/010-mha-comparison-20261016/summary.json)、[011](assets/fa-split/011-workload-scaling-20261016/summary.json)。
 
-目前最直接的完整B证据来自hidden4096、FFN8192、GQA32:16、6层、PP3/VPP2、chunk2048。短数据长度模式为6144/4097/1537/257，长数据只将最长序列改为14336；仍是合成变长输入，不是完整LLaMA7B或真实业务分布。固定stage1/VPP chunk0、当前Q2048，每行每模式2个实际样本，单位ms：
+以下为两项优化之前（`9b9fc8f96`及之前归档）的融合/拆分证据，不能用作本次优化消融。较大负载完整B证据来自hidden4096、FFN8192、GQA32:16、6层、PP3/VPP2、chunk2048。短数据长度模式为6144/4097/1537/257，长数据只将最长序列改为14336；仍是合成变长输入，不是完整LLaMA7B或真实业务分布。固定stage1/VPP chunk0、当前Q2048，每行每模式2个实际样本，单位ms：
 
 | 数据/历史长度 | 原融合B中位数 | 拆分B中位数 | B缩短 | H中位数 | 配对B+H中位数 |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -162,7 +198,7 @@ DSPP_COMBINED_MEASURE_ROOT=/tmp/dspp-measure-new \
 
 各行对应B样本均缩短，但样本数有限，不代表所有任务的普遍收益。B/H时长是计算流边界区间，含辅助操作与流内等待；不是attention主kernel之和。B+H先按任务求和再取中位数，不等于训练iteration time。
 
-**现有端到端日志尚未显示加速。** 同配置第2轮未采B/H，短/长负载iteration时间分别839.7→849.0 ms（+1.1%）、1334.6→1364.6 ms（+2.2%）。第3轮采集B/H，分别786.4→807.4 ms（+2.7%）、1587.9→1673.1 ms（+5.4%）；这一轮包含采样、同步和时序文件输出，不能作为无采样端到端结论。每配置只有一组运行；不同迭代的变长batch不同，不跨迭代平均作受控比较。第1轮初始化影响明显，不参与判断。数据均来自[012短负载](assets/fa-split/012-width4096-theory-20261016/hidden4096-short/)和[长负载](assets/fa-split/012-width4096-theory-20261016/hidden4096-long/)日志，仍需专门的无采样配对验证稳定幅度。
+**此前融合/拆分端到端日志尚未显示加速。** 同配置第2轮未采B/H，短/长负载iteration时间分别839.7→849.0 ms（+1.1%）、1334.6→1364.6 ms（+2.2%）。第3轮采集B/H，分别786.4→807.4 ms（+2.7%）、1587.9→1673.1 ms（+5.4%）；这一轮包含采样、同步和时序文件输出，不能作为无采样端到端结论。每配置只有一组运行；不同迭代的变长batch不同，不跨迭代平均作受控比较。第1轮初始化影响明显，不参与判断。数据均来自[012短负载](assets/fa-split/012-width4096-theory-20261016/hidden4096-short/)和[长负载](assets/fa-split/012-width4096-theory-20261016/hidden4096-long/)日志，仍需专门的无采样配对验证稳定幅度。
 
 完整B/H样本见[012 summary](assets/fa-split/012-width4096-theory-20261016/summary.json)。[013放大时序图](assets/fa-split/013-measured-bh-timeline-20261016/paired-long-history.png)展示两个实际任务，[三卡概览](assets/fa-split/013-measured-bh-timeline-20261016/three-stage-bh-overview.png)包含全部采集事件。只采B/H，没有F/W和通信区间；空白不等于bubble，各rank时间原点也不是精确同步的跨GPU时钟。
 
@@ -181,20 +217,19 @@ H主要矩阵乘         = 8D·Ah = 2R
 B+H新增重计算量     = R
 ```
 
-在本轮hidden4096配置中，history4096/12288的B主要矩阵乘理论减少13.11%/23.76%，对应完整B实测时间减少6.7%–13.2%/19.5%。方向一致，但FLOPs不是耗时预测，公式不含softmax、归约、访存、边界tile冗余、分派或通信。宽度增大时投影/MLP约按D²增长，attention约按D增长，所以不能推断hidden越大可移出比例越大。完整推导和明确标注假设的等速率参考保留在[012理论对照](assets/fa-split/012-width4096-theory-20261016/theory-comparison.json)。
+在012归档的hidden4096配置中，history4096/12288的B主要矩阵乘理论减少13.11%/23.76%，对应完整B实测时间减少6.7%–13.2%/19.5%。方向一致，但FLOPs不是耗时预测，公式不含softmax、归约、访存、边界tile冗余、分派或通信。宽度增大时投影/MLP约按D²增长，attention约按D增长，所以不能推断hidden越大可移出比例越大。完整推导和明确标注假设的等速率参考保留在[012理论对照](assets/fa-split/012-width4096-theory-20261016/theory-comparison.json)。
 
 ## 4. 下一步准备做什么优化
 
-先做目标明确、便于对照的局部优化，再根据结果决定是否改写主kernel。以下均为**候选下一步，尚未实现**；已经完成的dQ/current合并不再重复列为待办。
+**当前下一步是CPU调度分析，暂不继续kernel优化。** 016已用当前工作区重新完成未拆分/立即H的F/B/W/H、无任务采样端到端和独立通信/消费者诊断。立即H端到端均值2150.045 ms，对照未拆分2019.230 ms（+6.48%），尚未测试跨任务延后H。先用实际成本评估合法延后能否弥补差额；具体步骤与未知约束见外层plan §6。
+
+以下局部优化仅作为候选，需CPU分析给出明确成本改善门槛后再决定；015中长历史H的联合输出回退也保留为候选诊断。dQ/current合并、整项无历史任务走融合、联合dK/dV归约与输出均已完成。
 
 | 优先级 | 优化 | 预期作用与验收重点 |
 | --- | --- | --- |
-| 1 | **无历史任务走原融合backward** | 没有H可移出时避免拆分成本。先覆盖整项physical task无历史的情况；混装中有/无历史序列的选择另评估，验证默认路径和缓存语义 |
-| 2 | **合并dK/dV归约与输出处理** | 先将当前两次独立GQA归约合成一次kernel，再评估H归约与缓存累加融合。必须保持FP32累加/BF16舍入及每份贡献只入账一次；后者可能改变舍入或写入冲突，需要单独验收 |
-| 3 | **压缩并复用中间工作区** | B只需要当前dKV，却按全部KV长度分配每Q-head中间量；修改区域地址并处理非对齐tile。复用不得覆盖H仍持有的数据；显存节省不自动等于耗时收益 |
-| 4 | **合并准备入口并批量处理packed序列** | 减少Python状态封装、逐序列prepare/发射、LSE复制及结果拼接；保留必要生命周期检查，重点验证序列隔离和混合长短尾 |
-| 5 | **针对dQ-only/H重新调整kernel资源** | 在独立诊断中测量共享内存、寄存器、访存与同步成本，再调整tile或分工。dQ最终转换需要等待部分结果累加，不能直接塞回主kernel；需先设计正确的归约机制 |
+| 1 | **压缩并复用中间工作区** | B只需要当前dKV，却按全部KV长度分配每Q-head中间量；修改区域地址并处理非对齐tile。复用不得覆盖H仍持有的数据；显存节省不自动等于耗时收益 |
+| 2 | **合并准备入口并批量处理packed序列** | 减少Python状态封装、逐序列prepare/发射、LSE复制及结果拼接；保留生命周期检查，验证序列隔离和混合长短尾；另评估混装中的无历史序列是否单独走融合 |
+| 3 | **评估H归约与缓存累加融合** | 当前只合并了dK/dV归约及输出，缓存路由/累加仍独立。进一步融合可能改变舍入或引入多源写入冲突，需单独设计与验收 |
+| 4 | **针对dQ-only/H重新调整kernel资源** | 独立诊断共享内存、寄存器、访存与同步成本，再调整tile或分工。dQ最终转换需要等待部分结果累加，不能直接塞回主kernel |
 
-优先推进1、2，每次只改一类因素：先通过对应梯度/状态回归，再使用相同权重、变长batch、chunk和ordering比较完整B/H，报告原始样本及范围；方向冲突或波动妨碍判断时再加反序重复。性能运行与正确性/profiler运行分开。
-
-端到端验证需要同时补齐两件事：在关闭B/H采样和文件输出的配对运行中判断真实iteration变化；在单独诊断中检查dx发送实际发起/接收时刻和消费者就绪，不能只看B结束。随后若设计跨任务延后的H调度，需要明确消费者期限、状态生命周期及通信推进，修改顺序后重新传播依赖和资源占用。当前B局部变短是继续研究的依据，是否能利用等待空隙抵消H成本仍是待验证问题。
+只有决定恢复实现优化后，才逐项对照当前拆分版本并补相关数值检查；不因本轮立即H性能较慢而追加GPU扫描。CPU重排H时必须保留完整dx交付、消费者、通信和状态生命周期约束，当前B缩短本身仍不等于iteration缩短。

@@ -1,0 +1,56 @@
+{
+  "4": {
+    "records": 9,
+    "parameter_gradient_tensors": 117,
+    "stage_dx_tensors": 165,
+    "actual_split_calls": 114,
+    "nohistory_fused_calls": 84,
+    "H_tasks": 114,
+    "maxima": {
+      "gradient_checks": {
+        "max_abs": 0.0027466285973787308,
+        "max_relative_l2": 0.012807373006289275
+      },
+      "stage_dx_checks": {
+        "max_abs": 6.103515625e-05,
+        "max_relative_l2": 0.013078801391032336
+      }
+    }
+  },
+  "2": {
+    "records": 9,
+    "parameter_gradient_tensors": 117,
+    "stage_dx_tensors": 165,
+    "actual_split_calls": 114,
+    "nohistory_fused_calls": 84,
+    "H_tasks": 114,
+    "maxima": {
+      "gradient_checks": {
+        "max_abs": 0.0007286109030246735,
+        "max_relative_l2": 0.00722370229603911
+      },
+      "stage_dx_checks": {
+        "max_abs": 3.0517578125e-05,
+        "max_relative_l2": 0.006845678707171019
+      }
+    }
+  },
+  "1": {
+    "records": 9,
+    "parameter_gradient_tensors": 117,
+    "stage_dx_tensors": 165,
+    "actual_split_calls": 114,
+    "nohistory_fused_calls": 84,
+    "H_tasks": 114,
+    "maxima": {
+      "gradient_checks": {
+        "max_abs": 9.458744898438454e-11,
+        "max_relative_l2": 4.1375906582152176e-10
+      },
+      "stage_dx_checks": {
+        "max_abs": 0.0,
+        "max_relative_l2": 0
+      }
+    }
+  }
+}

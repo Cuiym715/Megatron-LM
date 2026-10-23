@@ -4,6 +4,7 @@
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAException.h>
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -50,6 +51,51 @@ __global__ void dq_current_kernel(const Flash_bwd_params p, int history) {
 
 __global__ void convert_dq_kernel(const Flash_bwd_params p) {
     dspp_flash_split::convert_dQ<Traits>(p, 1);
+}
+
+// Joint K/V output pass. Each thread owns one [token, KV-head, dim]
+// element and sums the Q-head group's BF16 partials in FP32, casting once.
+// The source remains full-address; begin/rows exclude boundary-tile surplus.
+__global__ void reduce_dkv_output_kernel(
+    const cutlass::bfloat16_t* __restrict__ partial_k,
+    const cutlass::bfloat16_t* __restrict__ partial_v,
+    cutlass::bfloat16_t* __restrict__ dk,
+    cutlass::bfloat16_t* __restrict__ dv,
+    int64_t elements, int64_t begin, int kv_heads, int ratio) {
+    for (int64_t index = int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+         index < elements; index += int64_t(blockDim.x) * gridDim.x) {
+        const int dim = index % 128;
+        const int64_t token_head = index / 128;
+        const int64_t token = token_head / kv_heads;
+        const int head = token_head % kv_heads;
+        const int64_t source = ((begin + token) * kv_heads + head) * ratio * 128 + dim;
+        if (ratio == 1) {
+            dk[index] = partial_k[source];
+            dv[index] = partial_v[source];
+        } else {
+            float sum_k = 0.f, sum_v = 0.f;
+            for (int qhead = 0; qhead < ratio; ++qhead) {
+                sum_k += float(partial_k[source + qhead * 128]);
+                sum_v += float(partial_v[source + qhead * 128]);
+            }
+            dk[index] = cutlass::bfloat16_t(sum_k);
+            dv[index] = cutlass::bfloat16_t(sum_v);
+        }
+    }
+}
+
+void write_dkv_output(const at::Tensor& partial_k, const at::Tensor& partial_v,
+                      at::Tensor& dk, at::Tensor& dv, int64_t begin, int ratio) {
+    const int64_t elements = dk.numel();
+    if (!elements) { return; }
+    const int blocks = int(std::min<int64_t>((elements + 255) / 256, 65535));
+    reduce_dkv_output_kernel<<<blocks, 256, 0, at::cuda::getCurrentCUDAStream()>>>(
+        reinterpret_cast<const cutlass::bfloat16_t*>(partial_k.data_ptr()),
+        reinterpret_cast<const cutlass::bfloat16_t*>(partial_v.data_ptr()),
+        reinterpret_cast<cutlass::bfloat16_t*>(dk.data_ptr()),
+        reinterpret_cast<cutlass::bfloat16_t*>(dv.data_ptr()),
+        elements, begin, dk.size(1), ratio);
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
 void check_inputs(const at::Tensor& q, const at::Tensor& k, const at::Tensor& v,
@@ -206,17 +252,7 @@ std::vector<at::Tensor> split_dkv(const at::Tensor& q, const at::Tensor& k, cons
     // Boundary-tile surplus is never returned or included in the reduction.
     auto dk_region = compact ? dk : dk.slice(0, begin, end);
     auto dv_region = compact ? dv : dv.slice(0, begin, end);
-    if (p.h_h_k_ratio == 1) {
-        dk_region.copy_(partial_k.slice(0, begin, end));
-        dv_region.copy_(partial_v.slice(0, begin, end));
-    } else {
-        // ATen CUDA BF16 sum uses FP32 accumulation and casts once to BF16,
-        // matching the original FA2 API's GQA reduction/rounding contract.
-        at::sum_out(dk_region, partial_k.slice(0, begin, end).view(
-            {end - begin, p.h_k, p.h_h_k_ratio, 128}), {2});
-        at::sum_out(dv_region, partial_v.slice(0, begin, end).view(
-            {end - begin, p.h_k, p.h_h_k_ratio, 128}), {2});
-    }
+    write_dkv_output(partial_k, partial_v, dk_region, dv_region, begin, p.h_h_k_ratio);
     return {dk, dv};
 }
 
@@ -252,14 +288,6 @@ std::vector<at::Tensor> split_dq_current(
     convert_dq_kernel<<<dim3((p.seqlen_q + 63) / 64, 1, p.h), Traits::kNThreads,
         Traits::kSmemdQSize, stream>>>(p);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
-    if (p.h_h_k_ratio == 1) {
-        dk.copy_(partial_k.slice(0, history));
-        dv.copy_(partial_v.slice(0, history));
-    } else {
-        at::sum_out(dk, partial_k.slice(0, history).view(
-            {q.size(0), p.h_k, p.h_h_k_ratio, 128}), {2});
-        at::sum_out(dv, partial_v.slice(0, history).view(
-            {q.size(0), p.h_k, p.h_h_k_ratio, 128}), {2});
-    }
+    write_dkv_output(partial_k, partial_v, dk, dv, history, p.h_h_k_ratio);
     return {dq, dk, dv};
 }
