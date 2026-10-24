@@ -33,3 +33,12 @@ wholly within history. It reads only current rows from the per-Q-head dKV
 workspace; a nonaligned boundary tile's surplus history output is discarded.
 The original upstream-header patch, tile configuration, GQA reduction and dQ
 conversion remain unchanged. Independent historical dKV is still computed later.
+
+The optional diagnostic `deterministic=True` dQ entry follows pinned FA2's
+seq-K parallel deterministic launcher: ceil(SM_count / Q_heads) independent
+FP32 dQ partitions (batch=1), a fixed strided traversal of KV tiles per CTA,
+and the unchanged upstream `convert_dQ(params, nsplits)` reduction. The
+combined-current entry keeps the same dQ-only/current-dKV tile selection.
+No upstream header patch is added for this option. It costs extra temporary
+FP32 storage; the Python/native defaults remain false, and production
+attention does not enable it. It is for explicit numerical diagnosis only.

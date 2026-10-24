@@ -1,0 +1,301 @@
+{
+  "scope": "PP3/VPP2, same frozen seed11 InfiniPipe Fig2 approximate length distribution dataset and P7 cost/memory profiles; default attention; 2 warmup+6 measured iterations; one uncontended measured block per arm",
+  "model": "24 layers hidden2048/FFN5504/MHA16 BF16 chunk2048 micro4/global8",
+  "timing": "100304 valid targets / max-rank contiguous wall interval, including input/publication/checks/communication/optimizer",
+  "runs": {
+    "baseline": {
+      "tokens_per_second": 11340.888291115529,
+      "wall_seconds": 8.844457102939487,
+      "total_valid_tokens": 100304,
+      "all_rank_plans_equal": true,
+      "all_step_memory_checks_passed": true,
+      "no_optimizer_skip_or_nonfinite_loss": true,
+      "H_count": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "peak_allocated_GiB": [
+        27.002631187438965,
+        23.399405479431152,
+        23.429065704345703
+      ],
+      "end_allocated_GiB": [
+        [
+          9.051482677459717,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "versus_baseline_percent": 0.0
+    },
+    "full-replay": {
+      "tokens_per_second": 10470.774762042625,
+      "wall_seconds": 9.579424854367971,
+      "total_valid_tokens": 100304,
+      "all_rank_plans_equal": true,
+      "all_step_memory_checks_passed": true,
+      "no_optimizer_skip_or_nonfinite_loss": true,
+      "H_count": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "peak_allocated_GiB": [
+        27.039289474487305,
+        23.97424030303955,
+        23.89816951751709
+      ],
+      "end_allocated_GiB": [
+        [
+          9.051482677459717,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "prefetch": {
+        "worker_fallback_count": 0,
+        "worker_cuda_initialized": false,
+        "boundary_mean_ms": 57.043139822781086,
+        "rank0_commit_mean_ms": 48.89823993047079,
+        "max_rank_compute_mean_ms": 1427.3537699381511,
+        "worker_mean_ms": 0.004363246262073517,
+        "source_optimization_wait_ms": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "future_payload_max_bytes": 334665,
+        "commit_collectives": 2,
+        "samples_match_consumed_positions": true
+      },
+      "versus_baseline_percent": -7.672357814815545
+    },
+    "fast-replay-clean": {
+      "tokens_per_second": 11145.61806323619,
+      "wall_seconds": 8.999411197379231,
+      "total_valid_tokens": 100304,
+      "all_rank_plans_equal": true,
+      "all_step_memory_checks_passed": true,
+      "no_optimizer_skip_or_nonfinite_loss": true,
+      "H_count": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "peak_allocated_GiB": [
+        27.037328720092773,
+        23.971802711486816,
+        23.898642539978027
+      ],
+      "end_allocated_GiB": [
+        [
+          9.051482677459717,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "prefetch": {
+        "worker_fallback_count": 0,
+        "worker_cuda_initialized": false,
+        "boundary_mean_ms": 27.8816061715285,
+        "rank0_commit_mean_ms": 35.12674290686846,
+        "max_rank_compute_mean_ms": 1377.6914876302083,
+        "worker_mean_ms": 0.004660959045092265,
+        "source_optimization_wait_ms": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "future_payload_max_bytes": 334671,
+        "commit_collectives": 1,
+        "samples_match_consumed_positions": true
+      },
+      "versus_baseline_percent": -1.7218248065481223
+    },
+    "fast-b": {
+      "tokens_per_second": 11030.260889728374,
+      "wall_seconds": 9.093529246747494,
+      "total_valid_tokens": 100304,
+      "all_rank_plans_equal": true,
+      "all_step_memory_checks_passed": true,
+      "no_optimizer_skip_or_nonfinite_loss": true,
+      "H_count": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "peak_allocated_GiB": [
+        27.036352157592773,
+        23.972290992736816,
+        23.89913845062256
+      ],
+      "end_allocated_GiB": [
+        [
+          9.051482677459717,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "prefetch": {
+        "worker_fallback_count": 0,
+        "worker_cuda_initialized": false,
+        "boundary_mean_ms": 26.922032237052917,
+        "rank0_commit_mean_ms": 35.38196223477522,
+        "max_rank_compute_mean_ms": 1393.7653706868489,
+        "worker_mean_ms": 55.5541580542922,
+        "source_optimization_wait_ms": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "future_payload_max_bytes": 334660,
+        "commit_collectives": 1,
+        "samples_match_consumed_positions": true
+      },
+      "versus_baseline_percent": -2.739004153938285
+    }
+  },
+  "ratios": {
+    "fast_replay_vs_full_replay_percent": 6.445017838029754,
+    "fast_live_vs_fast_replay_percent": -1.0350002382400136
+  },
+  "all_B_task_schedules_identical": true,
+  "excluded": {
+    "fast-replay": "checks process overlapped the measured window by about 2.6 seconds; retained but excluded from comparison; rerun once as fast-replay-clean"
+  },
+  "limitations": [
+    "single block per arm; background CPU interference and run variation not isolated",
+    "all H=0; no new H-containing async GPU or full gradient/parameter comparison",
+    "new fast execution tested with B; no new A/C throughput block"
+  ]
+}

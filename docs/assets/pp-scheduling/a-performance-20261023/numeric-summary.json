@@ -1,0 +1,56 @@
+{
+  "comparisons": {
+    "template": {
+      "bitwise_equal": true,
+      "rank_step_reports": 18,
+      "tensor_comparisons": {
+        "params_before": 882,
+        "gradients": 882,
+        "params_after": 882,
+        "outputs": 636,
+        "dx": 530,
+        "logits": 106,
+        "loss": 6
+      },
+      "mismatched_tensors": 0,
+      "first_mismatches": [],
+      "runtime_plan_diagnostic_seconds": {
+        "median": 0.004075260832905769,
+        "minimum": 0.003915920853614807,
+        "maximum": 0.005290070548653603
+      }
+    },
+    "a": {
+      "bitwise_equal": true,
+      "rank_step_reports": 18,
+      "tensor_comparisons": {
+        "params_before": 882,
+        "gradients": 882,
+        "params_after": 882,
+        "outputs": 636,
+        "dx": 530,
+        "logits": 106,
+        "loss": 6
+      },
+      "mismatched_tensors": 0,
+      "first_mismatches": [],
+      "runtime_plan_diagnostic_seconds": {
+        "median": 0.026967652142047882,
+        "minimum": 0.025545358657836914,
+        "maximum": 0.035580825060606
+      }
+    }
+  },
+  "a_accepted_steps": 6,
+  "moved_real_W_FB_frontiers": [
+    33,
+    22,
+    35,
+    21,
+    21,
+    30
+  ],
+  "cross_rank_plans_agree": true,
+  "scope": "6 optimizer steps, seed11, deterministic FA; all stage output/dx, logits/loss, full gradients and before/after model parameter byte hashes; no tensor subsampling",
+  "limitation": "Numerical run adds CPU copies/hashing and deterministic FA. Its timing/memory is not performance evidence. Plan CPU duration excludes subsequent validation/hash/all-gather/publication, and is an indicative diagnostic only. Default FA numerical gate remains separate."
+}

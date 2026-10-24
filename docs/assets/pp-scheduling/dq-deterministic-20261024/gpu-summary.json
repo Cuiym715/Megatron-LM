@@ -1,0 +1,1262 @@
+{
+  "kernel_checks": [
+    {
+      "shape": [
+        2048,
+        4096,
+        16,
+        16
+      ],
+      "repeat_bitwise_equal": true,
+      "partitions": 9,
+      "extra_dq_workspace_bytes": 134217728
+    },
+    {
+      "shape": [
+        65,
+        194,
+        8,
+        2
+      ],
+      "repeat_bitwise_equal": true,
+      "partitions": 18,
+      "extra_dq_workspace_bytes": 8912896
+    },
+    {
+      "shape": [
+        17,
+        17,
+        4,
+        1
+      ],
+      "repeat_bitwise_equal": true,
+      "partitions": 36,
+      "extra_dq_workspace_bytes": 9175040
+    }
+  ],
+  "training": {
+    "b": {
+      "returncode": 0,
+      "seconds": 82.08033227920532,
+      "records": [
+        {
+          "iteration": 1,
+          "rank": 0,
+          "plan_sha256": "8d1508c5e8a6bb3b86112f04334e5954d2e0e75241725d12f8f37d5260ed14c2",
+          "mode": "reference",
+          "total_H": 1,
+          "local_H": 1,
+          "executed_H": 1,
+          "history_jobs": 4,
+          "repeats": 4,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 5389892608,
+            "allocated_end": 9718955520,
+            "allocated_peak": 23317200896,
+            "reserved_end": 24310185984
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 51
+            },
+            "gradients": {
+              "tensors": 51
+            },
+            "params_after": {
+              "tensors": 51
+            },
+            "outputs": {
+              "tensors": 20
+            },
+            "dx": {
+              "tensors": 10
+            },
+            "logits": {
+              "tensors": 10
+            },
+            "loss": {
+              "tensors": 1
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "rank": 1,
+          "plan_sha256": "8d1508c5e8a6bb3b86112f04334e5954d2e0e75241725d12f8f37d5260ed14c2",
+          "mode": "reference",
+          "total_H": 1,
+          "local_H": 0,
+          "executed_H": 0,
+          "history_jobs": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 4068805632,
+            "allocated_end": 7340887040,
+            "allocated_peak": 21252434944,
+            "reserved_end": 24010293248
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 48
+            },
+            "gradients": {
+              "tensors": 48
+            },
+            "params_after": {
+              "tensors": 48
+            },
+            "outputs": {
+              "tensors": 20
+            },
+            "dx": {
+              "tensors": 20
+            },
+            "logits": {
+              "tensors": 0
+            },
+            "loss": {
+              "tensors": 0
+            }
+          }
+        },
+        {
+          "iteration": 1,
+          "rank": 2,
+          "plan_sha256": "8d1508c5e8a6bb3b86112f04334e5954d2e0e75241725d12f8f37d5260ed14c2",
+          "mode": "reference",
+          "total_H": 1,
+          "local_H": 0,
+          "executed_H": 0,
+          "history_jobs": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 4068805632,
+            "allocated_end": 7340887040,
+            "allocated_peak": 22065081344,
+            "reserved_end": 24456986624
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 48
+            },
+            "gradients": {
+              "tensors": 48
+            },
+            "params_after": {
+              "tensors": 48
+            },
+            "outputs": {
+              "tensors": 20
+            },
+            "dx": {
+              "tensors": 20
+            },
+            "logits": {
+              "tensors": 0
+            },
+            "loss": {
+              "tensors": 0
+            }
+          }
+        },
+        {
+          "iteration": 2,
+          "rank": 0,
+          "plan_sha256": "9b7d4d3be8d2dcd3a5b89034cb3902905457618a8bd7713f3aa2776fa2f4c914",
+          "mode": "reference",
+          "total_H": 1,
+          "local_H": 1,
+          "executed_H": 1,
+          "history_jobs": 4,
+          "repeats": 8,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 9718956032,
+            "allocated_end": 9718956544,
+            "allocated_peak": 17078589440,
+            "reserved_end": 24310185984
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 51
+            },
+            "gradients": {
+              "tensors": 51
+            },
+            "params_after": {
+              "tensors": 51
+            },
+            "outputs": {
+              "tensors": 14
+            },
+            "dx": {
+              "tensors": 7
+            },
+            "logits": {
+              "tensors": 7
+            },
+            "loss": {
+              "tensors": 1
+            }
+          }
+        },
+        {
+          "iteration": 2,
+          "rank": 1,
+          "plan_sha256": "9b7d4d3be8d2dcd3a5b89034cb3902905457618a8bd7713f3aa2776fa2f4c914",
+          "mode": "reference",
+          "total_H": 1,
+          "local_H": 0,
+          "executed_H": 0,
+          "history_jobs": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 7340887040,
+            "allocated_end": 7340887040,
+            "allocated_peak": 14307893248,
+            "reserved_end": 24171773952
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 48
+            },
+            "gradients": {
+              "tensors": 48
+            },
+            "params_after": {
+              "tensors": 48
+            },
+            "outputs": {
+              "tensors": 14
+            },
+            "dx": {
+              "tensors": 14
+            },
+            "logits": {
+              "tensors": 0
+            },
+            "loss": {
+              "tensors": 0
+            }
+          }
+        },
+        {
+          "iteration": 2,
+          "rank": 2,
+          "plan_sha256": "9b7d4d3be8d2dcd3a5b89034cb3902905457618a8bd7713f3aa2776fa2f4c914",
+          "mode": "reference",
+          "total_H": 1,
+          "local_H": 0,
+          "executed_H": 0,
+          "history_jobs": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 7340887040,
+            "allocated_end": 7340887040,
+            "allocated_peak": 14333158400,
+            "reserved_end": 24618467328
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 48
+            },
+            "gradients": {
+              "tensors": 48
+            },
+            "params_after": {
+              "tensors": 48
+            },
+            "outputs": {
+              "tensors": 14
+            },
+            "dx": {
+              "tensors": 14
+            },
+            "logits": {
+              "tensors": 0
+            },
+            "loss": {
+              "tensors": 0
+            }
+          }
+        },
+        {
+          "iteration": 3,
+          "rank": 0,
+          "plan_sha256": "ef1995f8c3923f64fe2018825f3845038e86f1c7180768fed0eddad192708da8",
+          "mode": "reference",
+          "total_H": 0,
+          "local_H": 0,
+          "executed_H": 0,
+          "history_jobs": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 9718956032,
+            "allocated_end": 9718956544,
+            "allocated_peak": 14888826880,
+            "reserved_end": 24310185984
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 51
+            },
+            "gradients": {
+              "tensors": 51
+            },
+            "params_after": {
+              "tensors": 51
+            },
+            "outputs": {
+              "tensors": 10
+            },
+            "dx": {
+              "tensors": 5
+            },
+            "logits": {
+              "tensors": 5
+            },
+            "loss": {
+              "tensors": 1
+            }
+          }
+        },
+        {
+          "iteration": 3,
+          "rank": 1,
+          "plan_sha256": "ef1995f8c3923f64fe2018825f3845038e86f1c7180768fed0eddad192708da8",
+          "mode": "reference",
+          "total_H": 0,
+          "local_H": 0,
+          "executed_H": 0,
+          "history_jobs": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 7340887040,
+            "allocated_end": 7340887040,
+            "allocated_peak": 12246987776,
+            "reserved_end": 24171773952
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 48
+            },
+            "gradients": {
+              "tensors": 48
+            },
+            "params_after": {
+              "tensors": 48
+            },
+            "outputs": {
+              "tensors": 10
+            },
+            "dx": {
+              "tensors": 10
+            },
+            "logits": {
+              "tensors": 0
+            },
+            "loss": {
+              "tensors": 0
+            }
+          }
+        },
+        {
+          "iteration": 3,
+          "rank": 2,
+          "plan_sha256": "ef1995f8c3923f64fe2018825f3845038e86f1c7180768fed0eddad192708da8",
+          "mode": "reference",
+          "total_H": 0,
+          "local_H": 0,
+          "executed_H": 0,
+          "history_jobs": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 7340887040,
+            "allocated_end": 7340887040,
+            "allocated_peak": 12209305600,
+            "reserved_end": 24618467328
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 48
+            },
+            "gradients": {
+              "tensors": 48
+            },
+            "params_after": {
+              "tensors": 48
+            },
+            "outputs": {
+              "tensors": 10
+            },
+            "dx": {
+              "tensors": 10
+            },
+            "logits": {
+              "tensors": 0
+            },
+            "loss": {
+              "tensors": 0
+            }
+          }
+        }
+      ],
+      "steps": [
+        {
+          "iteration": 1,
+          "ranks": 3,
+          "same_plan": true,
+          "H": 1,
+          "repeats": 4,
+          "repeats_bitwise_equal": true,
+          "allocated_peak_GiB": [
+            21.716,
+            19.793,
+            20.55
+          ],
+          "allocated_end_GiB": [
+            9.051,
+            6.837,
+            6.837
+          ],
+          "bitwise_equal": null,
+          "categories": {
+            "params_before": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "gradients": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "params_after": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "outputs": {
+              "tensors": 60,
+              "mismatches": 0
+            },
+            "dx": {
+              "tensors": 50,
+              "mismatches": 0
+            },
+            "logits": {
+              "tensors": 10,
+              "mismatches": 0
+            },
+            "loss": {
+              "tensors": 1,
+              "mismatches": 0
+            }
+          }
+        },
+        {
+          "iteration": 2,
+          "ranks": 3,
+          "same_plan": true,
+          "H": 1,
+          "repeats": 8,
+          "repeats_bitwise_equal": true,
+          "allocated_peak_GiB": [
+            15.906,
+            13.325,
+            13.349
+          ],
+          "allocated_end_GiB": [
+            9.051,
+            6.837,
+            6.837
+          ],
+          "bitwise_equal": null,
+          "categories": {
+            "params_before": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "gradients": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "params_after": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "outputs": {
+              "tensors": 42,
+              "mismatches": 0
+            },
+            "dx": {
+              "tensors": 35,
+              "mismatches": 0
+            },
+            "logits": {
+              "tensors": 7,
+              "mismatches": 0
+            },
+            "loss": {
+              "tensors": 1,
+              "mismatches": 0
+            }
+          }
+        },
+        {
+          "iteration": 3,
+          "ranks": 3,
+          "same_plan": true,
+          "H": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "allocated_peak_GiB": [
+            13.866,
+            11.406,
+            11.371
+          ],
+          "allocated_end_GiB": [
+            9.051,
+            6.837,
+            6.837
+          ],
+          "bitwise_equal": null,
+          "categories": {
+            "params_before": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "gradients": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "params_after": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "outputs": {
+              "tensors": 30,
+              "mismatches": 0
+            },
+            "dx": {
+              "tensors": 25,
+              "mismatches": 0
+            },
+            "logits": {
+              "tensors": 5,
+              "mismatches": 0
+            },
+            "loss": {
+              "tensors": 1,
+              "mismatches": 0
+            }
+          }
+        }
+      ]
+    },
+    "c": {
+      "returncode": 0,
+      "seconds": 75.35957336425781,
+      "records": [
+        {
+          "iteration": 1,
+          "rank": 0,
+          "plan_sha256": "a7ebbeffc0dda5507760e5f5fb8ef6b8c15d4457edd24758c56a0c8c844289cc",
+          "mode": "compare",
+          "total_H": 1,
+          "local_H": 1,
+          "executed_H": 1,
+          "history_jobs": 4,
+          "repeats": 4,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 5389892608,
+            "allocated_end": 9718955520,
+            "allocated_peak": 23308846080,
+            "reserved_end": 24274534400
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 51,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "params_after": {
+              "tensors": 51,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "outputs": {
+              "tensors": 20,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "dx": {
+              "tensors": 10,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "gradients": {
+              "tensors": 51,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "logits": {
+              "tensors": 10,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "loss": {
+              "tensors": 1,
+              "mismatches": [],
+              "bitwise_equal": true
+            }
+          },
+          "bitwise_equal": true
+        },
+        {
+          "iteration": 1,
+          "rank": 1,
+          "plan_sha256": "a7ebbeffc0dda5507760e5f5fb8ef6b8c15d4457edd24758c56a0c8c844289cc",
+          "mode": "compare",
+          "total_H": 1,
+          "local_H": 0,
+          "executed_H": 0,
+          "history_jobs": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 4068805632,
+            "allocated_end": 7340887040,
+            "allocated_peak": 21269228544,
+            "reserved_end": 24331157504
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "params_after": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "outputs": {
+              "tensors": 20,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "dx": {
+              "tensors": 20,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "gradients": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "logits": {
+              "tensors": 0,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "loss": {
+              "tensors": 0,
+              "mismatches": [],
+              "bitwise_equal": true
+            }
+          },
+          "bitwise_equal": true
+        },
+        {
+          "iteration": 1,
+          "rank": 2,
+          "plan_sha256": "a7ebbeffc0dda5507760e5f5fb8ef6b8c15d4457edd24758c56a0c8c844289cc",
+          "mode": "compare",
+          "total_H": 1,
+          "local_H": 0,
+          "executed_H": 0,
+          "history_jobs": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 4068805632,
+            "allocated_end": 7340887040,
+            "allocated_peak": 22057741312,
+            "reserved_end": 24714936320
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "params_after": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "outputs": {
+              "tensors": 20,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "dx": {
+              "tensors": 20,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "gradients": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "logits": {
+              "tensors": 0,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "loss": {
+              "tensors": 0,
+              "mismatches": [],
+              "bitwise_equal": true
+            }
+          },
+          "bitwise_equal": true
+        },
+        {
+          "iteration": 2,
+          "rank": 0,
+          "plan_sha256": "83a8e165867c4ccb7242cf1b16c2d7244715bb042bd1a3fd02bfebd1e6b4a1f4",
+          "mode": "compare",
+          "total_H": 1,
+          "local_H": 1,
+          "executed_H": 1,
+          "history_jobs": 4,
+          "repeats": 8,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 9718956032,
+            "allocated_end": 9718956544,
+            "allocated_peak": 17078589440,
+            "reserved_end": 24274534400
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 51,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "params_after": {
+              "tensors": 51,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "outputs": {
+              "tensors": 14,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "dx": {
+              "tensors": 7,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "gradients": {
+              "tensors": 51,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "logits": {
+              "tensors": 7,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "loss": {
+              "tensors": 1,
+              "mismatches": [],
+              "bitwise_equal": true
+            }
+          },
+          "bitwise_equal": true
+        },
+        {
+          "iteration": 2,
+          "rank": 1,
+          "plan_sha256": "83a8e165867c4ccb7242cf1b16c2d7244715bb042bd1a3fd02bfebd1e6b4a1f4",
+          "mode": "compare",
+          "total_H": 1,
+          "local_H": 0,
+          "executed_H": 0,
+          "history_jobs": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 7340887040,
+            "allocated_end": 7340887040,
+            "allocated_peak": 14299504640,
+            "reserved_end": 24492638208
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "params_after": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "outputs": {
+              "tensors": 14,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "dx": {
+              "tensors": 14,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "gradients": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "logits": {
+              "tensors": 0,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "loss": {
+              "tensors": 0,
+              "mismatches": [],
+              "bitwise_equal": true
+            }
+          },
+          "bitwise_equal": true
+        },
+        {
+          "iteration": 2,
+          "rank": 2,
+          "plan_sha256": "83a8e165867c4ccb7242cf1b16c2d7244715bb042bd1a3fd02bfebd1e6b4a1f4",
+          "mode": "compare",
+          "total_H": 1,
+          "local_H": 0,
+          "executed_H": 0,
+          "history_jobs": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 7340887040,
+            "allocated_end": 7340887040,
+            "allocated_peak": 14324769792,
+            "reserved_end": 24876417024
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "params_after": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "outputs": {
+              "tensors": 14,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "dx": {
+              "tensors": 14,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "gradients": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "logits": {
+              "tensors": 0,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "loss": {
+              "tensors": 0,
+              "mismatches": [],
+              "bitwise_equal": true
+            }
+          },
+          "bitwise_equal": true
+        },
+        {
+          "iteration": 3,
+          "rank": 0,
+          "plan_sha256": "f69ff4574cc53a5e1073af7f27a64ec9e24632935b9ad2ca4aeda42045293670",
+          "mode": "compare",
+          "total_H": 0,
+          "local_H": 0,
+          "executed_H": 0,
+          "history_jobs": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 9718956032,
+            "allocated_end": 9718956544,
+            "allocated_peak": 14888826880,
+            "reserved_end": 24274534400
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 51,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "params_after": {
+              "tensors": 51,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "outputs": {
+              "tensors": 10,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "dx": {
+              "tensors": 5,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "gradients": {
+              "tensors": 51,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "logits": {
+              "tensors": 5,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "loss": {
+              "tensors": 1,
+              "mismatches": [],
+              "bitwise_equal": true
+            }
+          },
+          "bitwise_equal": true
+        },
+        {
+          "iteration": 3,
+          "rank": 1,
+          "plan_sha256": "f69ff4574cc53a5e1073af7f27a64ec9e24632935b9ad2ca4aeda42045293670",
+          "mode": "compare",
+          "total_H": 0,
+          "local_H": 0,
+          "executed_H": 0,
+          "history_jobs": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 7340887040,
+            "allocated_end": 7340887040,
+            "allocated_peak": 12246987776,
+            "reserved_end": 24492638208
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "params_after": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "outputs": {
+              "tensors": 10,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "dx": {
+              "tensors": 10,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "gradients": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "logits": {
+              "tensors": 0,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "loss": {
+              "tensors": 0,
+              "mismatches": [],
+              "bitwise_equal": true
+            }
+          },
+          "bitwise_equal": true
+        },
+        {
+          "iteration": 3,
+          "rank": 2,
+          "plan_sha256": "f69ff4574cc53a5e1073af7f27a64ec9e24632935b9ad2ca4aeda42045293670",
+          "mode": "compare",
+          "total_H": 0,
+          "local_H": 0,
+          "executed_H": 0,
+          "history_jobs": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "KV_drained": true,
+          "memory": {
+            "allocated_start": 7340887040,
+            "allocated_end": 7340887040,
+            "allocated_peak": 12209313792,
+            "reserved_end": 24876417024
+          },
+          "below_memory_budget": true,
+          "categories": {
+            "params_before": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "params_after": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "outputs": {
+              "tensors": 10,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "dx": {
+              "tensors": 10,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "gradients": {
+              "tensors": 48,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "logits": {
+              "tensors": 0,
+              "mismatches": [],
+              "bitwise_equal": true
+            },
+            "loss": {
+              "tensors": 0,
+              "mismatches": [],
+              "bitwise_equal": true
+            }
+          },
+          "bitwise_equal": true
+        }
+      ],
+      "steps": [
+        {
+          "iteration": 1,
+          "ranks": 3,
+          "same_plan": true,
+          "H": 1,
+          "repeats": 4,
+          "repeats_bitwise_equal": true,
+          "allocated_peak_GiB": [
+            21.708,
+            19.809,
+            20.543
+          ],
+          "allocated_end_GiB": [
+            9.051,
+            6.837,
+            6.837
+          ],
+          "bitwise_equal": true,
+          "categories": {
+            "params_before": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "params_after": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "outputs": {
+              "tensors": 60,
+              "mismatches": 0
+            },
+            "dx": {
+              "tensors": 50,
+              "mismatches": 0
+            },
+            "gradients": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "logits": {
+              "tensors": 10,
+              "mismatches": 0
+            },
+            "loss": {
+              "tensors": 1,
+              "mismatches": 0
+            }
+          }
+        },
+        {
+          "iteration": 2,
+          "ranks": 3,
+          "same_plan": true,
+          "H": 1,
+          "repeats": 8,
+          "repeats_bitwise_equal": true,
+          "allocated_peak_GiB": [
+            15.906,
+            13.317,
+            13.341
+          ],
+          "allocated_end_GiB": [
+            9.051,
+            6.837,
+            6.837
+          ],
+          "bitwise_equal": true,
+          "categories": {
+            "params_before": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "params_after": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "outputs": {
+              "tensors": 42,
+              "mismatches": 0
+            },
+            "dx": {
+              "tensors": 35,
+              "mismatches": 0
+            },
+            "gradients": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "logits": {
+              "tensors": 7,
+              "mismatches": 0
+            },
+            "loss": {
+              "tensors": 1,
+              "mismatches": 0
+            }
+          }
+        },
+        {
+          "iteration": 3,
+          "ranks": 3,
+          "same_plan": true,
+          "H": 0,
+          "repeats": 0,
+          "repeats_bitwise_equal": true,
+          "allocated_peak_GiB": [
+            13.866,
+            11.406,
+            11.371
+          ],
+          "allocated_end_GiB": [
+            9.051,
+            6.837,
+            6.837
+          ],
+          "bitwise_equal": true,
+          "categories": {
+            "params_before": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "params_after": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "outputs": {
+              "tensors": 30,
+              "mismatches": 0
+            },
+            "dx": {
+              "tensors": 25,
+              "mismatches": 0
+            },
+            "gradients": {
+              "tensors": 147,
+              "mismatches": 0
+            },
+            "logits": {
+              "tensors": 5,
+              "mismatches": 0
+            },
+            "loss": {
+              "tensors": 1,
+              "mismatches": 0
+            }
+          }
+        }
+      ]
+    }
+  },
+  "kernel_test_pass": true,
+  "deterministic_training_pass": true,
+  "full_tensor_comparisons": 1590,
+  "later_experiments_default_mode": true
+}

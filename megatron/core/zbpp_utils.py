@@ -11,6 +11,9 @@ class WeightGradStore:
     should_split_bw = False
     cache = []
     weight_grad_queue = None
+    # Keyed work is separate so legacy FIFO users keep their exact queue ABI.
+    keyed_weight_grads = {}
+    keyed_task_keys = set()
 
     @classmethod
     def lazy_init(cls):
@@ -64,26 +67,41 @@ class WeightGradStore:
         cls.cache.append((pre_func, func))
 
     @classmethod
-    def flush(cls, chunk=0):
+    def flush(cls, chunk=0, task_key=None):
         cls.lazy_init()
         if not cls.split_bw():
             assert len(cls.cache) == 0
             return
-        cls.weight_grad_queue[chunk].append(cls.cache)
+        if task_key is None:
+            cls.weight_grad_queue[chunk].append(cls.cache)
+        else:
+            key = (chunk, task_key)
+            if key in cls.keyed_task_keys:
+                raise RuntimeError(f'duplicate deferred W task: {key}')
+            cls.keyed_task_keys.add(key)
+            cls.keyed_weight_grads[key] = cls.cache
         cls.cache = []
 
     @classmethod
     def queue_size(cls, chunk=0):
         cls.lazy_init()
-        return len(cls.weight_grad_queue[chunk])
+        return len(cls.weight_grad_queue[chunk]) + sum(
+            key[0] == chunk for key in cls.keyed_weight_grads
+        )
 
     @classmethod
     def pop(cls, chunk=0, pop_num=None, timers=None,
-            progress_tracker=None, progress_parent=None):
+            progress_tracker=None, progress_parent=None, task_key=None):
         cls.lazy_init()
         if pop_num is None:
             pop_num = 1
-        available = len(cls.weight_grad_queue[chunk])
+        if task_key is not None:
+            if pop_num != 1:
+                raise ValueError('keyed W requires pop_num=1')
+            key = (chunk, task_key)
+            if key not in cls.keyed_weight_grads:
+                raise RuntimeError(f'missing or already consumed deferred W task: {key}')
+        available = 1 if task_key is not None else len(cls.weight_grad_queue[chunk])
         if pop_num < 0 or pop_num > available:
             rank = parallel_state.get_pipeline_model_parallel_rank()
             raise RuntimeError(
@@ -101,7 +119,8 @@ class WeightGradStore:
             timer.start()
         wgrad_index = 0
         for _ in range(pop_num):
-            stored_grads = cls.weight_grad_queue[chunk].popleft()
+            stored_grads = (cls.keyed_weight_grads.pop(key) if task_key is not None
+                            else cls.weight_grad_queue[chunk].popleft())
             for pre_func, func in stored_grads:
                 progress_token = None
                 if progress_tracker is not None:
@@ -127,6 +146,8 @@ class WeightGradStore:
     @classmethod
     def clear(cls, chunk=0, timers=None):
         cls.lazy_init()
+        if any(key[0] == chunk for key in cls.keyed_weight_grads):
+            raise RuntimeError('keyed W tasks must be consumed explicitly by task key')
         cleared = 0
         while cls.weight_grad_queue[chunk]:
             cleared += cls.pop(chunk=chunk, pop_num=1, timers=timers)
@@ -135,6 +156,7 @@ class WeightGradStore:
     @classmethod
     def assert_empty(cls):
         assert len(cls.cache) == 0, "deferred weight-gradient cache is not empty"
+        assert not cls.keyed_weight_grads, 'keyed deferred weight-gradient store is not empty'
         if cls.weight_grad_queue is None:
             return
         rank = parallel_state.get_pipeline_model_parallel_rank()
@@ -143,3 +165,4 @@ class WeightGradStore:
                 f"deferred weight-gradient queue is not empty: "
                 f"rank={rank}, chunk={chunk}, size={len(queue)}"
             )
+        cls.keyed_task_keys.clear()

@@ -1,0 +1,59 @@
+{
+  "branch": "cuiym-dspp",
+  "head": "9550175c1d14ab309e96f090142e105b1a8501fd",
+  "index_empty": true,
+  "image": "nvcr.io/nvidia/pytorch:26.01-py3",
+  "image_id": "sha256:5a62f25ce67e6f56a137c28e3be0161cba51aa06142a34e6670d247f075e9ada",
+  "torch": "2.10.0a0+a36e1d39eb.nv26.01.42222806",
+  "flash_attention": "2.7.4.post1",
+  "gpu": "3 x L40",
+  "pythonpath": "/workspace/tmp/dspp-w-diag-20261023/compat:/workspace/src/venvs/megatron/lib/python3.12/site-packages:/opt/dspp-existing-deps",
+  "raw_root": "/home/cuiym/tmp/dspp-w-diag-20261023",
+  "data_files": [
+    {
+      "path": "docs/assets/pp-scheduling/w-order-diagnosis-20261023/README.md",
+      "bytes": 7507,
+      "sha256": "efa589552898882356ef0e187cc83feb4de5e34a7d248616104005cea707b182"
+    },
+    {
+      "path": "docs/assets/pp-scheduling/w-order-diagnosis-20261023/analysis.json",
+      "bytes": 70810,
+      "sha256": "e3f175a2e80fbe3d175e79d182579c5de7dc937a3ae4ba4c654db256ec7ebe9f"
+    },
+    {
+      "path": "docs/assets/pp-scheduling/w-order-diagnosis-20261023/commands.json",
+      "bytes": 10147,
+      "sha256": "a0c3df42e08f65eac0ee65072496aa72ce8e372d048f54374f8fcc65736fc756"
+    },
+    {
+      "path": "docs/assets/pp-scheduling/w-order-diagnosis-20261023/cpu-tests.log",
+      "bytes": 2842,
+      "sha256": "cfc76ed9c02dd6113146e0ac0ba5fa213d8017fc9245ce3a17fdb126be5bde2f"
+    },
+    {
+      "path": "docs/assets/pp-scheduling/w-order-diagnosis-20261023/optimizer-replay.json",
+      "bytes": 3769,
+      "sha256": "a1169cdbfc1c8860270acf0e04c94d04a9b20f0b2411c8ba20a004755e692d13"
+    },
+    {
+      "path": "docs/assets/pp-scheduling/w-order-diagnosis-20261023/reduce-replay.json",
+      "bytes": 1237,
+      "sha256": "847032095f347bb4fa004e73247a84d053811851d0bd5d3803939a4c5ae48a2e"
+    },
+    {
+      "path": "tools/diagnose_dspp_w_order.py",
+      "bytes": 12888,
+      "sha256": "3995942e375584ab1e9de54fb8bfa00c68779810cd6080ea4340b298ce6f165f"
+    },
+    {
+      "path": "tools/analyze_dspp_w_order.py",
+      "bytes": 10067,
+      "sha256": "1e90b471099a8c7fe238a334c2fd301ee7b5a49859a07800910db44d0fa18cc3"
+    },
+    {
+      "path": "tools/replay_dspp_w_optimizer.py",
+      "bytes": 3584,
+      "sha256": "93cd70f2437a5fc5b31261013c78827614f3a011651066fa41e14eb1de8ac291"
+    }
+  ]
+}

@@ -37,6 +37,13 @@ from megatron.core.pipeline_parallel.slice_v import (
     build_slice_v_schedule,
 )
 from megatron.core.pipeline_parallel.dspp_timeline import DsppTimelineRecorder
+from megatron.core.pipeline_parallel.dspp_plan import (
+    message_key as plan_message_key,
+    receive_orders,
+    validate_plan,
+    preserves_retention_envelope,
+)
+from megatron.core.pipeline_parallel.dspp_plan_runtime import build_runtime_plan, build_distributed_b_plan
 from megatron.core.pipeline_parallel.dspp_progress import (
     DsppGpuProgressTracker,
     dspp_communication_buffer_count,
@@ -178,11 +185,11 @@ def get_forward_backward_func(slicing=False, variable_slicing=False, dspp=False)
                     "single-stage DSPP does not support virtual pipeline chunks"
                 )
             return forward_backward_dspp_no_pipelining
-        if pipeline_model_parallel_size == 3 and (
+        if pipeline_model_parallel_size > 1 and (
             parallel_state.get_virtual_pipeline_model_parallel_world_size() == 2
         ):
             return pipelining_with_dspp_stage_local_v
-        raise NotImplementedError("distributed DSPP requires PP=3 and VPP=2")
+        raise NotImplementedError("distributed DSPP requires PP>1 and VPP=2")
     if pipeline_model_parallel_size > 1:
         if parallel_state.get_virtual_pipeline_model_parallel_world_size() is not None:
             if variable_slicing:
@@ -1599,8 +1606,11 @@ class _DsppVTaskBatch:
                 )[0]
         return None if self.is_loss_stage else output_tensor
 
-    def backward(self, split, output_tensor_grad):
-        if self.kv_state.history_dkv_after_dx:
+    def backward(self, split, output_tensor_grad, task_key=None):
+        physical_id = self.training_batch.physical_microbatches[split].meta.microbatch_id
+        self.kv_state.check_history_consumers(physical_id)
+        deferred = self.kv_state.task_after_dx(physical_id)
+        if deferred:
             self.kv_state.begin_backward_task(
                 self.training_batch.physical_microbatches[split].meta.microbatch_id
             )
@@ -1612,8 +1622,8 @@ class _DsppVTaskBatch:
             input_tensor_grad = self.backward_func(
                 input_tensor, output_tensor, output_tensor_grad
             )
-            WeightGradStore.flush(chunk=self.chunk)
-        if self.kv_state.history_dkv_after_dx:
+            WeightGradStore.flush(chunk=self.chunk, task_key=task_key)
+        if deferred:
             self.kv_state.mark_dx_ready(
                 self.training_batch.physical_microbatches[split].meta.microbatch_id
             )
@@ -1624,12 +1634,13 @@ class _DsppVTaskBatch:
             self.training_batch.physical_microbatches[split].meta.microbatch_id
         )
 
-    def weight(self, progress_tracker=None, progress_parent=None):
+    def weight(self, progress_tracker=None, progress_parent=None, task_key=None):
         WeightGradStore.pop(
             chunk=self.chunk,
             pop_num=1,
             progress_tracker=progress_tracker,
             progress_parent=progress_parent,
+            task_key=task_key,
         )
 
 
@@ -1674,6 +1685,7 @@ def pipelining_with_dspp_stage_local_v(*,
                                        post_p2p_async_func: Optional[Callable] = None,
                                        offload_ratio: float = 0,
                                        offload_delay_to_next_stage: bool = False,
+                                       dspp_plan=None,
                                        ):
     """Run DSPP V-ZB from the current stage's local F/B/W event stream.
 
@@ -1699,52 +1711,147 @@ def pipelining_with_dspp_stage_local_v(*,
 
     pipeline_size = parallel_state.get_pipeline_model_parallel_world_size()
     stage = parallel_state.get_pipeline_model_parallel_rank()
-    if pipeline_size != 3:
-        raise ValueError("distributed DSPP currently requires PP=3")
+    if pipeline_size <= 1:
+        raise ValueError("distributed DSPP requires PP>1")
     WeightGradStore.assert_supported()
+    WeightGradStore.assert_empty()
 
-    logical_batches = []
-    for _ in range(num_microbatches):
-        if timers is not None:
-            timers("batch-generator", log_level=2).start()
-        training_batch, loss_func = get_batch_func(data_iterator)
-        if timers is not None:
-            timers("batch-generator").stop()
-        if not isinstance(training_batch, DsppTrainingBatch):
-            raise TypeError("DSPP get_batch_func must return DsppTrainingBatch")
-        logical_batches.append((training_batch, loss_func))
+    prefetch = data_iterator if hasattr(data_iterator, 'acquire_iteration') and not forward_only else None
+    fast_prefetch = (prefetch is not None
+                     and not getattr(get_args(), 'dspp_prefetch_full_validation', False))
+    if fast_prefetch:
+        args = get_args()
+        if dspp_plan is not None:
+            raise ValueError('prefetch cannot be combined with an external execution plan')
+        logical_batches, ordering, schedule_split_counts, execution_plan, local_plan_hash = (
+            prefetch.acquire_execution(args.curr_iteration + 1, num_microbatches,
+                args.consumed_train_samples, dtype, tensor_shape, micro_seq_length))
+        adaptive_layout = None
+        schedule_groups = ordering.schedule_groups
+        split_counts = [len(group) for group in schedule_groups]
+        total_valid_tokens = sum(batch.valid_token_count for batch, _ in logical_batches)
+        schedules = execution_plan.schedules
+    else:
+        logical_batches = []
+        if prefetch is not None:
+            args = get_args()
+            if dspp_plan is not None:
+                raise ValueError('prefetch cannot be combined with an external execution plan')
+            cpu_batches, dspp_plan = prefetch.acquire_iteration(
+                args.curr_iteration + 1, num_microbatches, args.consumed_train_samples)
+            prefetch.active['h2d_started_at'] = time.perf_counter()
+            logical_batches = [prefetch.materialize(batch) for batch in cpu_batches]
+            copy_ready = torch.cuda.Event()
+            copy_ready.record()
+            torch.cuda.current_stream().wait_event(copy_ready)
+            prefetch.active['h2d_queued_at'] = time.perf_counter()
+            del cpu_batches
+        else:
+            for _ in range(num_microbatches):
+                if timers is not None:
+                    timers("batch-generator", log_level=2).start()
+                training_batch, loss_func = get_batch_func(data_iterator)
+                if timers is not None:
+                    timers("batch-generator").stop()
+                if not isinstance(training_batch, DsppTrainingBatch):
+                    raise TypeError("DSPP get_batch_func must return DsppTrainingBatch")
+                logical_batches.append((training_batch, loss_func))
 
-    micro_seq_length, adaptive_layout = _prepare_adaptive_dspp_chunk(
-        logical_batches,
-        micro_seq_length,
-        pipeline_size=pipeline_size,
-        dtype=dtype,
-    )
-    for training_batch, _ in logical_batches:
-        if training_batch.plan.chunk_size != micro_seq_length:
-            raise ValueError(
-                "DSPP training batch chunk size does not match micro_seq_length"
-            )
+        micro_seq_length, adaptive_layout = _prepare_adaptive_dspp_chunk(
+            logical_batches,
+            micro_seq_length,
+            pipeline_size=pipeline_size,
+            dtype=dtype,
+        )
+        for training_batch, _ in logical_batches:
+            if training_batch.plan.chunk_size != micro_seq_length:
+                raise ValueError(
+                    "DSPP training batch chunk size does not match micro_seq_length"
+                )
 
-    total_valid_tokens = sum(batch.valid_token_count for batch, _ in logical_batches)
-    if total_valid_tokens <= 0:
-        raise RuntimeError("DSPP iteration contains no valid LM targets")
-    args = get_args()
-    ordering = build_dspp_ordering_plan(
-        [batch for batch, _ in logical_batches],
-        pp_degree=pipeline_size,
-        mode=getattr(args, 'dspp_microbatch_order', 'warmup-short-steady-long'),
-        # Execution-cost calibration is consumed by chunk planning only.  It
-        # must not silently change the ordering policy in a chunk-size
-        # ablation; ordering has its own explicit profile option.
-        profile_path=getattr(args, 'dspp_order_profile', None),
-    )
-    schedule_groups = ordering.schedule_groups
-    split_counts = [len(group) for group in schedule_groups]
-    schedule_split_counts = _pad_dspp_v_split_counts(split_counts, pipeline_size)
-    schedules, _ = build_slice_v_schedule(
-        pipeline_size, len(schedule_split_counts), schedule_split_counts
-    )
+        total_valid_tokens = sum(batch.valid_token_count for batch, _ in logical_batches)
+        if total_valid_tokens <= 0:
+            raise RuntimeError("DSPP iteration contains no valid LM targets")
+        args = get_args()
+        ordering = build_dspp_ordering_plan(
+            [batch for batch, _ in logical_batches],
+            pp_degree=pipeline_size,
+            mode=getattr(args, 'dspp_microbatch_order', 'warmup-short-steady-long'),
+            # Execution-cost calibration is consumed by chunk planning only.  It
+            # must not silently change the ordering policy in a chunk-size
+            # ablation; ordering has its own explicit profile option.
+            profile_path=getattr(args, 'dspp_order_profile', None),
+        )
+        schedule_groups = ordering.schedule_groups
+        split_counts = [len(group) for group in schedule_groups]
+        schedule_split_counts = _pad_dspp_v_split_counts(split_counts, pipeline_size)
+        schedules, _ = build_slice_v_schedule(
+            pipeline_size, len(schedule_split_counts), schedule_split_counts
+        )
+        execution_plan = None
+        if dspp_plan is not None or getattr(args, 'dspp_schedule', 'template') != 'legacy':
+            plan_error = None
+            local_plan_hash = None
+            try:
+                builder = (partial(build_distributed_b_plan, group=parallel_state.get_pipeline_model_parallel_group_gloo())
+                           if dspp_plan is None and getattr(args, 'dspp_schedule', 'template') in ('b', 'c')
+                           and not forward_only else build_runtime_plan)
+                reference_plan, execution_plan = builder(
+                    args, schedules, schedule_split_counts, schedule_groups,
+                    [batch for batch, _ in logical_batches], dtype, tensor_shape,
+                    micro_seq_length, forward_only=forward_only, optimize=dspp_plan is None,
+                    explicit_history=dspp_plan is not None and dspp_plan.schema_version == 2,
+                )
+                if dspp_plan is not None:
+                    if prefetch is not None and dspp_plan.binding != reference_plan.binding:
+                        if (dspp_plan.binding.input_hash != reference_plan.binding.input_hash
+                                or dspp_plan.binding.iteration_id != reference_plan.binding.iteration_id):
+                            raise ValueError('prefetched CPU/GPU input metadata mismatch')
+                        # Rebind to this input's current contracts, never a stale
+                        # result or a previous iteration's task list.
+                        dspp_plan = reference_plan
+                        prefetch.active['fallback_reason'] = 'commit-contract-changed'
+                    if dspp_plan.algorithm == 'A':
+                        if getattr(args, 'dspp_split_attention_backward', False):
+                            raise ValueError('P1 A cannot execute split attention backward')
+                        if getattr(args, 'dspp_auto_chunk_size', False):
+                            raise ValueError('P1 A requires fixed chunk size')
+                        if not preserves_retention_envelope(dspp_plan, reference_plan):
+                            raise ValueError('external plan exceeds P1 W retention envelope')
+                    execution_plan = dspp_plan
+                counted_memory = getattr(args, '_dspp_counted_memory', None)
+                if counted_memory is not None:
+                    args._dspp_memory_plan = counted_memory.check(execution_plan)
+                    if torch.cuda.get_device_name() != counted_memory.profile['device_name']:
+                        raise ValueError('counted memory device mismatch')
+                    if counted_memory.stages[stage]['physical_bytes'] > torch.cuda.get_device_properties(
+                            torch.cuda.current_device()).total_memory:
+                        raise ValueError('counted memory profile exceeds device capacity')
+                    if torch.cuda.memory_allocated() > counted_memory.stages[stage]['resident_bytes']:
+                        raise ValueError('counted resident allowance below pre-execution allocation')
+                    free_bytes, _ = torch.cuda.mem_get_info()
+                    reusable = torch.cuda.memory_reserved() - torch.cuda.memory_allocated()
+                    extra = max(0, args._dspp_memory_plan['total_peak_bytes'][stage]
+                                - torch.cuda.memory_allocated())
+                    if extra + counted_memory.stages[stage]['reserve_bytes'] > free_bytes + reusable:
+                        raise ValueError('counted capacity unavailable at plan commit')
+                validate_plan(execution_plan, reference_plan, binding=reference_plan.binding)
+                local_plan_hash = execution_plan.plan_hash
+            except Exception as exc:
+                plan_error = f'{type(exc).__name__}: {exc}'
+            # Validate agreement before launching any tasks or protocol threads.
+            outcomes = [None] * pipeline_size
+            dist.all_gather_object(outcomes, (plan_error, local_plan_hash),
+                                   group=parallel_state.get_pipeline_model_parallel_group_gloo())
+            if any(error is not None for error, _ in outcomes):
+                raise RuntimeError(f'DSPP plan rejected before execution: {outcomes}')
+            hashes = [value for _, value in outcomes]
+            if len(set(hashes)) != 1:
+                raise RuntimeError(f'DSPP plan disagreement before execution: {hashes}')
+            args._dspp_last_schedule_plan = execution_plan.to_dict()
+            schedules = execution_plan.schedules
+            if prefetch is not None:
+                prefetch.commit(execution_plan, plan_hash=local_plan_hash)
     schedule = schedules[stage]
     if forward_only:
         schedule = [node for node in schedule if node.kind == 'F']
@@ -1763,6 +1870,8 @@ def pipelining_with_dspp_stage_local_v(*,
         deallocate_pipeline_outputs=False
     )
 
+    slot_to_task = {(g, s): task for g, group in enumerate(schedule_groups)
+                    for s, task in enumerate(group)}
     task_batches = {}
     for logical_id, (training_batch, _loss_func) in enumerate(logical_batches):
         for chunk in range(2):
@@ -1777,13 +1886,17 @@ def pipelining_with_dspp_stage_local_v(*,
                 split_attention_backward=getattr(args, 'dspp_split_attention_backward', False),
                 history_dkv_after_dx=getattr(args, 'dspp_history_dkv_after_dx', False),
             )
+            if execution_plan is not None and execution_plan.schema_version == 2:
+                selected = {slot_to_task[n.microbatch, n.split][1] for n in execution_plan.schedules[stage]
+                            if n.kind == 'D' and n.chunk == chunk
+                            and slot_to_task[n.microbatch, n.split][0] == logical_id}
+                task_batches[logical_id, chunk].kv_state.configure_task_modes(
+                    tuple(p.meta for p in training_batch.physical_microbatches), selected)
 
-    slot_to_task = {
-        (group_id, split): task
-        for group_id, group in enumerate(schedule_groups)
-        for split, task in enumerate(group)
-    }
     ordering_metadata = {
+        'plan_hash': local_plan_hash if execution_plan is not None else None,
+        'plan_algorithm': execution_plan.algorithm if execution_plan is not None else 'legacy',
+        'plan_fallback': execution_plan.fallback_reason if execution_plan is not None else '',
         'mode': getattr(args, 'dspp_microbatch_order', 'warmup-short-steady-long'),
         'v_layer_layout': getattr(args, 'dspp_v_layer_layout', 'balanced'),
         'cost_source': ordering.cost_source,
@@ -1799,6 +1912,8 @@ def pipelining_with_dspp_stage_local_v(*,
         stage=stage,
         ordering=ordering_metadata,
     )
+    if execution_plan is not None and execution_plan.schema_version == 2:
+        timeline.backward_mode = 'selective'
     progress = DsppGpuProgressTracker(stage)
     if timeline.enabled and stage == 0:
         model_layout = {}
@@ -1832,33 +1947,18 @@ def pipelining_with_dspp_stage_local_v(*,
             model_layout=model_layout,
         )
 
-    def message_key(node):
-        return (node.kind, node.chunk, node.microbatch, node.split)
-
-    def incoming_sender(target_stage, node):
-        if node.kind == 'F' and node.chunk == 0 and target_stage > 0:
-            return target_stage - 1
-        if node.kind == 'F' and node.chunk == 1 and target_stage < pipeline_size - 1:
-            return target_stage + 1
-        if node.kind == 'B' and node.chunk == 1 and target_stage > 0:
-            return target_stage - 1
-        if node.kind == 'B' and node.chunk == 0 and target_stage < pipeline_size - 1:
-            return target_stage + 1
-        return None
+    message_key = plan_message_key
 
     # A sender may compute messages in a different F/B interleave than its
     # receiver consumes them. Queue ready tensors and submit them in the
     # receiver's local order; this is lane-local ordering, not global timing.
+    wire_schedules = ([tuple(n for n in seq if n.kind == 'F') for seq in schedules]
+                      if forward_only else schedules)
+    lanes = receive_orders(wire_schedules)
     expected_sends = {}
     for peer in (stage - 1, stage + 1):
         if 0 <= peer < pipeline_size:
-            peer_schedule = schedules[peer]
-            if forward_only:
-                peer_schedule = [node for node in peer_schedule if node.kind == 'F']
-            expected_sends[peer] = [
-                message_key(node) for node in peer_schedule
-                if incoming_sender(peer, node) == stage
-            ]
+            expected_sends[peer] = lanes[(stage, peer)]
     send_cursor = {peer: 0 for peer in expected_sends}
     ready_sends = {peer: {} for peer in expected_sends}
     send_index_by_key = {
@@ -1938,18 +2038,10 @@ def pipelining_with_dspp_stage_local_v(*,
         thread.start()
         credit_threads.append(thread)
 
-    local_receive_schedule = schedule
-    if forward_only:
-        local_receive_schedule = [
-            node for node in local_receive_schedule if node.kind == 'F'
-        ]
     expected_receives = {}
     for peer in (stage - 1, stage + 1):
         if 0 <= peer < pipeline_size:
-            expected_receives[peer] = [
-                message_key(node) for node in local_receive_schedule
-                if incoming_sender(stage, node) == peer
-            ]
+            expected_receives[peer] = lanes[(peer, stage)]
     recv_cursor = {peer: 0 for peer in expected_receives}
     recv_post_cursor = {peer: 0 for peer in expected_receives}
     pending_receives = {peer: {} for peer in expected_receives}
@@ -2214,6 +2306,31 @@ def pipelining_with_dspp_stage_local_v(*,
 
     local_forward = {}
     local_backward = {}
+    memory_audit = None
+    if getattr(args, 'dspp_memory_audit_dir', None):
+        from megatron.core.pipeline_parallel.dspp_memory import MemoryAudit
+        memory_audit = MemoryAudit(args.dspp_memory_audit_dir, stage,
+                                   int(getattr(args, 'curr_iteration', -1)) + 1)
+
+    def audit_memory(label):
+        if memory_audit is not None:
+            memory_audit.snapshot(label, {
+                'resident-model': model,
+                'input': [batch for batch, _ in logical_batches],
+                'F-activations': [(b.inputs, b.outputs, b.output_grads) for b in task_batches.values()],
+                'KV-pending-H': [b.kv_state for b in task_batches.values()],
+                'W-closures': (WeightGradStore.cache, WeightGradStore.weight_grad_queue,
+                               WeightGradStore.keyed_weight_grads),
+                'local-boundary': (local_forward, local_backward),
+                'send': (ready_sends, inflight_sends),
+                'recv': pending_receives,
+            })
+
+    audit_memory('start')
+    counted_memory = (getattr(args, '_dspp_counted_memory', None)
+                      if execution_plan is not None and not forward_only else None)
+    if counted_memory is not None:
+        torch.cuda.reset_peak_memory_stats()
     total_loss = None
     local_peak_live_tokens = (
         estimate_stage_peak_live_slots(schedule, schedule_groups)
@@ -2222,6 +2339,8 @@ def pipelining_with_dspp_stage_local_v(*,
     observation_baseline = _begin_dspp_activation_observation(
         adaptive_layout is not None and not forward_only
     )
+    if prefetch is not None:
+        prefetch.mark_compute()
     for node in schedule:
         fill_receive_lookaheads()
         flush_ready_sends()
@@ -2270,6 +2389,10 @@ def pipelining_with_dspp_stage_local_v(*,
                         submit_send(stage - 1, node, tensor)
             continue
         logical_id, physical_id = task_id
+        weight_task_key = (
+            (execution_plan.binding.iteration_id, logical_id, physical_id, node.chunk, stage)
+            if execution_plan is not None else None
+        )
         task_batch = task_batches[(logical_id, node.chunk)]
         if timeline.recording:
             physical_meta = task_batch.training_batch.physical_microbatches[physical_id].meta
@@ -2305,7 +2428,7 @@ def pipelining_with_dspp_stage_local_v(*,
                 contribution = task_batch.loss_contribution
                 total_loss = contribution if total_loss is None else total_loss + contribution
                 task_batch.loss_contribution = None
-        elif node.kind == 'B':
+        elif node.kind in ('B', 'D'):
             if node.chunk == 1:
                 output_grad = None if stage == 0 else receive(stage - 1, node)
             else:
@@ -2315,15 +2438,15 @@ def pipelining_with_dspp_stage_local_v(*,
                     else receive(stage + 1, node)
                 )
             progress_token = progress.begin_compute(
-                f'B{node.chunk}', node, task_id
+                f'{node.kind}{node.chunk}', node, task_id
             )
             if timeline.recording:
                 with timeline.task(
                     task_kind, task_id, physical_meta, chunk=node.chunk
                 ):
-                    input_grad = task_batch.backward(physical_id, output_grad)
+                    input_grad = task_batch.backward(physical_id, output_grad, weight_task_key)
             else:
-                input_grad = task_batch.backward(physical_id, output_grad)
+                input_grad = task_batch.backward(physical_id, output_grad, weight_task_key)
             progress.end_compute(progress_token)
             if node.chunk == 1:
                 if stage == pipeline_size - 1:
@@ -2333,10 +2456,11 @@ def pipelining_with_dspp_stage_local_v(*,
             elif stage > 0:
                 submit_send(stage - 1, node, input_grad)
             # The complete stage dx is now published to the existing local/P2P
-            # boundary. H is a separate task, immediately next on this stream;
-            # no F/B/W task may consume historical gradients before it finishes.
-            if task_batch.kv_state.history_dkv_after_dx:
-                if task_batch.kv_state.pending_history_count:
+            # boundary. Legacy after-dx runs H here; explicit D/H plans dispatch
+            # it at its own slot, before any dependent history consumer.
+            if (node.kind == 'B' and task_batch.kv_state.task_after_dx(physical_id)):
+                audit_memory(f'D{node.chunk}/{task_id}')
+                if task_batch.kv_state.history_job_count(physical_id):
                     history_kind = f'H{node.chunk}'
                     history_token = progress.begin_compute(history_kind, node, task_id)
                     if timeline.recording:
@@ -2347,6 +2471,14 @@ def pipelining_with_dspp_stage_local_v(*,
                     progress.end_compute(history_token)
                 else:
                     task_batch.history(physical_id)
+        elif node.kind == 'H':
+            history_token = progress.begin_compute(f'H{node.chunk}', node, task_id)
+            if timeline.recording:
+                with timeline.task(task_kind, task_id, physical_meta, chunk=node.chunk):
+                    task_batch.history(physical_id)
+            else:
+                task_batch.history(physical_id)
+            progress.end_compute(history_token)
         elif node.kind == 'W':
             progress_token = progress.begin_compute(
                 f'W{node.chunk}', node, task_id
@@ -2356,11 +2488,15 @@ def pipelining_with_dspp_stage_local_v(*,
                 with timeline.task(
                     task_kind, task_id, physical_meta, chunk=node.chunk
                 ):
-                    task_batch.weight(wgrad_progress, progress_token)
+                    task_batch.weight(wgrad_progress, progress_token, weight_task_key)
             else:
-                task_batch.weight(wgrad_progress, progress_token)
+                task_batch.weight(wgrad_progress, progress_token, weight_task_key)
             progress.end_compute(progress_token)
 
+        audit_memory(f'{node.kind}{node.chunk}/{task_id}')
+
+    if prefetch is not None:
+        prefetch.mark_compute(finished=True)
     while any(
         send_cursor[peer] != len(expected_sends[peer])
         for peer in expected_sends
@@ -2390,10 +2526,20 @@ def pipelining_with_dspp_stage_local_v(*,
         request.wait()
     debug_p2p('all-sends-complete')
 
+    if local_forward or local_backward:
+        raise RuntimeError('DSPP local V boundary state was not drained')
+    for peer in expected_receives:
+        if recv_cursor[peer] != len(expected_receives[peer]) or pending_receives[peer]:
+            raise RuntimeError(f'DSPP has unconsumed receives from peer stage {peer}')
+    if any(ready_sends.values()):
+        raise RuntimeError('DSPP has queued payloads after all sends completed')
+
     for task_batch in task_batches.values():
         if forward_only:
             task_batch.kv_state.clear()
         else:
+            if task_batch.inputs or task_batch.outputs or task_batch.output_grads:
+                raise RuntimeError('DSPP task activation/gradient state was not drained')
             task_batch.kv_state.finish_iteration()
     if not forward_only:
         WeightGradStore.assert_empty()
@@ -2404,6 +2550,10 @@ def pipelining_with_dspp_stage_local_v(*,
     scheduled_tasks = sum(schedule_split_counts)
     if stage == 0:
         args._dspp_last_iteration_metrics = {
+            'schedule_algorithm': execution_plan.algorithm if execution_plan is not None else 'legacy',
+            'schedule_fallback': execution_plan.fallback_reason if execution_plan is not None else '',
+            'schedule_reference_ms': execution_plan.reference_ms if execution_plan is not None else 0.0,
+            'schedule_predicted_ms': execution_plan.predicted_ms if execution_plan is not None else 0.0,
             'valid_tokens': total_valid_tokens,
             'physical_microbatches': real_tasks,
             'physical_token_capacity': real_tasks * micro_seq_length,
@@ -2414,6 +2564,33 @@ def pipelining_with_dspp_stage_local_v(*,
         if adaptive_layout is not None:
             args._dspp_last_iteration_metrics.update(args._dspp_chunk_selection)
     timeline.finish()
+    if memory_audit is not None:
+        audit_memory('drained')
+        memory_audit.finish()
+    if counted_memory is not None:
+        # Tasks and communication are drained on every rank before comparing;
+        # no per-task synchronization or Python tensor walks are introduced.
+        import json
+        from pathlib import Path
+        predicted = args._dspp_memory_plan
+        allocated = torch.cuda.max_memory_allocated()
+        report = dict(predicted, stage=stage, iteration=execution_plan.binding.iteration_id,
+                      plan_hash=local_plan_hash, algorithm=execution_plan.algorithm,
+                      fallback=execution_plan.fallback_reason,
+                      observed_allocated_bytes=allocated,
+                      observed_reserved_bytes=torch.cuda.max_memory_reserved(),
+                      observed_within_bound=allocated <= predicted['total_peak_bytes'][stage])
+        directory = getattr(args, 'dspp_memory_report_dir', None)
+        if directory:
+            path = Path(directory)
+            path.mkdir(parents=True, exist_ok=True)
+            (path / f'iteration_{report["iteration"]:06d}_stage_{stage}.json').write_text(
+                json.dumps(report, indent=2))
+        outcomes = [None] * pipeline_size
+        dist.all_gather_object(outcomes, report['observed_within_bound'],
+                              group=parallel_state.get_pipeline_model_parallel_group_gloo())
+        if not all(outcomes):
+            raise RuntimeError(f'DSPP counted memory bound exceeded: {outcomes}')
     progress.stop()
     forward_data_store = []
     if stage == 0 and total_loss is not None:

@@ -1,0 +1,566 @@
+{
+  "model": {
+    "layers": 24,
+    "hidden": 2048,
+    "ffn": 5504,
+    "attention_heads": 16,
+    "dtype": "BF16",
+    "pp": 3,
+    "vpp": 2,
+    "chunk": 2048,
+    "micro_batch": 4,
+    "global_batch": 8,
+    "initial_lr": 0.001
+  },
+  "input": {
+    "source": "/home/cuiym/tmp/dspp-a-performance-20261023/data/seed11",
+    "sampler": "/home/cuiym/src/InfiniPipe-code/scripts/generate_dspp_compare_lengths.py",
+    "valid_sequence_lengths": [
+      [
+        767,
+        767,
+        13567,
+        767,
+        767,
+        1279,
+        767,
+        767
+      ],
+      [
+        767,
+        3839,
+        1023,
+        767,
+        767,
+        2559,
+        1023,
+        767
+      ],
+      [
+        1279,
+        1279,
+        767,
+        1023,
+        767,
+        767,
+        1279,
+        767
+      ]
+    ],
+    "valid_tokens": 38888
+  },
+  "arms": {
+    "reference": {
+      "returncode": 0,
+      "elapsed_seconds": 74.00959753990173,
+      "steps": [
+        {
+          "iteration": 1,
+          "selected_H": 0,
+          "feedback": null,
+          "allocated_GiB": [
+            22.07377815246582,
+            19.792872428894043,
+            20.105960845947266
+          ],
+          "predicted_GiB": [
+            36.59312438964844,
+            32.14677429199219,
+            32.41728210449219
+          ]
+        },
+        {
+          "iteration": 2,
+          "selected_H": 0,
+          "feedback": null,
+          "allocated_GiB": [
+            15.646926879882812,
+            12.911155700683594,
+            12.906408309936523
+          ],
+          "predicted_GiB": [
+            22.26995086669922,
+            19.09911346435547,
+            19.080589294433594
+          ]
+        },
+        {
+          "iteration": 3,
+          "selected_H": 0,
+          "feedback": null,
+          "allocated_GiB": [
+            13.866300582885742,
+            11.405896186828613,
+            11.37080192565918
+          ],
+          "predicted_GiB": [
+            19.04632568359375,
+            16.278778076171875,
+            16.20556640625
+          ]
+        }
+      ],
+      "category_max": {},
+      "diagnostic_only": false,
+      "numeric_reports": 9
+    },
+    "fixture": {
+      "returncode": 0,
+      "elapsed_seconds": 286.341365814209,
+      "steps": [
+        {
+          "iteration": 1,
+          "selected_H": 0,
+          "feedback": {
+            "accepted": false,
+            "reason": "feedback-budget-unavailable",
+            "passes": 0,
+            "withdraw": false
+          },
+          "allocated_GiB": [
+            21.71585178375244,
+            19.14249324798584,
+            20.550204277038574
+          ],
+          "predicted_GiB": [
+            35.78684997558594,
+            31.284591674804688,
+            32.99540710449219
+          ]
+        },
+        {
+          "iteration": 2,
+          "selected_H": 0,
+          "feedback": {
+            "accepted": false,
+            "reason": "no-makespan-improvement",
+            "passes": 1,
+            "withdraw": false,
+            "seed_ms": 274.0,
+            "candidate_ms": 274.0,
+            "selected_count": 0
+          },
+          "allocated_GiB": [
+            15.646926879882812,
+            13.356390953063965,
+            13.340981483459473
+          ],
+          "predicted_GiB": [
+            22.26995086669922,
+            19.66252899169922,
+            19.658714294433594
+          ]
+        },
+        {
+          "iteration": 3,
+          "selected_H": 0,
+          "feedback": {
+            "accepted": false,
+            "reason": "feedback-budget-unavailable",
+            "passes": 0,
+            "withdraw": false
+          },
+          "allocated_GiB": [
+            13.85860538482666,
+            11.385420799255371,
+            11.371789932250977
+          ],
+          "predicted_GiB": [
+            19.04632568359375,
+            16.278778076171875,
+            16.20458984375
+          ]
+        }
+      ],
+      "category_max": {
+        "params_before": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "gradients": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "params_after": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "outputs": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "dx": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "logits": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "loss": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        }
+      },
+      "diagnostic_only": false,
+      "numeric_reports": 9
+    },
+    "fixture-targeted": {
+      "returncode": 1,
+      "elapsed_seconds": 61.87842106819153,
+      "steps": [
+        {
+          "iteration": 1,
+          "selected_H": 1,
+          "feedback": {
+            "accepted": true,
+            "reason": "",
+            "passes": 1,
+            "withdraw": false,
+            "seed_ms": 34300.0,
+            "candidate_ms": 34150.0,
+            "selected_count": 1
+          },
+          "allocated_GiB": [
+            21.715835571289062,
+            19.808512687683105,
+            20.542872428894043
+          ],
+          "predicted_GiB": [
+            36.03733825683594,
+            32.14677429199219,
+            32.99540710449219
+          ]
+        }
+      ],
+      "category_max": {},
+      "diagnostic_only": false,
+      "numeric_reports": 0
+    },
+    "diagnostic-seed": {
+      "returncode": 0,
+      "elapsed_seconds": 116.47353506088257,
+      "steps": [
+        {
+          "iteration": 1,
+          "selected_H": 1,
+          "feedback": null,
+          "allocated_GiB": [
+            21.709031105041504,
+            19.792887687683105,
+            20.542872428894043
+          ],
+          "predicted_GiB": [
+            36.03733825683594,
+            32.14677429199219,
+            32.99540710449219
+          ]
+        }
+      ],
+      "category_max": {
+        "params_before": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "gradients": {
+          "max_abs": 0.00010168366134166718,
+          "max_relative_l2": 0.008077878767498249,
+          "failed_tensors": 0
+        },
+        "params_after": {
+          "max_abs": 0.0020751953125,
+          "max_relative_l2": 0.029392712748093665,
+          "failed_tensors": 14
+        },
+        "outputs": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "dx": {
+          "max_abs": 9.5367431640625e-07,
+          "max_relative_l2": 0.013287077685078783,
+          "failed_tensors": 0
+        },
+        "logits": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "loss": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        }
+      },
+      "diagnostic_only": true,
+      "numeric_reports": 3
+    },
+    "seed-reference": {
+      "returncode": 0,
+      "elapsed_seconds": 71.7045521736145,
+      "steps": [
+        {
+          "iteration": 1,
+          "selected_H": 1,
+          "feedback": null,
+          "allocated_GiB": [
+            21.70803928375244,
+            19.800692558288574,
+            20.542872428894043
+          ],
+          "predicted_GiB": [
+            36.03733825683594,
+            32.14677429199219,
+            32.99540710449219
+          ]
+        },
+        {
+          "iteration": 2,
+          "selected_H": 1,
+          "feedback": null,
+          "allocated_GiB": [
+            15.905675888061523,
+            13.325263977050781,
+            13.348793983459473
+          ],
+          "predicted_GiB": [
+            22.528616905212402,
+            19.67723846435547,
+            19.658714294433594
+          ]
+        },
+        {
+          "iteration": 3,
+          "selected_H": 0,
+          "feedback": null,
+          "allocated_GiB": [
+            13.866300582885742,
+            11.405896186828613,
+            11.370809555053711
+          ],
+          "predicted_GiB": [
+            19.04632568359375,
+            16.278778076171875,
+            16.205535888671875
+          ]
+        }
+      ],
+      "category_max": {},
+      "diagnostic_only": false,
+      "numeric_reports": 9
+    },
+    "c-vs-seed": {
+      "returncode": 1,
+      "elapsed_seconds": 70.75415563583374,
+      "steps": [
+        {
+          "iteration": 1,
+          "selected_H": 1,
+          "feedback": {
+            "accepted": true,
+            "reason": "",
+            "passes": 1,
+            "withdraw": false,
+            "seed_ms": 34300.0,
+            "candidate_ms": 34150.0,
+            "selected_count": 1
+          },
+          "allocated_GiB": [
+            21.715850830078125,
+            19.808512687683105,
+            20.542872428894043
+          ],
+          "predicted_GiB": [
+            36.03733825683594,
+            32.14677429199219,
+            32.99540710449219
+          ]
+        }
+      ],
+      "category_max": {},
+      "diagnostic_only": false,
+      "numeric_reports": 0
+    },
+    "diagnostic-seed-repeat": {
+      "returncode": 0,
+      "elapsed_seconds": 137.17511415481567,
+      "steps": [
+        {
+          "iteration": 1,
+          "selected_H": 1,
+          "feedback": null,
+          "allocated_GiB": [
+            21.715858459472656,
+            19.792887687683105,
+            20.550684928894043
+          ],
+          "predicted_GiB": [
+            36.03733825683594,
+            32.14677429199219,
+            32.99540710449219
+          ]
+        }
+      ],
+      "category_max": {
+        "params_before": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "gradients": {
+          "max_abs": 0.00010080402716994286,
+          "max_relative_l2": 0.008327451744904422,
+          "failed_tensors": 0
+        },
+        "params_after": {
+          "max_abs": 0.0020751953125,
+          "max_relative_l2": 0.029462141520790908,
+          "failed_tensors": 15
+        },
+        "outputs": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "dx": {
+          "max_abs": 8.344650268554688e-07,
+          "max_relative_l2": 0.01329272919594273,
+          "failed_tensors": 0
+        },
+        "logits": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "loss": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        }
+      },
+      "diagnostic_only": true,
+      "numeric_reports": 3
+    },
+    "seed-reference-launch-failed": {
+      "returncode": 1,
+      "elapsed_seconds": 1.8687171936035156,
+      "steps": [],
+      "category_max": {},
+      "diagnostic_only": false,
+      "numeric_reports": 0
+    }
+  },
+  "numeric_acceptance": "P5 with H not accepted: optimizer parameter differences exceed the existing relative L2 <= .02 criterion; collectors retain failures without declaring pass.",
+  "dq_repeat": [
+    {
+      "rank": 0,
+      "records": [
+        {
+          "q": [
+            2048,
+            16,
+            128
+          ],
+          "k": [
+            4096,
+            16,
+            128
+          ],
+          "max_abs": [
+            1.1641532182693481e-10,
+            0.0,
+            0.0
+          ],
+          "different": [
+            442,
+            0,
+            0
+          ]
+        },
+        {
+          "q": [
+            2048,
+            16,
+            128
+          ],
+          "k": [
+            4096,
+            16,
+            128
+          ],
+          "max_abs": [
+            1.1641532182693481e-10,
+            0.0,
+            0.0
+          ],
+          "different": [
+            475,
+            0,
+            0
+          ]
+        },
+        {
+          "q": [
+            2048,
+            16,
+            128
+          ],
+          "k": [
+            4096,
+            16,
+            128
+          ],
+          "max_abs": [
+            1.1641532182693481e-10,
+            0.0,
+            0.0
+          ],
+          "different": [
+            467,
+            0,
+            0
+          ]
+        },
+        {
+          "q": [
+            2048,
+            16,
+            128
+          ],
+          "k": [
+            4096,
+            16,
+            128
+          ],
+          "max_abs": [
+            1.1641532182693481e-10,
+            0.0,
+            0.0
+          ],
+          "different": [
+            468,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "rank": 1,
+      "records": []
+    },
+    {
+      "rank": 2,
+      "records": []
+    }
+  ]
+}

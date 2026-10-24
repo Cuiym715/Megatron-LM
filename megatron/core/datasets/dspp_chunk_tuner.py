@@ -118,7 +118,7 @@ def estimate_stage_peak_live_slots(schedule, schedule_groups) -> int:
         key = (node.chunk, node.microbatch, node.split)
         if node.kind == "F":
             forward_live.add(key)
-        elif node.kind == "B":
+        elif node.kind in ("B", "D"):
             forward_live.discard(key)
             weight_live.add(key)
         elif node.kind == "W":

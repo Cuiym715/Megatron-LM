@@ -1,0 +1,22 @@
+{
+  "head": "9550175c1d14ab309e96f090142e105b1a8501fd",
+  "branch": "cuiym-dspp",
+  "baseline_source_hash_checks": {
+    "megatron/core/pipeline_parallel/dspp_plan.py": true,
+    "megatron/core/pipeline_parallel/dspp_plan_runtime.py": true,
+    "megatron/core/pipeline_parallel/schedules.py": true,
+    "megatron/core/zbpp_utils.py": true,
+    "examples/run_dspp_multisample_chunk_compare.sh": true,
+    "examples/run_dspp_infinipipe_compare.sh": true
+  },
+  "production_code_changed_by_this_experiment": false,
+  "temporary_container_removed": true,
+  "original_containers_retained": [
+    "nvidia_pytorch",
+    "nvidia_pytorch_v",
+    "nvidia_pytorch_env"
+  ],
+  "monitor_exit": 137,
+  "monitor_exit_reason": "normal stop of the temporary container after all training groups exited",
+  "commit_or_push": false
+}

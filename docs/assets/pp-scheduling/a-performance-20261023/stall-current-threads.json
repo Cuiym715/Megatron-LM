@@ -1,0 +1,23 @@
+{
+  "0": [
+    "  File \"/workspace/src/Megatron-LM-kwai/megatron/core/kv_cache/dspp_packed_attention.py\", line 147 in prepared_cu_seqlens",
+    "  File \"/workspace/src/Megatron-LM-kwai/megatron/core/kv_cache/dspp_packed_attention.py\", line 476 in forward",
+    "  File \"/opt/dspp-existing-deps/torch/autograd/function.py\", line 583 in apply",
+    "  File \"/workspace/src/Megatron-LM-kwai/megatron/core/kv_cache/dspp_packed_attention.py\", line 701 in dspp_packed_flash_attention",
+    "  File \"/workspace/src/Megatron-LM-kwai/megatron/model/transformer.py\", line 973 in forward"
+  ],
+  "1": [
+    "  File \"/workspace/src/Megatron-LM-kwai/megatron/core/pipeline_parallel/schedules.py\", line 2128 in wait_for_send_launch",
+    "  File \"/workspace/src/Megatron-LM-kwai/megatron/core/pipeline_parallel/schedules.py\", line 2227 in receive",
+    "  File \"/workspace/src/Megatron-LM-kwai/megatron/core/pipeline_parallel/schedules.py\", line 2339 in pipelining_with_dspp_stage_local_v",
+    "  File \"/workspace/src/Megatron-LM-kwai/megatron/training.py\", line 673 in train_step",
+    "  File \"/workspace/tmp/dspp-a-performance-20261023/bench_entry.py\", line 34 in step"
+  ],
+  "2": [
+    "  File \"/workspace/src/Megatron-LM-kwai/megatron/core/pipeline_parallel/schedules.py\", line 2196 in wait_for_sender_ready",
+    "  File \"/workspace/src/Megatron-LM-kwai/megatron/core/pipeline_parallel/schedules.py\", line 2210 in receive",
+    "  File \"/workspace/src/Megatron-LM-kwai/megatron/core/pipeline_parallel/schedules.py\", line 2339 in pipelining_with_dspp_stage_local_v",
+    "  File \"/workspace/src/Megatron-LM-kwai/megatron/training.py\", line 673 in train_step",
+    "  File \"/workspace/tmp/dspp-a-performance-20261023/bench_entry.py\", line 34 in step"
+  ]
+}

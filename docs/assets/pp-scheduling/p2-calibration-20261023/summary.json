@@ -1,0 +1,520 @@
+{
+  "state": "P2 first implementation; acceptance incomplete",
+  "baseline": {
+    "branch": "cuiym-dspp",
+    "head": "9550175c1d14ab309e96f090142e105b1a8501fd",
+    "existing_changes_preserved": true
+  },
+  "training": {
+    "model": {
+      "layers": 6,
+      "hidden": 512,
+      "ffn": 1024,
+      "Hq": 4,
+      "Hkv": 4,
+      "head_dim": 128,
+      "pp": 3,
+      "vpp": 2,
+      "dtype": "BF16"
+    },
+    "lengths": [
+      193,
+      129,
+      33,
+      17
+    ],
+    "purpose": "small full-stage engineering calibration, not distribution-matched performance",
+    "steps_per_run": 3,
+    "calibration_runs": 4,
+    "audit_runs": 2,
+    "first_audit_superseded": "temporary recursive closure retained tensors until GC; fixed audit in separate directory"
+  },
+  "cost": {
+    "records": 1332,
+    "groups": 30,
+    "operations": {
+      "F": 408,
+      "B_fused": 204,
+      "W": 408,
+      "D": 204,
+      "H": 108
+    },
+    "estimator": "extended-nonnegative-ridge-v1",
+    "version": "5ae62a9a79c2a724c8c0c0221617f3007344e5d3d285532d27da5c3160807d91",
+    "folds": [
+      {
+        "dimension": "capacity",
+        "held_out": 128,
+        "train": 834,
+        "test": 498,
+        "summary": {
+          "F": {
+            "samples": 156,
+            "available": 156,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 1.5889393132849903,
+            "median_relative": 0.22144491127324145,
+            "p95_relative": 1.222977837962627
+          },
+          "B_fused": {
+            "samples": 78,
+            "available": 78,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.2678325463402067,
+            "median_relative": 0.04195980140016781,
+            "p95_relative": 0.15565002688364235
+          },
+          "W": {
+            "samples": 156,
+            "available": 156,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.07675123924300786,
+            "median_relative": 0.19499289844379786,
+            "p95_relative": 0.7093684901772666
+          },
+          "D": {
+            "samples": 78,
+            "available": 78,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.5989483930400148,
+            "median_relative": 0.0853789662082173,
+            "p95_relative": 0.18610932477905012
+          },
+          "H": {
+            "samples": 30,
+            "available": 30,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.1551832658405065,
+            "median_relative": 0.3203225055587159,
+            "p95_relative": 0.9868051051949326
+          }
+        }
+      },
+      {
+        "dimension": "capacity",
+        "held_out": 64,
+        "train": 498,
+        "test": 834,
+        "summary": {
+          "F": {
+            "samples": 252,
+            "available": 252,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 1.2457589438765941,
+            "median_relative": 0.22390433406409804,
+            "p95_relative": 0.6300327097624722
+          },
+          "B_fused": {
+            "samples": 126,
+            "available": 126,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.2789395073292926,
+            "median_relative": 0.043279726957019614,
+            "p95_relative": 0.1237701792292896
+          },
+          "W": {
+            "samples": 252,
+            "available": 252,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.07656431255432278,
+            "median_relative": 0.18736217780883285,
+            "p95_relative": 0.485640800271055
+          },
+          "D": {
+            "samples": 126,
+            "available": 126,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.4203409668408944,
+            "median_relative": 0.06863066279931987,
+            "p95_relative": 0.2737512386559518
+          },
+          "H": {
+            "samples": 78,
+            "available": 78,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.1597440242767334,
+            "median_relative": 0.26901541037283183,
+            "p95_relative": 0.546554935781885
+          }
+        }
+      },
+      {
+        "dimension": "history",
+        "held_out": "long",
+        "train": 996,
+        "test": 336,
+        "summary": {
+          "F": {
+            "samples": 96,
+            "available": 96,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 1.5091857524461818,
+            "median_relative": 0.227305138400073,
+            "p95_relative": 0.5380863777295163
+          },
+          "B_fused": {
+            "samples": 48,
+            "available": 48,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.25605390452067756,
+            "median_relative": 0.03936702758539748,
+            "p95_relative": 0.10095478749272811
+          },
+          "W": {
+            "samples": 96,
+            "available": 96,
+            "covered_fraction": 1.0,
+            "median_absolute_ms": 0.08806401491165161,
+            "median_relative": 0.20662886469430286,
+            "p95_relative": 0.5656371177003883
+          },
+          "D": {
+            "samples": 48,
+            "available": 48,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.951319327346742,
+            "median_relative": 0.13217316498756568,
+            "p95_relative": 0.34725476092033825
+          },
+          "H": {
+            "samples": 48,
+            "available": 48,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.1658260247572677,
+            "median_relative": 0.23520580781406136,
+            "p95_relative": 0.5207957463804855
+          }
+        }
+      },
+      {
+        "dimension": "history",
+        "held_out": "none",
+        "train": 756,
+        "test": 576,
+        "summary": {
+          "F": {
+            "samples": 192,
+            "available": 192,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 1.169360579712023,
+            "median_relative": 0.22550661614039225,
+            "p95_relative": 0.8211418918900978
+          },
+          "B_fused": {
+            "samples": 96,
+            "available": 96,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.19383127755596963,
+            "median_relative": 0.030249446047629937,
+            "p95_relative": 0.15462036469502877
+          },
+          "W": {
+            "samples": 192,
+            "available": 192,
+            "covered_fraction": 1.0,
+            "median_absolute_ms": 0.06579200178384781,
+            "median_relative": 0.1553743518801054,
+            "p95_relative": 0.5384615528125402
+          },
+          "D": {
+            "samples": 96,
+            "available": 96,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.5663344301637578,
+            "median_relative": 0.09069249093644138,
+            "p95_relative": 0.3744829773776513
+          }
+        }
+      },
+      {
+        "dimension": "history",
+        "held_out": "short",
+        "train": 912,
+        "test": 420,
+        "summary": {
+          "F": {
+            "samples": 120,
+            "available": 120,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 1.3555639442597567,
+            "median_relative": 0.2266546225058697,
+            "p95_relative": 1.2583730308726535
+          },
+          "B_fused": {
+            "samples": 60,
+            "available": 60,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.188182595002091,
+            "median_relative": 0.02906440627591612,
+            "p95_relative": 0.13694890302488322
+          },
+          "W": {
+            "samples": 120,
+            "available": 120,
+            "covered_fraction": 1.0,
+            "median_absolute_ms": 0.07603200525045395,
+            "median_relative": 0.17864206469908384,
+            "p95_relative": 0.6131687166402586
+          },
+          "D": {
+            "samples": 60,
+            "available": 60,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.36024558239908844,
+            "median_relative": 0.055393722286014406,
+            "p95_relative": 0.19920183836988545
+          },
+          "H": {
+            "samples": 60,
+            "available": 60,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.17333500367460852,
+            "median_relative": 0.3508378415794814,
+            "p95_relative": 1.0459280154967627
+          }
+        }
+      },
+      {
+        "dimension": "packing",
+        "held_out": "packed",
+        "train": 858,
+        "test": 474,
+        "summary": {
+          "F": {
+            "samples": 144,
+            "available": 144,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 1.6841784798472572,
+            "median_relative": 0.29176984218398283,
+            "p95_relative": 0.9403535606945794
+          },
+          "B_fused": {
+            "samples": 72,
+            "available": 72,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.29900623884666855,
+            "median_relative": 0.04692990494123954,
+            "p95_relative": 0.12511334654722184
+          },
+          "W": {
+            "samples": 144,
+            "available": 144,
+            "covered_fraction": 1.0,
+            "median_absolute_ms": 0.09011200070381165,
+            "median_relative": 0.21427683777064455,
+            "p95_relative": 0.6228669399645569
+          },
+          "D": {
+            "samples": 72,
+            "available": 72,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.9824973940128068,
+            "median_relative": 0.13857195006849982,
+            "p95_relative": 0.2573202752563422
+          },
+          "H": {
+            "samples": 42,
+            "available": 42,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 0.12407510399105542,
+            "median_relative": 0.1900398386186114,
+            "p95_relative": 0.8869522143995446
+          }
+        }
+      },
+      {
+        "dimension": "packing",
+        "held_out": "single",
+        "train": 474,
+        "test": 858,
+        "summary": {
+          "F": {
+            "samples": 264,
+            "available": 264,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 4.893642974343246,
+            "median_relative": 1.0476991441058687,
+            "p95_relative": 13.218487203755531
+          },
+          "B_fused": {
+            "samples": 132,
+            "available": 132,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 2.4107920164747965,
+            "median_relative": 0.38542010011368577,
+            "p95_relative": 4.156809856213163
+          },
+          "W": {
+            "samples": 264,
+            "available": 264,
+            "covered_fraction": 1.0,
+            "median_absolute_ms": 0.0865280032157898,
+            "median_relative": 0.21054313520156648,
+            "p95_relative": 0.6837606759650781
+          },
+          "D": {
+            "samples": 132,
+            "available": 132,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 12.389984253552965,
+            "median_relative": 1.8651357171940477,
+            "p95_relative": 12.735430954604176
+          },
+          "H": {
+            "samples": 66,
+            "available": 66,
+            "covered_fraction": 0.0,
+            "median_absolute_ms": 4.996535161448653,
+            "median_relative": 8.57273938635546,
+            "p95_relative": 26.06135833554047
+          }
+        }
+      }
+    ]
+  },
+  "p2p": {
+    "samples": 120,
+    "points": 24,
+    "measurement": "max endpoint CUDA dispatch-to-completion envelope",
+    "compute_probe": "8 BF16 1024x1024 GEMMs on independent CUDA stream"
+  },
+  "memory": {
+    "audits": [
+      {
+        "file": "/home/cuiym/tmp/dspp-p2-20261023/c64-split-owners-fixed/owners/iteration_000001_stage_0.json",
+        "stage": 0,
+        "iteration": 1,
+        "boundaries": 98,
+        "baseline_allocated_bytes": 383307776,
+        "allocated_peak_bytes": 479873024,
+        "reserved_peak_bytes": 505413632,
+        "tracked_dynamic_peak_bytes": 52824440,
+        "uncovered_peak_increment_bytes": 43740808,
+        "certified": false
+      },
+      {
+        "file": "/home/cuiym/tmp/dspp-p2-20261023/c64-split-owners-fixed/owners/iteration_000001_stage_1.json",
+        "stage": 1,
+        "iteration": 1,
+        "boundaries": 98,
+        "baseline_allocated_bytes": 53521408,
+        "allocated_peak_bytes": 92561408,
+        "reserved_peak_bytes": 104857600,
+        "tracked_dynamic_peak_bytes": 20258664,
+        "uncovered_peak_increment_bytes": 18781336,
+        "certified": false
+      },
+      {
+        "file": "/home/cuiym/tmp/dspp-p2-20261023/c64-split-owners-fixed/owners/iteration_000001_stage_2.json",
+        "stage": 2,
+        "iteration": 1,
+        "boundaries": 98,
+        "baseline_allocated_bytes": 53521408,
+        "allocated_peak_bytes": 92505600,
+        "reserved_peak_bytes": 104857600,
+        "tracked_dynamic_peak_bytes": 20073008,
+        "uncovered_peak_increment_bytes": 18911184,
+        "certified": false
+      },
+      {
+        "file": "/home/cuiym/tmp/dspp-p2-20261023/c64-split-owners-fixed/owners/iteration_000002_stage_0.json",
+        "stage": 0,
+        "iteration": 2,
+        "boundaries": 90,
+        "baseline_allocated_bytes": 706780160,
+        "allocated_peak_bytes": 786533888,
+        "reserved_peak_bytes": 832569344,
+        "tracked_dynamic_peak_bytes": 52480632,
+        "uncovered_peak_increment_bytes": 27273096,
+        "certified": false
+      },
+      {
+        "file": "/home/cuiym/tmp/dspp-p2-20261023/c64-split-owners-fixed/owners/iteration_000002_stage_1.json",
+        "stage": 1,
+        "iteration": 2,
+        "boundaries": 90,
+        "baseline_allocated_bytes": 114353152,
+        "allocated_peak_bytes": 135800832,
+        "reserved_peak_bytes": 148897792,
+        "tracked_dynamic_peak_bytes": 19641736,
+        "uncovered_peak_increment_bytes": 1805944,
+        "certified": false
+      },
+      {
+        "file": "/home/cuiym/tmp/dspp-p2-20261023/c64-split-owners-fixed/owners/iteration_000002_stage_2.json",
+        "stage": 2,
+        "iteration": 2,
+        "boundaries": 90,
+        "baseline_allocated_bytes": 114353152,
+        "allocated_peak_bytes": 135785984,
+        "reserved_peak_bytes": 148897792,
+        "tracked_dynamic_peak_bytes": 19691168,
+        "uncovered_peak_increment_bytes": 1741664,
+        "certified": false
+      },
+      {
+        "file": "/home/cuiym/tmp/dspp-p2-20261023/c64-split-owners-fixed/owners/iteration_000003_stage_0.json",
+        "stage": 0,
+        "iteration": 3,
+        "boundaries": 82,
+        "baseline_allocated_bytes": 706778112,
+        "allocated_peak_bytes": 786533888,
+        "reserved_peak_bytes": 834666496,
+        "tracked_dynamic_peak_bytes": 52926304,
+        "uncovered_peak_increment_bytes": 26829472,
+        "certified": false
+      },
+      {
+        "file": "/home/cuiym/tmp/dspp-p2-20261023/c64-split-owners-fixed/owners/iteration_000003_stage_1.json",
+        "stage": 1,
+        "iteration": 3,
+        "boundaries": 82,
+        "baseline_allocated_bytes": 114351104,
+        "allocated_peak_bytes": 136465920,
+        "reserved_peak_bytes": 150994944,
+        "tracked_dynamic_peak_bytes": 20311120,
+        "uncovered_peak_increment_bytes": 1803696,
+        "certified": false
+      },
+      {
+        "file": "/home/cuiym/tmp/dspp-p2-20261023/c64-split-owners-fixed/owners/iteration_000003_stage_2.json",
+        "stage": 2,
+        "iteration": 3,
+        "boundaries": 82,
+        "baseline_allocated_bytes": 114351104,
+        "allocated_peak_bytes": 136226304,
+        "reserved_peak_bytes": 150994944,
+        "tracked_dynamic_peak_bytes": 20007424,
+        "uncovered_peak_increment_bytes": 1867776,
+        "certified": false
+      }
+    ],
+    "certified": false,
+    "remaining": "storage/workspace bounds, actual last users and CUDA reclamation are not certified; allocator histories retained"
+  },
+  "checks": {
+    "cpu": "101 passed, 10 GPU-only skipped",
+    "strict_runtime": "86 passed, overlaps previous CPU tests",
+    "gpu_boundary": "15 passed, includes overlapping CPU cases",
+    "pp4_pp8": "CPU schedule/dependency tests only; no GPU acceptance"
+  },
+  "remaining": [
+    "unknown capacity/kernel-region predictions low confidence; held-out single-item H error still large",
+    "makespan ranking/split-decision inversion requires frozen candidate plans (P3/P4)",
+    "full owner/stream/workspace memory contract not accepted",
+    "paired full-tensor fused/split numerical regression not newly performed",
+    "legacy profiles retain old aggregation semantics and must be recollected to gain v2 stage identity",
+    "heterogeneous stage hardware must supply explicit frozen calibration_contexts",
+    "probe P2P overlap is not a bound for every training workload"
+  ],
+  "artifacts_sha256": {
+    "stage-profile-final.json": "919fa03add189b795afeb164608a266abef643a51a9f9fcb726a209bb0115c8b",
+    "holdout-final.json": "c3a812d007121ebded0d3c436ae0043e6710519fd43349f99758eb551c8c360f",
+    "p2p.json": "6ff3f78ffe4d3af83d8868c3b01d851c5bbf4212c3b0f7427ec98e3a40ff13b7",
+    "cpu-tests-complete.log": "1db0a21e68dd872745499112d0423858a3f84489d682c35fe1f2ef99efd9751d",
+    "strict-profile-tests.log": "7b366bbaccb1be9b050909888d29e55b40ddda564027d93f693b6eaf38bf415a",
+    "gpu-boundary-regression.log": "19b3a65cb0ca41e0f54d29ba245e87d4b1cf2d6d537ac5585c069dc937c37769",
+    "commands.json": "32e46d7c1aa11a6016f6bcdab2b5f8cf167ca5d742bc16c9ab49e89c9eb3b7bc",
+    "owner-fixed-command.json": "05281fd65dd420c3a29221b52e5b3da68dd1c54eab27effcd2e713a505c40c35"
+  }
+}

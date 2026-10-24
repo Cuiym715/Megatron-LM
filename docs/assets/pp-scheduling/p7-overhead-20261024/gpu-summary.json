@@ -1,0 +1,894 @@
+{
+  "scope": "PP3/VPP2, default FA, same seed11 InfiniPipe Fig2 approximate distribution dataset; 2 warmup + 6 measured steps, one block per arm",
+  "model": "24 layers, hidden2048/FFN5504/MHA16, BF16, chunk2048, micro4/global8",
+  "data": "read-only existing /home/cuiym/tmp/dspp-a-performance-20261023/data/seed11/data",
+  "baseline": "baseline-sync: original fused template + rule-based ordering, no P6 prefetch",
+  "timing": "max-rank continuous wall block; all input, validation, publication, communication and optimizer included; cold excluded",
+  "all_methods_same_physical_task_mapping_and_valid_tokens": true,
+  "all_B_C_controls_same_task_schedules": true,
+  "runs": {
+    "baseline-sync": {
+      "measured_iterations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "valid_tokens": [
+        7928,
+        13304,
+        17144,
+        34040,
+        15608,
+        12280
+      ],
+      "total_valid_tokens": 100304,
+      "max_rank_wall_seconds": 8.82421487942338,
+      "tokens_per_second": 11366.90361358861,
+      "H_count": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "plan_results": {
+        "optimized-or-template": 6
+      },
+      "all_rank_plans_equal": true,
+      "all_step_memory_checks_passed": true,
+      "no_optimizer_skip_or_nonfinite_loss": true,
+      "peak_allocated_GiB": [
+        27.002638816833496,
+        23.399405479431152,
+        23.429065704345703
+      ],
+      "peak_reserved_GiB": [
+        29.515625,
+        25.314453125,
+        25.7109375
+      ],
+      "end_allocated_GiB": [
+        [
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "versus_original_template_percent": 0.0,
+      "versus_prefetched_template_percent": 8.581901184103714
+    },
+    "baseline": {
+      "measured_iterations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "valid_tokens": [
+        7928,
+        13304,
+        17144,
+        34040,
+        15608,
+        12280
+      ],
+      "total_valid_tokens": 100304,
+      "max_rank_wall_seconds": 9.58150028064847,
+      "tokens_per_second": 10468.506712104536,
+      "H_count": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "plan_results": {
+        "optimized-or-template": 6
+      },
+      "all_rank_plans_equal": true,
+      "all_step_memory_checks_passed": true,
+      "no_optimizer_skip_or_nonfinite_loss": true,
+      "peak_allocated_GiB": [
+        27.001662254333496,
+        23.39939785003662,
+        23.429065704345703
+      ],
+      "peak_reserved_GiB": [
+        29.55078125,
+        25.298828125,
+        25.7109375
+      ],
+      "end_allocated_GiB": [
+        [
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "prefetch": {
+        "worker_fallback_count": 0,
+        "worker_cuda_initialized": false,
+        "worker_mean_ms": 19.50686890631914,
+        "source_optimization_wait_ms": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "max_rank_boundary_mean_ms": 37.26797550916672,
+        "rank0_commit_check_mean_ms": 36.75809781998396,
+        "max_rank_compute_mean_ms": 1463.726582845052,
+        "cold_boundary_max_rank_ms": 5674.014002084732,
+        "future_payload_max_bytes": 332258,
+        "sample_ids_match_consumed_position": true,
+        "worker_completes_during_previous_task_loop": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      "versus_original_template_percent": -7.903620299991665,
+      "versus_prefetched_template_percent": 0.0
+    },
+    "async-a": {
+      "measured_iterations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "valid_tokens": [
+        7928,
+        13304,
+        17144,
+        34040,
+        15608,
+        12280
+      ],
+      "total_valid_tokens": 100304,
+      "max_rank_wall_seconds": 9.244890309870243,
+      "tokens_per_second": 10849.669021265849,
+      "H_count": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "plan_results": {
+        "optimized-or-template": 6
+      },
+      "all_rank_plans_equal": true,
+      "all_step_memory_checks_passed": true,
+      "no_optimizer_skip_or_nonfinite_loss": true,
+      "peak_allocated_GiB": [
+        27.000685691833496,
+        23.399405479431152,
+        23.429065704345703
+      ],
+      "peak_reserved_GiB": [
+        29.53125,
+        25.248046875,
+        25.58984375
+      ],
+      "end_allocated_GiB": [
+        [
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "prefetch": {
+        "worker_fallback_count": 0,
+        "worker_cuda_initialized": false,
+        "worker_mean_ms": 39.49151622752348,
+        "source_optimization_wait_ms": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "max_rank_boundary_mean_ms": 53.09378014256557,
+        "rank0_commit_check_mean_ms": 46.35684502621492,
+        "max_rank_compute_mean_ms": 1378.3238016764324,
+        "cold_boundary_max_rank_ms": 6308.657668530941,
+        "future_payload_max_bytes": 332250,
+        "sample_ids_match_consumed_position": true,
+        "worker_completes_during_previous_task_loop": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      "versus_original_template_percent": -4.550356103173359,
+      "versus_prefetched_template_percent": 3.6410380166311818
+    },
+    "async-b": {
+      "measured_iterations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "valid_tokens": [
+        7928,
+        13304,
+        17144,
+        34040,
+        15608,
+        12280
+      ],
+      "total_valid_tokens": 100304,
+      "max_rank_wall_seconds": 9.332927528768778,
+      "tokens_per_second": 10747.324426425965,
+      "H_count": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "plan_results": {
+        "optimized-or-template": 6
+      },
+      "all_rank_plans_equal": true,
+      "all_step_memory_checks_passed": true,
+      "no_optimizer_skip_or_nonfinite_loss": true,
+      "peak_allocated_GiB": [
+        27.03782081604004,
+        23.972779273986816,
+        23.898642539978027
+      ],
+      "peak_reserved_GiB": [
+        29.5078125,
+        26.330078125,
+        25.6875
+      ],
+      "end_allocated_GiB": [
+        [
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "prefetch": {
+        "worker_fallback_count": 0,
+        "worker_cuda_initialized": false,
+        "worker_mean_ms": 56.92521948367357,
+        "source_optimization_wait_ms": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "max_rank_boundary_mean_ms": 57.149880565702915,
+        "rank0_commit_check_mean_ms": 49.40667717407147,
+        "max_rank_compute_mean_ms": 1385.9940795898438,
+        "cold_boundary_max_rank_ms": 6692.344754934311,
+        "future_payload_max_bytes": 334619,
+        "sample_ids_match_consumed_position": true,
+        "worker_completes_during_previous_task_loop": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      "planning": {
+        "full_mean_ms": 86.44143243630727,
+        "decision_mean_ms": 5.769321384529273,
+        "backend": [
+          "cpp"
+        ],
+        "budget_overrun_count": 0
+      },
+      "versus_original_template_percent": -5.450729664162612,
+      "versus_prefetched_template_percent": 2.663395286350023
+    },
+    "async-c": {
+      "measured_iterations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "valid_tokens": [
+        7928,
+        13304,
+        17144,
+        34040,
+        15608,
+        12280
+      ],
+      "total_valid_tokens": 100304,
+      "max_rank_wall_seconds": 8.93793748691678,
+      "tokens_per_second": 11222.275849078549,
+      "H_count": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "plan_results": {
+        "no-makespan-improvement": 6
+      },
+      "all_rank_plans_equal": true,
+      "all_step_memory_checks_passed": true,
+      "no_optimizer_skip_or_nonfinite_loss": true,
+      "peak_allocated_GiB": [
+        27.038305282592773,
+        23.972275733947754,
+        23.898653984069824
+      ],
+      "peak_reserved_GiB": [
+        29.5078125,
+        26.3203125,
+        25.64453125
+      ],
+      "end_allocated_GiB": [
+        [
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "prefetch": {
+        "worker_fallback_count": 0,
+        "worker_cuda_initialized": false,
+        "worker_mean_ms": 84.12151349087556,
+        "source_optimization_wait_ms": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "max_rank_boundary_mean_ms": 58.0440079793334,
+        "rank0_commit_check_mean_ms": 49.36035474141439,
+        "max_rank_compute_mean_ms": 1320.3456013997395,
+        "cold_boundary_max_rank_ms": 6596.653286367655,
+        "future_payload_max_bytes": 334619,
+        "sample_ids_match_consumed_position": true,
+        "worker_completes_during_previous_task_loop": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      "planning": {
+        "full_mean_ms": 109.91211173435052,
+        "decision_mean_ms": 6.7472147444883985,
+        "backend": [
+          "cpp"
+        ],
+        "budget_overrun_count": 0
+      },
+      "versus_original_template_percent": -1.2723585017221928,
+      "versus_prefetched_template_percent": 7.200350133056177
+    },
+    "sync-b": {
+      "measured_iterations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "valid_tokens": [
+        7928,
+        13304,
+        17144,
+        34040,
+        15608,
+        12280
+      ],
+      "total_valid_tokens": 100304,
+      "max_rank_wall_seconds": 9.290743835270405,
+      "tokens_per_second": 10796.121578470005,
+      "H_count": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "plan_results": {
+        "optimized-or-template": 6
+      },
+      "all_rank_plans_equal": true,
+      "all_step_memory_checks_passed": true,
+      "no_optimizer_skip_or_nonfinite_loss": true,
+      "peak_allocated_GiB": [
+        27.036840438842773,
+        23.971306800842285,
+        23.898642539978027
+      ],
+      "peak_reserved_GiB": [
+        29.498046875,
+        26.1953125,
+        25.671875
+      ],
+      "end_allocated_GiB": [
+        [
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "planning": {
+        "full_mean_ms": 128.6999573931098,
+        "decision_mean_ms": 7.6287901028990746,
+        "backend": [
+          "cpp"
+        ],
+        "budget_overrun_count": 0
+      },
+      "versus_original_template_percent": -5.0214381552093235,
+      "versus_prefetched_template_percent": 3.1295281683934473
+    },
+    "replay-b": {
+      "measured_iterations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "valid_tokens": [
+        7928,
+        13304,
+        17144,
+        34040,
+        15608,
+        12280
+      ],
+      "total_valid_tokens": 100304,
+      "max_rank_wall_seconds": 8.58418900333345,
+      "tokens_per_second": 11684.738064486874,
+      "H_count": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "plan_results": {
+        "optimized-or-template": 6
+      },
+      "all_rank_plans_equal": true,
+      "all_step_memory_checks_passed": true,
+      "no_optimizer_skip_or_nonfinite_loss": true,
+      "peak_allocated_GiB": [
+        27.037817001342773,
+        23.97324848175049,
+        23.898642539978027
+      ],
+      "peak_reserved_GiB": [
+        29.498046875,
+        26.28125,
+        25.671875
+      ],
+      "end_allocated_GiB": [
+        [
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "planning": {
+        "full_mean_ms": 128.6999573931098,
+        "decision_mean_ms": 7.6287901028990746,
+        "backend": [
+          "cpp"
+        ],
+        "budget_overrun_count": 0
+      },
+      "versus_original_template_percent": 2.7961392275580366,
+      "versus_prefetched_template_percent": 11.618002317140718
+    },
+    "replay-async-b": {
+      "measured_iterations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "valid_tokens": [
+        7928,
+        13304,
+        17144,
+        34040,
+        15608,
+        12280
+      ],
+      "total_valid_tokens": 100304,
+      "max_rank_wall_seconds": 9.18252419680357,
+      "tokens_per_second": 10923.35809307377,
+      "H_count": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "plan_results": {
+        "optimized-or-template": 6
+      },
+      "all_rank_plans_equal": true,
+      "all_step_memory_checks_passed": true,
+      "no_optimizer_skip_or_nonfinite_loss": true,
+      "peak_allocated_GiB": [
+        27.036352157592773,
+        23.971306800842285,
+        23.898642539978027
+      ],
+      "peak_reserved_GiB": [
+        29.509765625,
+        26.1953125,
+        25.6875
+      ],
+      "end_allocated_GiB": [
+        [
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "prefetch": {
+        "worker_fallback_count": 0,
+        "worker_cuda_initialized": false,
+        "worker_mean_ms": 0.003867472211519877,
+        "source_optimization_wait_ms": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "max_rank_boundary_mean_ms": 55.627274637420975,
+        "rank0_commit_check_mean_ms": 48.08876228829225,
+        "max_rank_compute_mean_ms": 1364.0391642252605,
+        "cold_boundary_max_rank_ms": 5778.963031247258,
+        "future_payload_max_bytes": 334626,
+        "sample_ids_match_consumed_position": true,
+        "worker_completes_during_previous_task_loop": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      "planning": {
+        "full_mean_ms": 86.44143243630727,
+        "decision_mean_ms": 5.769321384529273,
+        "backend": [
+          "cpp"
+        ],
+        "budget_overrun_count": 0
+      },
+      "versus_original_template_percent": -3.902078662694053,
+      "versus_prefetched_template_percent": 4.344949986451252
+    },
+    "before-b": {
+      "measured_iterations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "valid_tokens": [
+        7928,
+        13304,
+        17144,
+        34040,
+        15608,
+        12280
+      ],
+      "total_valid_tokens": 100304,
+      "max_rank_wall_seconds": 9.4617387522012,
+      "tokens_per_second": 10601.011360270866,
+      "H_count": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "plan_results": {
+        "optimized-or-template": 6
+      },
+      "all_rank_plans_equal": true,
+      "all_step_memory_checks_passed": true,
+      "no_optimizer_skip_or_nonfinite_loss": true,
+      "peak_allocated_GiB": [
+        27.036840438842773,
+        23.971802711486816,
+        23.898653984069824
+      ],
+      "peak_reserved_GiB": [
+        29.509765625,
+        26.2109375,
+        25.64453125
+      ],
+      "end_allocated_GiB": [
+        [
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "prefetch": {
+        "worker_fallback_count": 0,
+        "worker_cuda_initialized": false,
+        "worker_mean_ms": 85.1346633086602,
+        "source_optimization_wait_ms": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "max_rank_boundary_mean_ms": 69.9876428892215,
+        "rank0_commit_check_mean_ms": 48.21110020081202,
+        "max_rank_compute_mean_ms": 1384.0015258789062,
+        "cold_boundary_max_rank_ms": 6654.549974948168,
+        "future_payload_max_bytes": 334596,
+        "sample_ids_match_consumed_position": true,
+        "worker_completes_during_previous_task_loop": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      "planning": {
+        "full_mean_ms": 114.84818812459707,
+        "decision_mean_ms": 7.584950886666775,
+        "backend": [],
+        "budget_overrun_count": 0
+      },
+      "versus_original_template_percent": -6.737914557506719,
+      "versus_prefetched_template_percent": 1.2657454574024118
+    }
+  },
+  "ratios": {
+    "p7_async_B_vs_p6_async_B_percent": 1.3801802600026614,
+    "async_B_vs_sync_B_percent": -0.4519877966301711,
+    "async_B_vs_identical_prefetched_replay_percent": -1.6115343390547987,
+    "compute_interval_increase_percent": 1.6095516859336634
+  },
+  "limitations": [
+    "one measured block per arm, no confidence interval; B/C identical schedules so wall-time difference is not C algorithm gain",
+    "H=0 at measured costs; deferred-H async execution not covered",
+    "compute interval includes host/pipeline/communication waits, not isolated kernel time",
+    "no new convergence or full gradient/updated-parameter comparison",
+    "isolated per-op calibration task events used only in cal-fused/cal-split, not throughput arms"
+  ],
+  "excluded": [
+    "cal-fused-entry-error: experiment recorder accessed legacy-only absent field",
+    "before-b-port-busy: rendezvous port occupied, training never started",
+    "replay-async-b-entry-error: experiment-only worker was not importable under runpy; same-input template executed, excluded"
+  ]
+}

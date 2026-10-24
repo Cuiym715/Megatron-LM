@@ -19,9 +19,12 @@ import torch.distributed as dist
 
 from megatron.core.datasets.dspp_batch_plan import DsppMicrobatchMeta
 from megatron.core.datasets.dspp_ordering import task_signature
+from megatron.core.datasets.dspp_calibration import SCHEMA, operation, stage_context
 
 
 _COLORS = {
+    "D0": "#A65A32",
+    "D1": "#CC8844",
     "F0": "#6C8EBF",
     "F1": "#82B366",
     "B0": "#D79B00",
@@ -147,7 +150,7 @@ def render_timeline_svg(records: Sequence[Mapping[str, Any]], title: str) -> str
         f'<text x="20" y="28" font-family="sans-serif" font-size="18">{html.escape(title)}</text>',
     ]
     legend_x = left
-    for kind in ("F0", "F1", "B0", "B1", "W0", "W1", "H0", "H1"):
+    for kind in ("F0", "F1", "B0", "B1", "D0", "D1", "W0", "W1", "H0", "H1"):
         parts.append(
             f'<rect x="{legend_x}" y="42" width="16" height="12" '
             f'fill="{_COLORS[kind]}" stroke="#444" stroke-width="0.35"/>'
@@ -220,7 +223,7 @@ class DsppTimelineRecorder:
         self.recording = self.enabled or self.torch_profile_enabled
         self.task_timing_only = bool(getattr(args, 'dspp_task_timing_only', False))
         self.task_timing_scope = getattr(args, 'dspp_task_timing_scope', 'bh')
-        self._timed_kinds = ('F', 'B', 'W', 'H') if self.task_timing_scope == 'all' else ('B', 'H')
+        self._timed_kinds = ('F', 'B', 'D', 'W', 'H') if self.task_timing_scope == 'all' else ('B', 'D', 'H')
         self.stage = stage
         self.iteration = current
         self.backward_mode = (
@@ -228,6 +231,9 @@ class DsppTimelineRecorder:
             else 'split_immediate' if getattr(args, 'dspp_split_attention_backward', False)
             else 'fused'
         )
+        self.calibration_contexts = {
+            str(chunk): stage_context(args, stage, chunk) for chunk in range(2)
+        } if self.enabled and hasattr(args, 'num_layers') else {}
         self.output_dir = Path(output_dir) if output_dir else None
         self.ordering = dict(ordering)
         self.microbatch_ids = {
@@ -369,6 +375,10 @@ class DsppTimelineRecorder:
             })
         serializable = []
         for record in self.records:
+            try:
+                record['calibration_operation'] = operation(record['kind'], self.backward_mode)
+            except ValueError:
+                record['calibration_operation'] = None
             begin, end = record.pop("_begin"), record.pop("_end")
             record["start_ms"] = self.anchor.elapsed_time(begin)
             record["end_ms"] = self.anchor.elapsed_time(end)
@@ -385,6 +395,8 @@ class DsppTimelineRecorder:
                     "stage": self.stage,
                     "anchor_cpu_ns": self.anchor_cpu_ns,
                     "backward_mode": self.backward_mode,
+                    "calibration_schema": SCHEMA if self.calibration_contexts else None,
+                    "calibration_contexts": self.calibration_contexts,
                     "task_timing_only": self.task_timing_only,
                     "task_timing_scope": self.task_timing_scope,
                     "peak_allocated_bytes": torch.cuda.max_memory_allocated(),

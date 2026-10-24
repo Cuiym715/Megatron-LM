@@ -1,0 +1,790 @@
+{
+  "configuration": {
+    "layers": 24,
+    "hidden": 2048,
+    "ffn": 5504,
+    "heads": 16,
+    "head_dim": 128,
+    "PP": 3,
+    "VPP": 2,
+    "dtype": "BF16",
+    "chunk": 2048,
+    "micro_batch": 4,
+    "global_batch": 8,
+    "seed": 1234,
+    "optimizer_iterations": 8,
+    "warmup": 2,
+    "measured": 6
+  },
+  "input": {
+    "source": "existing InfiniPipe Figure2 histogram/beta sampler; A seed11 trace, no regeneration",
+    "retained_trace_records": 978,
+    "alignment": 256,
+    "max_raw_length": 16384,
+    "over_max": "drop",
+    "data_hashes": {
+      "lengths.txt": "81a6e603dc61bcd96a5c4a3d5f4a9ed154bdcb9a1a49bda1acb8c230f40d2970",
+      "lengths.txt.json": "873bab57185cd405543fe8e6d580d33645e09f65c4fbbce232c67a101f2cdc4e",
+      "data.bin": "3e956b4198b5f93732e31c4c5933eda572d7893cb0b69b3a026912ad3cd83e56",
+      "data.idx": "2794cbe173b0998a084eff33a90e8a6b355abe4b201f76cda584e6adb2f7f760",
+      "data.json": "b22e4741c094a9788cae8279106e5b8919c5b543eeeda970857fb007d5f133a0"
+    },
+    "actual_training_lengths": [
+      767,
+      767,
+      13567,
+      767,
+      767,
+      1279,
+      767,
+      767,
+      767,
+      3839,
+      1023,
+      767,
+      767,
+      2559,
+      1023,
+      767,
+      1279,
+      1279,
+      767,
+      1023,
+      767,
+      767,
+      1279,
+      767,
+      1023,
+      1023,
+      767,
+      7423,
+      767,
+      767,
+      767,
+      767,
+      1023,
+      767,
+      7935,
+      3327,
+      1279,
+      767,
+      1023,
+      1023,
+      3583,
+      1023,
+      7167,
+      767,
+      13055,
+      6911,
+      767,
+      767,
+      7423,
+      1023,
+      767,
+      767,
+      767,
+      3327,
+      767,
+      767,
+      767,
+      3327,
+      767,
+      1023,
+      1023,
+      767,
+      3839,
+      767
+    ],
+    "measured_training_lengths": [
+      1279,
+      1279,
+      767,
+      1023,
+      767,
+      767,
+      1279,
+      767,
+      1023,
+      1023,
+      767,
+      7423,
+      767,
+      767,
+      767,
+      767,
+      1023,
+      767,
+      7935,
+      3327,
+      1279,
+      767,
+      1023,
+      1023,
+      3583,
+      1023,
+      7167,
+      767,
+      13055,
+      6911,
+      767,
+      767,
+      7423,
+      1023,
+      767,
+      767,
+      767,
+      3327,
+      767,
+      767,
+      767,
+      3327,
+      767,
+      1023,
+      1023,
+      767,
+      3839,
+      767
+    ],
+    "measured_min": 767,
+    "measured_max": 13055,
+    "measured_mean": 2089.6666666666665
+  },
+  "measurements": {
+    "reference-frozen": {
+      "tokens": 100304,
+      "seconds": 9.004581788554788,
+      "tokens_per_second": 11139.218050913893,
+      "rank_seconds": [
+        9.004581788554788,
+        8.996528388932347,
+        8.996461011469364
+      ],
+      "allocated_peak_GiB": [
+        27.001173973083496,
+        23.399405479431152,
+        23.429065704345703
+      ],
+      "reserved_peak_GiB": [
+        29.5078125,
+        25.361328125,
+        25.7109375
+      ],
+      "builder_ms": [
+        34.14355218410492,
+        36.97269409894943,
+        25.76974779367447,
+        48.31694811582565,
+        32.56280720233917,
+        23.90727959573269
+      ],
+      "selected_H": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "fallback": [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]
+    },
+    "b-live": {
+      "tokens": 100304,
+      "seconds": 9.81087445281446,
+      "tokens_per_second": 10223.757370702633,
+      "rank_seconds": [
+        9.81087445281446,
+        9.802500069141388,
+        9.80257591046393
+      ],
+      "allocated_peak_GiB": [
+        27.05098533630371,
+        24.074389457702637,
+        23.43148422241211
+      ],
+      "reserved_peak_GiB": [
+        29.63671875,
+        26.169921875,
+        25.796875
+      ],
+      "builder_ms": [
+        134.15508344769478,
+        149.60949681699276,
+        156.20501525700092,
+        244.5136234164238,
+        151.43300406634808,
+        147.99639396369457
+      ],
+      "selected_H": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "fallback": [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "vs_reference_percent": -8.218356764603884
+    },
+    "replay": {
+      "tokens": 100304,
+      "seconds": 8.594525277614594,
+      "tokens_per_second": 11670.685321183828,
+      "rank_seconds": [
+        8.594525277614594,
+        8.586432641372085,
+        8.587159045040607
+      ],
+      "allocated_peak_GiB": [
+        27.05000877380371,
+        24.08219051361084,
+        23.43100357055664
+      ],
+      "reserved_peak_GiB": [
+        29.62109375,
+        26.09375,
+        25.865234375
+      ],
+      "builder_ms": [
+        29.527531936764717,
+        38.02987188100815,
+        46.169353649020195,
+        53.13385650515556,
+        42.6466129720211,
+        42.72549785673618
+      ],
+      "selected_H": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "fallback": [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "vs_reference_percent": 4.771136248888963
+    }
+  },
+  "plan_checks": [
+    {
+      "iteration": 1,
+      "replay_identical": true,
+      "cross_rank_identical": true,
+      "supply_order_changed": true,
+      "H": 0,
+      "planning": {
+        "base": "supply",
+        "base_fallback_reason": "",
+        "seed_makespan_ms": 974.9109748005867,
+        "selected_count": 0,
+        "decision": {
+          "stop": "deadline",
+          "decision_ms": 0.4973914474248886,
+          "budget_ms": 0.0,
+          "max_steps": 32,
+          "steps": [
+            {
+              "kind": "deadline",
+              "before_ms": 974.9109748005867,
+              "after_ms": null,
+              "on_path": 6,
+              "firsts": 6,
+              "singles_tried": 0,
+              "second_candidates": 0,
+              "second_trials": 0,
+              "positions_scored": 0,
+              "positions_replayed": 0
+            }
+          ],
+          "candidate_order": "input-node-order",
+          "grouping": null,
+          "top_k": null
+        },
+        "fraction": 0.6,
+        "full_budget_ms": 621.9015153765678,
+        "preparation_ms": 692.8558759391308,
+        "tail_reserve_ms": 23.400000000000002,
+        "allocated_decision_budget_ms": 0.0,
+        "tail_actual_ms": 7.344832643866539,
+        "total_ms": 702.7570772916079,
+        "budget_met": false,
+        "budget_overrun_ms": 80.85556191504008,
+        "fallback_reason": "",
+        "cost_policy": "fused_fw/nonnegative_overhead",
+        "execution_constraint": "per-chunk W accumulation order",
+        "search_capacity_policy": "final audit, otherwise unsplit base",
+        "unavailable_split_costs": []
+      }
+    },
+    {
+      "iteration": 2,
+      "replay_identical": true,
+      "cross_rank_identical": true,
+      "supply_order_changed": true,
+      "H": 0,
+      "planning": {
+        "base": "supply",
+        "base_fallback_reason": "",
+        "seed_makespan_ms": 644.6807014346123,
+        "selected_count": 0,
+        "decision": {
+          "stop": "stalled",
+          "decision_ms": 0.2892371267080307,
+          "budget_ms": 303.53321484327313,
+          "max_steps": 32,
+          "steps": [
+            {
+              "kind": "stalled",
+              "before_ms": 644.6807014346123,
+              "after_ms": null,
+              "on_path": 0,
+              "firsts": 0,
+              "singles_tried": 0,
+              "second_candidates": 0,
+              "second_trials": 0,
+              "positions_scored": 0,
+              "positions_replayed": 0
+            }
+          ],
+          "candidate_order": "input-node-order",
+          "grouping": null,
+          "top_k": null
+        },
+        "fraction": 0.6,
+        "full_budget_ms": 396.35865476131437,
+        "preparation_ms": 79.02543991804123,
+        "tail_reserve_ms": 13.8,
+        "allocated_decision_budget_ms": 303.53321484327313,
+        "tail_actual_ms": 4.403756931424141,
+        "total_ms": 85.13577096164227,
+        "budget_met": true,
+        "budget_overrun_ms": 0.0,
+        "fallback_reason": "",
+        "cost_policy": "fused_fw/nonnegative_overhead",
+        "execution_constraint": "per-chunk W accumulation order",
+        "search_capacity_policy": "final audit, otherwise unsplit base",
+        "unavailable_split_costs": []
+      }
+    },
+    {
+      "iteration": 3,
+      "replay_identical": true,
+      "cross_rank_identical": true,
+      "supply_order_changed": true,
+      "H": 0,
+      "planning": {
+        "base": "supply",
+        "base_fallback_reason": "",
+        "seed_makespan_ms": 461.4082432985306,
+        "selected_count": 0,
+        "decision": {
+          "stop": "stalled",
+          "decision_ms": 0.24425797164440155,
+          "budget_ms": 144.7122616112232,
+          "max_steps": 32,
+          "steps": [
+            {
+              "kind": "stalled",
+              "before_ms": 461.4082432985306,
+              "after_ms": null,
+              "on_path": 0,
+              "firsts": 0,
+              "singles_tried": 0,
+              "second_candidates": 0,
+              "second_trials": 0,
+              "positions_scored": 0,
+              "positions_replayed": 0
+            }
+          ],
+          "candidate_order": "input-node-order",
+          "grouping": null,
+          "top_k": null
+        },
+        "fraction": 0.6,
+        "full_budget_ms": 277.9431940555572,
+        "preparation_ms": 124.23093244433403,
+        "tail_reserve_ms": 9.0,
+        "allocated_decision_budget_ms": 144.7122616112232,
+        "tail_actual_ms": 3.8436707109212875,
+        "total_ms": 129.59101237356663,
+        "budget_met": true,
+        "budget_overrun_ms": 0.0,
+        "fallback_reason": "",
+        "cost_policy": "fused_fw/nonnegative_overhead",
+        "execution_constraint": "per-chunk W accumulation order",
+        "search_capacity_policy": "final audit, otherwise unsplit base",
+        "unavailable_split_costs": []
+      }
+    },
+    {
+      "iteration": 4,
+      "replay_identical": true,
+      "cross_rank_identical": true,
+      "supply_order_changed": true,
+      "H": 0,
+      "planning": {
+        "base": "supply",
+        "base_fallback_reason": "",
+        "seed_makespan_ms": 659.6362254023552,
+        "selected_count": 0,
+        "decision": {
+          "stop": "stalled",
+          "decision_ms": 1.08262337744236,
+          "budget_ms": 265.4964375346899,
+          "max_steps": 32,
+          "steps": [
+            {
+              "kind": "stalled",
+              "before_ms": 659.6362254023552,
+              "after_ms": null,
+              "on_path": 1,
+              "firsts": 1,
+              "singles_tried": 1,
+              "second_candidates": 0,
+              "second_trials": 0,
+              "positions_scored": 3,
+              "positions_replayed": 1
+            }
+          ],
+          "candidate_order": "input-node-order",
+          "grouping": null,
+          "top_k": null
+        },
+        "fraction": 0.6,
+        "full_budget_ms": 418.0122619986534,
+        "preparation_ms": 136.3158244639635,
+        "tail_reserve_ms": 16.2,
+        "allocated_decision_budget_ms": 265.4964375346899,
+        "tail_actual_ms": 5.203187465667725,
+        "total_ms": 144.15485225617886,
+        "budget_met": true,
+        "budget_overrun_ms": 0.0,
+        "fallback_reason": "",
+        "cost_policy": "fused_fw/nonnegative_overhead",
+        "execution_constraint": "per-chunk W accumulation order",
+        "search_capacity_policy": "final audit, otherwise unsplit base",
+        "unavailable_split_costs": []
+      }
+    },
+    {
+      "iteration": 5,
+      "replay_identical": true,
+      "cross_rank_identical": true,
+      "supply_order_changed": true,
+      "H": 0,
+      "planning": {
+        "base": "supply",
+        "base_fallback_reason": "",
+        "seed_makespan_ms": 818.5338866114616,
+        "selected_count": 0,
+        "decision": {
+          "stop": "stalled",
+          "decision_ms": 1.9193869084119797,
+          "budget_ms": 357.90959084928033,
+          "max_steps": 32,
+          "steps": [
+            {
+              "kind": "stalled",
+              "before_ms": 818.5338866114616,
+              "after_ms": null,
+              "on_path": 2,
+              "firsts": 2,
+              "singles_tried": 2,
+              "second_candidates": 0,
+              "second_trials": 0,
+              "positions_scored": 5,
+              "positions_replayed": 2
+            }
+          ],
+          "candidate_order": "input-node-order",
+          "grouping": null,
+          "top_k": null
+        },
+        "fraction": 0.6,
+        "full_budget_ms": 517.7198581695557,
+        "preparation_ms": 141.2102673202753,
+        "tail_reserve_ms": 18.6,
+        "allocated_decision_budget_ms": 357.90959084928033,
+        "tail_actual_ms": 5.832543596625328,
+        "total_ms": 150.6668832153082,
+        "budget_met": true,
+        "budget_overrun_ms": 0.0,
+        "fallback_reason": "",
+        "cost_policy": "fused_fw/nonnegative_overhead",
+        "execution_constraint": "per-chunk W accumulation order",
+        "search_capacity_policy": "final audit, otherwise unsplit base",
+        "unavailable_split_costs": []
+      }
+    },
+    {
+      "iteration": 6,
+      "replay_identical": true,
+      "cross_rank_identical": true,
+      "supply_order_changed": true,
+      "H": 0,
+      "planning": {
+        "base": "supply",
+        "base_fallback_reason": "",
+        "seed_makespan_ms": 1729.611773967743,
+        "selected_count": 0,
+        "decision": {
+          "stop": "stalled",
+          "decision_ms": 12.64156959950924,
+          "budget_ms": 818.9560253769159,
+          "max_steps": 32,
+          "steps": [
+            {
+              "kind": "stalled",
+              "before_ms": 1729.611773967743,
+              "after_ms": null,
+              "on_path": 7,
+              "firsts": 7,
+              "singles_tried": 7,
+              "second_candidates": 0,
+              "second_trials": 0,
+              "positions_scored": 25,
+              "positions_replayed": 7
+            }
+          ],
+          "candidate_order": "input-node-order",
+          "grouping": null,
+          "top_k": null
+        },
+        "fraction": 0.6,
+        "full_budget_ms": 1065.4264276742936,
+        "preparation_ms": 206.2704022973776,
+        "tail_reserve_ms": 40.2,
+        "allocated_decision_budget_ms": 818.9560253769159,
+        "tail_actual_ms": 12.691807001829147,
+        "total_ms": 235.06652377545834,
+        "budget_met": true,
+        "budget_overrun_ms": 0.0,
+        "fallback_reason": "",
+        "cost_policy": "fused_fw/nonnegative_overhead",
+        "execution_constraint": "per-chunk W accumulation order",
+        "search_capacity_policy": "final audit, otherwise unsplit base",
+        "unavailable_split_costs": []
+      }
+    },
+    {
+      "iteration": 7,
+      "replay_identical": true,
+      "cross_rank_identical": true,
+      "supply_order_changed": true,
+      "H": 0,
+      "planning": {
+        "base": "supply",
+        "base_fallback_reason": "",
+        "seed_makespan_ms": 735.2202231884003,
+        "selected_count": 0,
+        "decision": {
+          "stop": "stalled",
+          "decision_ms": 1.4051683247089386,
+          "budget_ms": 317.63689011931416,
+          "max_steps": 32,
+          "steps": [
+            {
+              "kind": "stalled",
+              "before_ms": 735.2202231884003,
+              "after_ms": null,
+              "on_path": 1,
+              "firsts": 1,
+              "singles_tried": 1,
+              "second_candidates": 0,
+              "second_trials": 0,
+              "positions_scored": 3,
+              "positions_replayed": 1
+            }
+          ],
+          "candidate_order": "input-node-order",
+          "grouping": null,
+          "top_k": null
+        },
+        "fraction": 0.6,
+        "full_budget_ms": 468.670770907402,
+        "preparation_ms": 134.23388078808784,
+        "tail_reserve_ms": 16.8,
+        "allocated_decision_budget_ms": 317.63689011931416,
+        "tail_actual_ms": 6.915565580129623,
+        "total_ms": 144.65848170220852,
+        "budget_met": true,
+        "budget_overrun_ms": 0.0,
+        "fallback_reason": "",
+        "cost_policy": "fused_fw/nonnegative_overhead",
+        "execution_constraint": "per-chunk W accumulation order",
+        "search_capacity_policy": "final audit, otherwise unsplit base",
+        "unavailable_split_costs": []
+      }
+    },
+    {
+      "iteration": 8,
+      "replay_identical": true,
+      "cross_rank_identical": true,
+      "supply_order_changed": true,
+      "H": 0,
+      "planning": {
+        "base": "supply",
+        "base_fallback_reason": "",
+        "seed_makespan_ms": 650.440189063549,
+        "selected_count": 0,
+        "decision": {
+          "stop": "stalled",
+          "decision_ms": 0.37090107798576355,
+          "budget_ms": 251.85413416624067,
+          "max_steps": 32,
+          "steps": [
+            {
+              "kind": "stalled",
+              "before_ms": 650.440189063549,
+              "after_ms": null,
+              "on_path": 0,
+              "firsts": 0,
+              "singles_tried": 0,
+              "second_candidates": 0,
+              "second_trials": 0,
+              "positions_scored": 0,
+              "positions_replayed": 0
+            }
+          ],
+          "candidate_order": "input-node-order",
+          "grouping": null,
+          "top_k": null
+        },
+        "fraction": 0.6,
+        "full_budget_ms": 399.81434733867644,
+        "preparation_ms": 134.16021317243576,
+        "tail_reserve_ms": 13.8,
+        "allocated_decision_budget_ms": 251.85413416624067,
+        "tail_actual_ms": 5.7641081511974335,
+        "total_ms": 142.130421474576,
+        "budget_met": true,
+        "budget_overrun_ms": 0.0,
+        "fallback_reason": "",
+        "cost_policy": "fused_fw/nonnegative_overhead",
+        "execution_constraint": "per-chunk W accumulation order",
+        "search_capacity_policy": "final audit, otherwise unsplit base",
+        "unavailable_split_costs": []
+      }
+    }
+  ],
+  "memory_version": "eec05594d337141710f30d2d6c264ee9811209abef1a135ce69238506c204130",
+  "profile_hashes": {
+    "stage-profile.json": "ad1ff8403688834b300314379640987d8702d1ebb7c301407f854b8d268500c6",
+    "memory-profile.json": "5903d9d53cf43da18a661598ba3d038942471a9ba0457d84a865ad244a2d38b1",
+    "p2p.json": "569d6ad2407d41325a847896e685b4063d290082c01ef1be0d50b206a190b560"
+  },
+  "scope": "effective target tokens / maximum rank continuous wall block. Live includes prediction, reference agreement, supply/split search, result broadcast and execution; replay uses exact saved plans, omits online optimization and coordinator result broadcast, retains reference reconstruction and execution-side checks, communications and optimizer.",
+  "planning_mean_ms": 163.98543616135916,
+  "planning_total_ms": 983.9126169681549,
+  "unavailable_split_costs": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "production_sources_unchanged": true,
+  "excluded_runs": [
+    {
+      "path": "bench/fused-reference",
+      "reason": "iteration6 rejected by available-memory check; incomplete"
+    },
+    {
+      "path": "bench-final/fused-reference",
+      "reason": "memory fixture changed after iteration3; excluded even though completed"
+    }
+  ],
+  "cleanup": [
+    {
+      "path": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/audit.py",
+      "sha256": "86fc5bc476378ae844d7410a3fc4fbba6f79e9decd8991e0868cdaec5ff309c4",
+      "bytes": 2868
+    },
+    {
+      "path": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/write_report.py",
+      "sha256": "0037871176ca0ea3d13dfc918e0ff5245bd3dfe8218805814adeb0fc2a85731b",
+      "bytes": 7469
+    },
+    {
+      "path": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/common_crawl-seed11-raw-lengths-max16k.txt",
+      "sha256": "61620073189426f77ddb75500dd0cacbd2d70fff28e8d38eeb1db921eb104d87",
+      "bytes": 1225
+    },
+    {
+      "path": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/common_crawl-seed19-raw-lengths-max16k.txt",
+      "sha256": "fd78674cb1a3788298dbf403733c6fafd7427630d6771c69bbe4dcc51e9d3e2b",
+      "bytes": 1217
+    },
+    {
+      "path": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/github-seed11-raw-lengths-max16k.txt",
+      "sha256": "3d5e727d0014b27f4cbb79edb0f547a34f82e4ba83b407cdab28e63038c1cb65",
+      "bytes": 1178
+    },
+    {
+      "path": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/github-seed19-raw-lengths-max16k.txt",
+      "sha256": "43666772675d769f95ecdc23ec48f89d50e04ff82fa42a29dcb5cbb2ee749eb8",
+      "bytes": 1196
+    },
+    {
+      "path": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/common_crawl-seed11-source-rows.json",
+      "sha256": "de68b1577d5d8ca846501ae3602403973c6b078b588a7f1016e450f0f8214655",
+      "bytes": 2009
+    },
+    {
+      "path": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/common_crawl-seed19-source-rows.json",
+      "sha256": "6bb9eac343d51d231a7f3924b7ca7a3e866f3b55845eef29a9306fad3a64ed66",
+      "bytes": 2022
+    },
+    {
+      "path": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/github-seed11-source-rows.json",
+      "sha256": "de68b1577d5d8ca846501ae3602403973c6b078b588a7f1016e450f0f8214655",
+      "bytes": 2009
+    },
+    {
+      "path": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/github-seed19-source-rows.json",
+      "sha256": "6bb9eac343d51d231a7f3924b7ca7a3e866f3b55845eef29a9306fad3a64ed66",
+      "bytes": 2022
+    },
+    {
+      "path": "/home/cuiym/src/Megatron-LM-kwai/docs/assets/pp-scheduling/p4-input-provenance-20261023/README.md",
+      "sha256": "152ad6e2659368da8391ef2b610497a000ffe2806b806e81a584f8bbc23137c6",
+      "bytes": 3964,
+      "reason": "last-turn report incorrectly recommends replacing existing sampler; source statistics retained in audit.json"
+    }
+  ]
+}

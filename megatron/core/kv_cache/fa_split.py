@@ -146,35 +146,43 @@ def prepare_backward(q, k, v, out, dout, lse, *, softmax_scale=None,
 
 
 @torch.no_grad()
-def backward_dq(state: SplitBackwardState | VarlenSplitBackwardState) -> torch.Tensor:
-    """Complete dQ over ALL legal KV positions, independent of dKV selection."""
+def backward_dq(state: SplitBackwardState | VarlenSplitBackwardState, *,
+                deterministic: bool = False) -> torch.Tensor:
+    """Complete dQ over ALL legal KV positions, independent of dKV selection.
+
+    Diagnostic deterministic=True uses FA2's private FP32 accumulators and
+    fixed-order reduction, requiring extra workspace. Training keeps False.
+    """
     if isinstance(state, VarlenSplitBackwardState):
         # Child checks cover all shared tensor versions and copied LSE/delta.
         # Only CUDA/CPU metadata tensors need an additional outer check.
         state._check_metadata()
-        parts = [backward_dq(s) for s in state.sequences]
+        parts = [backward_dq(s, deterministic=deterministic) for s in state.sequences]
         return parts[0] if len(parts) == 1 else torch.cat(parts, dim=0)
     state._check()
-    return load_extension().dq(*state.tensors(), state.softmax_scale)
+    return load_extension().dq(*state.tensors(), state.softmax_scale, deterministic)
 
 
 @torch.no_grad()
-def backward_dq_current(state: SplitBackwardState | VarlenSplitBackwardState
+def backward_dq_current(state: SplitBackwardState | VarlenSplitBackwardState, *,
+                        deterministic: bool = False
                         ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """One scan: all-context dQ and compact current-only dK/dV.
 
     Each independent packed sequence has its own bottom-right causal boundary.
     Nonaligned boundary tiles can compute discarded history partials; no
     history output is returned or routed. Saved state remains usable by H.
+    deterministic=True is an opt-in diagnostic with extra FP32 workspace;
+    normal training retains the default atomic accumulation path.
     """
     if isinstance(state, VarlenSplitBackwardState):
         state._check_metadata()
-        parts = [backward_dq_current(s) for s in state.sequences]
+        parts = [backward_dq_current(s, deterministic=deterministic) for s in state.sequences]
         if len(parts) == 1:
             return parts[0]
         return tuple(torch.cat([p[i] for p in parts], dim=0) for i in range(3))
     state._check()
-    return tuple(load_extension().dq_current(*state.tensors(), state.softmax_scale))
+    return tuple(load_extension().dq_current(*state.tensors(), state.softmax_scale, deterministic))
 
 
 @torch.no_grad()

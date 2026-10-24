@@ -1,0 +1,266 @@
+{
+  "scope": "PP3 only; numerical isolation uses deterministic FA; external fixture is not A output",
+  "groups": [
+    {
+      "head_kv": 4,
+      "method": "legacy",
+      "rank_step_reports": 9,
+      "maximum_errors": {
+        "params_before": 0.0,
+        "params_after": 0.0,
+        "gradients": 0.0,
+        "outputs": 0.0,
+        "dx": 0.0,
+        "logits": 0.0,
+        "loss": 0.0
+      },
+      "accepted_steps": [],
+      "W_position_changed_steps": [],
+      "fallback": {}
+    },
+    {
+      "head_kv": 4,
+      "method": "template",
+      "rank_step_reports": 9,
+      "maximum_errors": {
+        "params_before": 0.0,
+        "params_after": 0.0,
+        "gradients": 0.0,
+        "outputs": 0.0,
+        "dx": 0.0,
+        "logits": 0.0,
+        "loss": 0.0
+      },
+      "accepted_steps": [],
+      "W_position_changed_steps": [],
+      "fallback": {}
+    },
+    {
+      "head_kv": 4,
+      "method": "a",
+      "rank_step_reports": 9,
+      "maximum_errors": {
+        "params_before": 0.0,
+        "params_after": 0.0,
+        "gradients": 0.0,
+        "outputs": 0.0,
+        "dx": 0.0,
+        "logits": 0.0,
+        "loss": 0.0
+      },
+      "accepted_steps": [
+        1,
+        2,
+        3
+      ],
+      "W_position_changed_steps": [
+        1,
+        2,
+        3
+      ],
+      "fallback": {}
+    },
+    {
+      "head_kv": 2,
+      "method": "legacy",
+      "rank_step_reports": 9,
+      "maximum_errors": {
+        "params_before": 0.0,
+        "params_after": 0.0,
+        "gradients": 0.0,
+        "outputs": 0.0,
+        "dx": 0.0,
+        "logits": 0.0,
+        "loss": 0.0
+      },
+      "accepted_steps": [],
+      "W_position_changed_steps": [],
+      "fallback": {}
+    },
+    {
+      "head_kv": 2,
+      "method": "template",
+      "rank_step_reports": 9,
+      "maximum_errors": {
+        "params_before": 0.0,
+        "params_after": 0.0,
+        "gradients": 0.0,
+        "outputs": 0.0,
+        "dx": 0.0,
+        "logits": 0.0,
+        "loss": 0.0
+      },
+      "accepted_steps": [],
+      "W_position_changed_steps": [],
+      "fallback": {}
+    },
+    {
+      "head_kv": 2,
+      "method": "a",
+      "rank_step_reports": 9,
+      "maximum_errors": {
+        "params_before": 0.0,
+        "params_after": 0.0,
+        "gradients": 0.0,
+        "outputs": 0.0,
+        "dx": 0.0,
+        "logits": 0.0,
+        "loss": 0.0
+      },
+      "accepted_steps": [
+        1,
+        2,
+        3
+      ],
+      "W_position_changed_steps": [
+        1,
+        2,
+        3
+      ],
+      "fallback": {}
+    },
+    {
+      "head_kv": 1,
+      "method": "legacy",
+      "rank_step_reports": 9,
+      "maximum_errors": {
+        "params_before": 0.0,
+        "params_after": 0.0,
+        "gradients": 0.0,
+        "outputs": 0.0,
+        "dx": 0.0,
+        "logits": 0.0,
+        "loss": 0.0
+      },
+      "accepted_steps": [],
+      "W_position_changed_steps": [],
+      "fallback": {}
+    },
+    {
+      "head_kv": 1,
+      "method": "template",
+      "rank_step_reports": 9,
+      "maximum_errors": {
+        "params_before": 0.0,
+        "params_after": 0.0,
+        "gradients": 0.0,
+        "outputs": 0.0,
+        "dx": 0.0,
+        "logits": 0.0,
+        "loss": 0.0
+      },
+      "accepted_steps": [],
+      "W_position_changed_steps": [],
+      "fallback": {}
+    },
+    {
+      "head_kv": 1,
+      "method": "a",
+      "rank_step_reports": 9,
+      "maximum_errors": {
+        "params_before": 0.0,
+        "params_after": 0.0,
+        "gradients": 0.0,
+        "outputs": 0.0,
+        "dx": 0.0,
+        "logits": 0.0,
+        "loss": 0.0
+      },
+      "accepted_steps": [
+        2,
+        3
+      ],
+      "W_position_changed_steps": [
+        2,
+        3
+      ],
+      "fallback": {
+        "1": "unreliable-compute-cost"
+      }
+    }
+  ],
+  "repaired_external": {
+    "reports": 9,
+    "all_errors_zero": true,
+    "old_W_permutation_rejected": true,
+    "original_LR": 0.001,
+    "W_insertion_positions_preserved": true
+  },
+  "default_FA_memory": {
+    "legacy": [
+      {
+        "rank": 0,
+        "allocated_peak": 786077184,
+        "reserved_peak": 834666496,
+        "end_allocation_steps": [
+          706757120,
+          706758144,
+          706758144
+        ]
+      },
+      {
+        "rank": 1,
+        "allocated_peak": 136405504,
+        "reserved_peak": 150994944,
+        "end_allocation_steps": [
+          114330624,
+          114330624,
+          114330624
+        ]
+      },
+      {
+        "rank": 2,
+        "allocated_peak": 136432128,
+        "reserved_peak": 150994944,
+        "end_allocation_steps": [
+          114330624,
+          114330624,
+          114330624
+        ]
+      }
+    ],
+    "a": [
+      {
+        "rank": 0,
+        "allocated_peak": 786077184,
+        "reserved_peak": 834666496,
+        "end_allocation_steps": [
+          706757120,
+          706758144,
+          706758144
+        ]
+      },
+      {
+        "rank": 1,
+        "allocated_peak": 136405504,
+        "reserved_peak": 150994944,
+        "end_allocation_steps": [
+          114330624,
+          114330624,
+          114330624
+        ]
+      },
+      {
+        "rank": 2,
+        "allocated_peak": 136432128,
+        "reserved_peak": 150994944,
+        "end_allocation_steps": [
+          114330624,
+          114330624,
+          114330624
+        ]
+      }
+    ]
+  },
+  "memory_peaks_equal": true,
+  "MQA_attempts": {
+    "first": "stalled before first report; manually terminated after about 150 seconds without iteration progress; cause unresolved",
+    "first_log": "hkv1/a-stalled-attempt1/train.log",
+    "diagnostic_retry": "3 steps passed; 9 rank-step reports, zero errors",
+    "plain_retry": {
+      "reports": 9,
+      "all_errors_zero": true
+    },
+    "resolution": "two retries passed; initial stall is not a proven fix or acceptance"
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "observation": "Current from_records groups (physical stage, F/B/W, signature), dropping virtual chunk. Runtime predict_detailed receives physical stage/kind/meta with no virtual chunk. Exact signature confidence does not distinguish embedding/head boundary.",
+  "paired_same_signature_cost_ratios": [
+    {
+      "stage": 0,
+      "op": "F",
+      "matched_signatures": 66,
+      "median_chunk1_over_chunk0": 1.347821571090582,
+      "minimum": 1.0104506475620845,
+      "maximum": 2.5790808336419
+    },
+    {
+      "stage": 0,
+      "op": "B",
+      "matched_signatures": 66,
+      "median_chunk1_over_chunk0": 0.9624721956345366,
+      "minimum": 0.7658165885585904,
+      "maximum": 1.241627517201787
+    },
+    {
+      "stage": 0,
+      "op": "W",
+      "matched_signatures": 66,
+      "median_chunk1_over_chunk0": 1.2887758601344914,
+      "minimum": 0.9433640891624753,
+      "maximum": 1.5504619518942764
+    },
+    {
+      "stage": 1,
+      "op": "F",
+      "matched_signatures": 66,
+      "median_chunk1_over_chunk0": 0.9850937365681329,
+      "minimum": 0.7547816079318321,
+      "maximum": 14.95040387596196
+    },
+    {
+      "stage": 1,
+      "op": "B",
+      "matched_signatures": 66,
+      "median_chunk1_over_chunk0": 1.0121831589599695,
+      "minimum": 0.6756594888216979,
+      "maximum": 1.552277624123847
+    },
+    {
+      "stage": 1,
+      "op": "W",
+      "matched_signatures": 66,
+      "median_chunk1_over_chunk0": 0.9995108211522048,
+      "minimum": 0.7739358130299527,
+      "maximum": 1.0350844996168729
+    },
+    {
+      "stage": 2,
+      "op": "F",
+      "matched_signatures": 66,
+      "median_chunk1_over_chunk0": 0.9695238578766772,
+      "minimum": 0.8453723807779842,
+      "maximum": 1.0912481423655913
+    },
+    {
+      "stage": 2,
+      "op": "B",
+      "matched_signatures": 66,
+      "median_chunk1_over_chunk0": 1.0015861417585081,
+      "minimum": 0.6349751852383053,
+      "maximum": 1.1712001131651684
+    },
+    {
+      "stage": 2,
+      "op": "W",
+      "matched_signatures": 66,
+      "median_chunk1_over_chunk0": 0.9976127745659946,
+      "minimum": 0.7544171527194986,
+      "maximum": 1.0160627794185857
+    }
+  ],
+  "p2p_profile": null,
+  "p2p_fallback": {
+    "bandwidth_GB_per_second": 25,
+    "latency_microseconds": 20
+  },
+  "limitation": "This proves cost-key aggregation and observed boundary asymmetry; it does not isolate the causal share of wall-time regression. No production/profile changes made during comparison."
+}

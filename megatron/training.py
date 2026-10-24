@@ -1008,7 +1008,7 @@ def save_checkpoint_and_time(iteration, model, optimizer, opt_param_scheduler):
     timers('save-checkpoint', log_level=0).start(barrier=True)
     # Copy optimizer params to model params in need when `overlap_gather`
     optimizer.gather_model_params(args, timers)
-    save_checkpoint(iteration, model, optimizer, opt_param_scheduler, train_data_iterator)
+    save_checkpoint(iteration, model, optimizer, opt_param_scheduler)
     timers('save-checkpoint').stop(barrier=True)
     timers.log(['save-checkpoint'])
     if args.kaimm_gc_interval > 0:
@@ -1021,6 +1021,13 @@ def train(forward_step_func, get_batch_func, model, optimizer, opt_param_schedul
     """Train the model function."""
     args = get_args()
     timers = get_timers()
+    dspp_prefetch = None
+    if getattr(args, 'dspp_prefetch', False):
+        if not hasattr(get_batch_func, 'dspp_materialize_cpu'):
+            raise ValueError('training get_batch_func does not expose DSPP CPU materialization')
+        from megatron.core.pipeline_parallel.dspp_prefetch import DsppIterationPrefetch
+        dspp_prefetch = DsppIterationPrefetch(args, train_data_iterator, get_batch_func)
+        train_data_iterator = dspp_prefetch
 
     # Write args to tensorboard
     write_args_to_tensorboard()
@@ -1108,6 +1115,8 @@ def train(forward_step_func, get_batch_func, model, optimizer, opt_param_schedul
 
         # Logging.
         loss_scale = optimizer.get_loss_scale().item()
+        if dspp_prefetch is not None:
+            dspp_prefetch.retire()
         if dspp_metric_end is not None:
             # loss_scale.item() is the pre-existing device synchronization;
             # reading the two events here adds no per-iteration synchronize.
@@ -1200,6 +1209,9 @@ def train(forward_step_func, get_batch_func, model, optimizer, opt_param_schedul
 
     if args.dspp and torch.distributed.get_rank() == 0:
         write_dspp_metrics(args)
+
+    if dspp_prefetch is not None:
+        dspp_prefetch.close()
 
     return iteration
 

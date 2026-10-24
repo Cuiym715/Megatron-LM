@@ -1,0 +1,2991 @@
+{
+  "cases": {
+    "short": {
+      "pattern": [
+        17,
+        33,
+        49,
+        63
+      ],
+      "arms": {
+        "reference": {
+          "command": {
+            "command": [
+              "/workspace/src/venvs/megatron/bin/python",
+              "-m",
+              "torch.distributed.run",
+              "--master-addr=127.0.0.1",
+              "--master-port=29546",
+              "--nproc-per-node=3",
+              "/workspace/tmp/dspp-p4-lengths-20261023/entry.py",
+              "--tensor-model-parallel-size",
+              "1",
+              "--pipeline-model-parallel-size",
+              "3",
+              "--num-layers-per-virtual-pipeline-stage",
+              "1",
+              "--num-layers",
+              "6",
+              "--hidden-size",
+              "512",
+              "--ffn-hidden-size",
+              "1024",
+              "--num-attention-heads",
+              "4",
+              "--seq-length",
+              "256",
+              "--max-position-embeddings",
+              "256",
+              "--micro-seq-length",
+              "64",
+              "--micro-batch-size",
+              "4",
+              "--global-batch-size",
+              "8",
+              "--train-iters",
+              "3",
+              "--seed",
+              "1234",
+              "--lr",
+              ".001",
+              "--min-lr",
+              ".0001",
+              "--lr-decay-style",
+              "cosine",
+              "--weight-decay",
+              ".1",
+              "--clip-grad",
+              "1",
+              "--bf16",
+              "--use-flash-attn",
+              "--no-masked-softmax-fusion",
+              "--no-position-embedding",
+              "--use-rotary-position-embeddings",
+              "--swiglu",
+              "--rms-norm",
+              "--disable-bias-linear",
+              "--no-query-key-layer-scaling",
+              "--hidden-dropout",
+              "0",
+              "--attention-dropout",
+              "0",
+              "--make-main-grad-addresss-divisible-by",
+              "1",
+              "--data-impl",
+              "mmap",
+              "--split",
+              "100,0,0",
+              "--tokenizer-type",
+              "SentencePieceTokenizer",
+              "--tokenizer-model",
+              "/workspace/src/tokenizers/Mistral-7B-v0.1/tokenizer.model",
+              "--dataloader-type",
+              "cyclic",
+              "--dspp",
+              "--dspp-v-layer-layout",
+              "balanced",
+              "--dspp-microbatch-order",
+              "warmup-short-steady-long",
+              "--dspp-packing-strategy",
+              "baseline",
+              "--dspp-recv-lookahead",
+              "2",
+              "--dspp-send-inflight-depth",
+              "2",
+              "--variable-seq-pad-token-id",
+              "0",
+              "--variable-seq-debug-num-batches",
+              "0",
+              "--eval-iters",
+              "0",
+              "--log-interval",
+              "1",
+              "--data-path",
+              "/workspace/tmp/dspp-p4-lengths-20261023/short/data",
+              "--dspp-schedule",
+              "template",
+              "--timing-log-level",
+              "0",
+              "--dspp-split-attention-backward",
+              "--dspp-history-dkv-after-dx",
+              "--dspp-memory-profile",
+              "/workspace/tmp/dspp-p2-split-memory-20261023/memory-profile.json",
+              "--dspp-memory-report-dir",
+              "/workspace/tmp/dspp-p4-lengths-20261023/short/reference/memory",
+              "--dspp-execution-profile",
+              "/workspace/tmp/dspp-p2-20261023/stage-profile-final.json",
+              "--dspp-p2p-profile",
+              "/workspace/tmp/dspp-p2-20261023/p2p.json"
+            ],
+            "diagnostic_costs": false,
+            "dataset": {
+              "kind": "synthetic-dspp-indexed-dataset",
+              "training_lengths_pattern": [
+                17,
+                33,
+                49,
+                63
+              ],
+              "raw_lengths_pattern": [
+                18,
+                34,
+                50,
+                64
+              ],
+              "raw_lengths_file": null,
+              "raw_lengths_sha256": null,
+              "repeats": 32,
+              "documents": 128,
+              "vocab_size": 32000,
+              "token_pattern": "sequential"
+            },
+            "started": 1792763457.0815487,
+            "returncode": 0,
+            "ended": 1792763490.0814388
+          },
+          "iterations": [
+            {
+              "iteration": 1,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    63,
+                    63,
+                    17,
+                    17
+                  ],
+                  "physical_tasks": 3,
+                  "key_tokens": [
+                    63,
+                    63,
+                    34
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    49,
+                    49,
+                    49,
+                    49
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    49,
+                    49,
+                    49,
+                    49
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": null,
+              "allocated_peak_mib": [
+                673.72021484375,
+                172.5595703125,
+                172.3720703125
+              ],
+              "predicted_peak_mib": [
+                820.38671875,
+                174.5078125,
+                174.22265625
+              ],
+              "fallback": "",
+              "planning": null,
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 2,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    63,
+                    49,
+                    17,
+                    49
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    63,
+                    49,
+                    49,
+                    17
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    63,
+                    33,
+                    49,
+                    33
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    63,
+                    49,
+                    33,
+                    33
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": null,
+              "allocated_peak_mib": [
+                714.06982421875,
+                131.7568359375,
+                131.47607421875
+              ],
+              "predicted_peak_mib": [
+                821.41796875,
+                174.7578125,
+                174.47265625
+              ],
+              "fallback": "",
+              "planning": null,
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 3,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    49,
+                    17,
+                    49,
+                    63
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    63,
+                    49,
+                    49,
+                    17
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    63,
+                    63,
+                    17,
+                    49
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    63,
+                    63,
+                    49,
+                    17
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": null,
+              "allocated_peak_mib": [
+                714.0244140625,
+                131.86083984375,
+                131.56298828125
+              ],
+              "predicted_peak_mib": [
+                821.609375,
+                174.94921875,
+                174.6640625
+              ],
+              "fallback": "",
+              "planning": null,
+              "all_rank_plan_match": true
+            }
+          ]
+        },
+        "measured-b": {
+          "command": {
+            "command": [
+              "/workspace/src/venvs/megatron/bin/python",
+              "-m",
+              "torch.distributed.run",
+              "--master-addr=127.0.0.1",
+              "--master-port=29546",
+              "--nproc-per-node=3",
+              "/workspace/tmp/dspp-p4-lengths-20261023/entry.py",
+              "--tensor-model-parallel-size",
+              "1",
+              "--pipeline-model-parallel-size",
+              "3",
+              "--num-layers-per-virtual-pipeline-stage",
+              "1",
+              "--num-layers",
+              "6",
+              "--hidden-size",
+              "512",
+              "--ffn-hidden-size",
+              "1024",
+              "--num-attention-heads",
+              "4",
+              "--seq-length",
+              "256",
+              "--max-position-embeddings",
+              "256",
+              "--micro-seq-length",
+              "64",
+              "--micro-batch-size",
+              "4",
+              "--global-batch-size",
+              "8",
+              "--train-iters",
+              "3",
+              "--seed",
+              "1234",
+              "--lr",
+              ".001",
+              "--min-lr",
+              ".0001",
+              "--lr-decay-style",
+              "cosine",
+              "--weight-decay",
+              ".1",
+              "--clip-grad",
+              "1",
+              "--bf16",
+              "--use-flash-attn",
+              "--no-masked-softmax-fusion",
+              "--no-position-embedding",
+              "--use-rotary-position-embeddings",
+              "--swiglu",
+              "--rms-norm",
+              "--disable-bias-linear",
+              "--no-query-key-layer-scaling",
+              "--hidden-dropout",
+              "0",
+              "--attention-dropout",
+              "0",
+              "--make-main-grad-addresss-divisible-by",
+              "1",
+              "--data-impl",
+              "mmap",
+              "--split",
+              "100,0,0",
+              "--tokenizer-type",
+              "SentencePieceTokenizer",
+              "--tokenizer-model",
+              "/workspace/src/tokenizers/Mistral-7B-v0.1/tokenizer.model",
+              "--dataloader-type",
+              "cyclic",
+              "--dspp",
+              "--dspp-v-layer-layout",
+              "balanced",
+              "--dspp-microbatch-order",
+              "warmup-short-steady-long",
+              "--dspp-packing-strategy",
+              "baseline",
+              "--dspp-recv-lookahead",
+              "2",
+              "--dspp-send-inflight-depth",
+              "2",
+              "--variable-seq-pad-token-id",
+              "0",
+              "--variable-seq-debug-num-batches",
+              "0",
+              "--eval-iters",
+              "0",
+              "--log-interval",
+              "1",
+              "--data-path",
+              "/workspace/tmp/dspp-p4-lengths-20261023/short/data",
+              "--dspp-schedule",
+              "b",
+              "--timing-log-level",
+              "0",
+              "--dspp-split-attention-backward",
+              "--dspp-history-dkv-after-dx",
+              "--dspp-memory-profile",
+              "/workspace/tmp/dspp-p2-split-memory-20261023/memory-profile.json",
+              "--dspp-memory-report-dir",
+              "/workspace/tmp/dspp-p4-lengths-20261023/short/measured-b/memory",
+              "--dspp-execution-profile",
+              "/workspace/tmp/dspp-p2-20261023/stage-profile-final.json",
+              "--dspp-p2p-profile",
+              "/workspace/tmp/dspp-p2-20261023/p2p.json"
+            ],
+            "diagnostic_costs": false,
+            "dataset": {
+              "kind": "synthetic-dspp-indexed-dataset",
+              "training_lengths_pattern": [
+                17,
+                33,
+                49,
+                63
+              ],
+              "raw_lengths_pattern": [
+                18,
+                34,
+                50,
+                64
+              ],
+              "raw_lengths_file": null,
+              "raw_lengths_sha256": null,
+              "repeats": 32,
+              "documents": 128,
+              "vocab_size": 32000,
+              "token_pattern": "sequential"
+            },
+            "started": 1792763490.0835042,
+            "returncode": 0,
+            "ended": 1792763530.352419
+          },
+          "iterations": [
+            {
+              "iteration": 1,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    63,
+                    63,
+                    17,
+                    17
+                  ],
+                  "physical_tasks": 3,
+                  "key_tokens": [
+                    63,
+                    63,
+                    34
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    49,
+                    49,
+                    49,
+                    49
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    49,
+                    49,
+                    49,
+                    49
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                673.72021484375,
+                109.0341796875,
+                109.0341796875
+              ],
+              "predicted_peak_mib": [
+                820.38671875,
+                174.5078125,
+                174.22265625
+              ],
+              "fallback": "unreliable-compute-cost",
+              "planning": null,
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 2,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    63,
+                    49,
+                    17,
+                    49
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    63,
+                    49,
+                    49,
+                    17
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    63,
+                    33,
+                    49,
+                    33
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    63,
+                    49,
+                    33,
+                    33
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                714.06982421875,
+                132.3896484375,
+                132.04638671875
+              ],
+              "predicted_peak_mib": [
+                821.41796875,
+                174.7578125,
+                174.47265625
+              ],
+              "fallback": "unreliable-compute-cost",
+              "planning": null,
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 3,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    49,
+                    17,
+                    49,
+                    63
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    63,
+                    49,
+                    49,
+                    17
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    63,
+                    63,
+                    17,
+                    49
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    63,
+                    63,
+                    49,
+                    17
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                714.0244140625,
+                132.30615234375,
+                132.19580078125
+              ],
+              "predicted_peak_mib": [
+                821.609375,
+                174.94921875,
+                174.6640625
+              ],
+              "fallback": "unreliable-compute-cost",
+              "planning": null,
+              "all_rank_plan_match": true
+            }
+          ]
+        }
+      }
+    },
+    "boundary": {
+      "pattern": [
+        63,
+        64,
+        65,
+        129
+      ],
+      "arms": {
+        "reference": {
+          "command": {
+            "command": [
+              "/workspace/src/venvs/megatron/bin/python",
+              "-m",
+              "torch.distributed.run",
+              "--master-addr=127.0.0.1",
+              "--master-port=29546",
+              "--nproc-per-node=3",
+              "/workspace/tmp/dspp-p4-lengths-20261023/entry.py",
+              "--tensor-model-parallel-size",
+              "1",
+              "--pipeline-model-parallel-size",
+              "3",
+              "--num-layers-per-virtual-pipeline-stage",
+              "1",
+              "--num-layers",
+              "6",
+              "--hidden-size",
+              "512",
+              "--ffn-hidden-size",
+              "1024",
+              "--num-attention-heads",
+              "4",
+              "--seq-length",
+              "256",
+              "--max-position-embeddings",
+              "256",
+              "--micro-seq-length",
+              "64",
+              "--micro-batch-size",
+              "2",
+              "--global-batch-size",
+              "4",
+              "--train-iters",
+              "3",
+              "--seed",
+              "1234",
+              "--lr",
+              ".001",
+              "--min-lr",
+              ".0001",
+              "--lr-decay-style",
+              "cosine",
+              "--weight-decay",
+              ".1",
+              "--clip-grad",
+              "1",
+              "--bf16",
+              "--use-flash-attn",
+              "--no-masked-softmax-fusion",
+              "--no-position-embedding",
+              "--use-rotary-position-embeddings",
+              "--swiglu",
+              "--rms-norm",
+              "--disable-bias-linear",
+              "--no-query-key-layer-scaling",
+              "--hidden-dropout",
+              "0",
+              "--attention-dropout",
+              "0",
+              "--make-main-grad-addresss-divisible-by",
+              "1",
+              "--data-impl",
+              "mmap",
+              "--split",
+              "100,0,0",
+              "--tokenizer-type",
+              "SentencePieceTokenizer",
+              "--tokenizer-model",
+              "/workspace/src/tokenizers/Mistral-7B-v0.1/tokenizer.model",
+              "--dataloader-type",
+              "cyclic",
+              "--dspp",
+              "--dspp-v-layer-layout",
+              "balanced",
+              "--dspp-microbatch-order",
+              "warmup-short-steady-long",
+              "--dspp-packing-strategy",
+              "baseline",
+              "--dspp-recv-lookahead",
+              "2",
+              "--dspp-send-inflight-depth",
+              "2",
+              "--variable-seq-pad-token-id",
+              "0",
+              "--variable-seq-debug-num-batches",
+              "0",
+              "--eval-iters",
+              "0",
+              "--log-interval",
+              "1",
+              "--data-path",
+              "/workspace/tmp/dspp-p4-lengths-20261023/boundary/data",
+              "--dspp-schedule",
+              "template",
+              "--timing-log-level",
+              "0",
+              "--dspp-split-attention-backward",
+              "--dspp-history-dkv-after-dx",
+              "--dspp-memory-profile",
+              "/workspace/tmp/dspp-p2-split-memory-20261023/memory-profile.json",
+              "--dspp-memory-report-dir",
+              "/workspace/tmp/dspp-p4-lengths-20261023/boundary/reference/memory",
+              "--dspp-execution-profile",
+              "/workspace/tmp/dspp-p2-20261023/stage-profile-final.json",
+              "--dspp-p2p-profile",
+              "/workspace/tmp/dspp-p2-20261023/p2p.json"
+            ],
+            "diagnostic_costs": false,
+            "dataset": {
+              "kind": "synthetic-dspp-indexed-dataset",
+              "training_lengths_pattern": [
+                63,
+                64,
+                65,
+                129
+              ],
+              "raw_lengths_pattern": [
+                64,
+                65,
+                66,
+                130
+              ],
+              "raw_lengths_file": null,
+              "raw_lengths_sha256": null,
+              "repeats": 32,
+              "documents": 128,
+              "vocab_size": 32000,
+              "token_pattern": "sequential"
+            },
+            "started": 1792763663.1574578,
+            "returncode": 0,
+            "ended": 1792763691.747517
+          },
+          "iterations": [
+            {
+              "iteration": 1,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    129,
+                    129
+                  ],
+                  "physical_tasks": 6,
+                  "key_tokens": [
+                    64,
+                    128,
+                    64,
+                    128,
+                    129,
+                    129
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    63,
+                    63
+                  ],
+                  "physical_tasks": 2,
+                  "key_tokens": [
+                    63,
+                    63
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": null,
+              "allocated_peak_mib": [
+                673.72021484375,
+                109.0341796875,
+                109.0341796875
+              ],
+              "predicted_peak_mib": [
+                874.068359375,
+                197.3828125,
+                197.072265625
+              ],
+              "fallback": "",
+              "planning": null,
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 2,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    65,
+                    65
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    64,
+                    64,
+                    65,
+                    65
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    65,
+                    65
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    64,
+                    64,
+                    65,
+                    65
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": null,
+              "allocated_peak_mib": [
+                724.974609375,
+                134.59326171875,
+                134.34130859375
+              ],
+              "predicted_peak_mib": [
+                846.490234375,
+                184.8046875,
+                184.494140625
+              ],
+              "fallback": "",
+              "planning": null,
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 3,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    129,
+                    65
+                  ],
+                  "physical_tasks": 5,
+                  "key_tokens": [
+                    64,
+                    128,
+                    64,
+                    129,
+                    65
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    63,
+                    65
+                  ],
+                  "physical_tasks": 2,
+                  "key_tokens": [
+                    64,
+                    128
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": null,
+              "allocated_peak_mib": [
+                736.56982421875,
+                137.7783203125,
+                137.84130859375
+              ],
+              "predicted_peak_mib": [
+                873.220703125,
+                196.65625,
+                196.470703125
+              ],
+              "fallback": "",
+              "planning": null,
+              "all_rank_plan_match": true
+            }
+          ]
+        },
+        "measured-b": {
+          "command": {
+            "command": [
+              "/workspace/src/venvs/megatron/bin/python",
+              "-m",
+              "torch.distributed.run",
+              "--master-addr=127.0.0.1",
+              "--master-port=29546",
+              "--nproc-per-node=3",
+              "/workspace/tmp/dspp-p4-lengths-20261023/entry.py",
+              "--tensor-model-parallel-size",
+              "1",
+              "--pipeline-model-parallel-size",
+              "3",
+              "--num-layers-per-virtual-pipeline-stage",
+              "1",
+              "--num-layers",
+              "6",
+              "--hidden-size",
+              "512",
+              "--ffn-hidden-size",
+              "1024",
+              "--num-attention-heads",
+              "4",
+              "--seq-length",
+              "256",
+              "--max-position-embeddings",
+              "256",
+              "--micro-seq-length",
+              "64",
+              "--micro-batch-size",
+              "2",
+              "--global-batch-size",
+              "4",
+              "--train-iters",
+              "3",
+              "--seed",
+              "1234",
+              "--lr",
+              ".001",
+              "--min-lr",
+              ".0001",
+              "--lr-decay-style",
+              "cosine",
+              "--weight-decay",
+              ".1",
+              "--clip-grad",
+              "1",
+              "--bf16",
+              "--use-flash-attn",
+              "--no-masked-softmax-fusion",
+              "--no-position-embedding",
+              "--use-rotary-position-embeddings",
+              "--swiglu",
+              "--rms-norm",
+              "--disable-bias-linear",
+              "--no-query-key-layer-scaling",
+              "--hidden-dropout",
+              "0",
+              "--attention-dropout",
+              "0",
+              "--make-main-grad-addresss-divisible-by",
+              "1",
+              "--data-impl",
+              "mmap",
+              "--split",
+              "100,0,0",
+              "--tokenizer-type",
+              "SentencePieceTokenizer",
+              "--tokenizer-model",
+              "/workspace/src/tokenizers/Mistral-7B-v0.1/tokenizer.model",
+              "--dataloader-type",
+              "cyclic",
+              "--dspp",
+              "--dspp-v-layer-layout",
+              "balanced",
+              "--dspp-microbatch-order",
+              "warmup-short-steady-long",
+              "--dspp-packing-strategy",
+              "baseline",
+              "--dspp-recv-lookahead",
+              "2",
+              "--dspp-send-inflight-depth",
+              "2",
+              "--variable-seq-pad-token-id",
+              "0",
+              "--variable-seq-debug-num-batches",
+              "0",
+              "--eval-iters",
+              "0",
+              "--log-interval",
+              "1",
+              "--data-path",
+              "/workspace/tmp/dspp-p4-lengths-20261023/boundary/data",
+              "--dspp-schedule",
+              "b",
+              "--timing-log-level",
+              "0",
+              "--dspp-split-attention-backward",
+              "--dspp-history-dkv-after-dx",
+              "--dspp-memory-profile",
+              "/workspace/tmp/dspp-p2-split-memory-20261023/memory-profile.json",
+              "--dspp-memory-report-dir",
+              "/workspace/tmp/dspp-p4-lengths-20261023/boundary/measured-b/memory",
+              "--dspp-execution-profile",
+              "/workspace/tmp/dspp-p2-20261023/stage-profile-final.json",
+              "--dspp-p2p-profile",
+              "/workspace/tmp/dspp-p2-20261023/p2p.json"
+            ],
+            "diagnostic_costs": false,
+            "dataset": {
+              "kind": "synthetic-dspp-indexed-dataset",
+              "training_lengths_pattern": [
+                63,
+                64,
+                65,
+                129
+              ],
+              "raw_lengths_pattern": [
+                64,
+                65,
+                66,
+                130
+              ],
+              "raw_lengths_file": null,
+              "raw_lengths_sha256": null,
+              "repeats": 32,
+              "documents": 128,
+              "vocab_size": 32000,
+              "token_pattern": "sequential"
+            },
+            "started": 1792763691.7494037,
+            "returncode": 0,
+            "ended": 1792763730.3138752
+          },
+          "iterations": [
+            {
+              "iteration": 1,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    129,
+                    129
+                  ],
+                  "physical_tasks": 6,
+                  "key_tokens": [
+                    64,
+                    128,
+                    64,
+                    128,
+                    129,
+                    129
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    63,
+                    63
+                  ],
+                  "physical_tasks": 2,
+                  "key_tokens": [
+                    63,
+                    63
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                673.72021484375,
+                109.0341796875,
+                109.0341796875
+              ],
+              "predicted_peak_mib": [
+                874.068359375,
+                197.3828125,
+                197.072265625
+              ],
+              "fallback": "unreliable-compute-cost",
+              "planning": null,
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 2,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    65,
+                    65
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    64,
+                    64,
+                    65,
+                    65
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    65,
+                    65
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    64,
+                    64,
+                    65,
+                    65
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                724.974609375,
+                134.59326171875,
+                134.34130859375
+              ],
+              "predicted_peak_mib": [
+                846.490234375,
+                184.8046875,
+                184.494140625
+              ],
+              "fallback": "unreliable-compute-cost",
+              "planning": null,
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 3,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    129,
+                    65
+                  ],
+                  "physical_tasks": 5,
+                  "key_tokens": [
+                    64,
+                    128,
+                    64,
+                    129,
+                    65
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    63,
+                    65
+                  ],
+                  "physical_tasks": 2,
+                  "key_tokens": [
+                    64,
+                    128
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                736.56982421875,
+                137.7783203125,
+                137.84130859375
+              ],
+              "predicted_peak_mib": [
+                873.220703125,
+                196.65625,
+                196.470703125
+              ],
+              "fallback": "unreliable-compute-cost",
+              "planning": null,
+              "all_rank_plan_match": true
+            }
+          ]
+        },
+        "split-b": {
+          "command": {
+            "command": [
+              "/workspace/src/venvs/megatron/bin/python",
+              "-m",
+              "torch.distributed.run",
+              "--master-addr=127.0.0.1",
+              "--master-port=29546",
+              "--nproc-per-node=3",
+              "/workspace/tmp/dspp-p4-lengths-20261023/entry.py",
+              "--tensor-model-parallel-size",
+              "1",
+              "--pipeline-model-parallel-size",
+              "3",
+              "--num-layers-per-virtual-pipeline-stage",
+              "1",
+              "--num-layers",
+              "6",
+              "--hidden-size",
+              "512",
+              "--ffn-hidden-size",
+              "1024",
+              "--num-attention-heads",
+              "4",
+              "--seq-length",
+              "256",
+              "--max-position-embeddings",
+              "256",
+              "--micro-seq-length",
+              "64",
+              "--micro-batch-size",
+              "2",
+              "--global-batch-size",
+              "4",
+              "--train-iters",
+              "3",
+              "--seed",
+              "1234",
+              "--lr",
+              ".001",
+              "--min-lr",
+              ".0001",
+              "--lr-decay-style",
+              "cosine",
+              "--weight-decay",
+              ".1",
+              "--clip-grad",
+              "1",
+              "--bf16",
+              "--use-flash-attn",
+              "--no-masked-softmax-fusion",
+              "--no-position-embedding",
+              "--use-rotary-position-embeddings",
+              "--swiglu",
+              "--rms-norm",
+              "--disable-bias-linear",
+              "--no-query-key-layer-scaling",
+              "--hidden-dropout",
+              "0",
+              "--attention-dropout",
+              "0",
+              "--make-main-grad-addresss-divisible-by",
+              "1",
+              "--data-impl",
+              "mmap",
+              "--split",
+              "100,0,0",
+              "--tokenizer-type",
+              "SentencePieceTokenizer",
+              "--tokenizer-model",
+              "/workspace/src/tokenizers/Mistral-7B-v0.1/tokenizer.model",
+              "--dataloader-type",
+              "cyclic",
+              "--dspp",
+              "--dspp-v-layer-layout",
+              "balanced",
+              "--dspp-microbatch-order",
+              "warmup-short-steady-long",
+              "--dspp-packing-strategy",
+              "baseline",
+              "--dspp-recv-lookahead",
+              "2",
+              "--dspp-send-inflight-depth",
+              "2",
+              "--variable-seq-pad-token-id",
+              "0",
+              "--variable-seq-debug-num-batches",
+              "0",
+              "--eval-iters",
+              "0",
+              "--log-interval",
+              "1",
+              "--data-path",
+              "/workspace/tmp/dspp-p4-lengths-20261023/boundary/data",
+              "--dspp-schedule",
+              "b",
+              "--timing-log-level",
+              "0",
+              "--dspp-split-attention-backward",
+              "--dspp-history-dkv-after-dx",
+              "--dspp-memory-profile",
+              "/workspace/tmp/dspp-p2-split-memory-20261023/memory-profile.json",
+              "--dspp-memory-report-dir",
+              "/workspace/tmp/dspp-p4-lengths-20261023/boundary/split-b/memory",
+              "--dspp-execution-profile",
+              "/workspace/tmp/dspp-p2-20261023/stage-profile-final.json",
+              "--dspp-p2p-profile",
+              "/workspace/tmp/dspp-p2-20261023/p2p.json"
+            ],
+            "diagnostic_costs": true,
+            "dataset": {
+              "kind": "synthetic-dspp-indexed-dataset",
+              "training_lengths_pattern": [
+                63,
+                64,
+                65,
+                129
+              ],
+              "raw_lengths_pattern": [
+                64,
+                65,
+                66,
+                130
+              ],
+              "raw_lengths_file": null,
+              "raw_lengths_sha256": null,
+              "repeats": 32,
+              "documents": 128,
+              "vocab_size": 32000,
+              "token_pattern": "sequential"
+            },
+            "started": 1792763730.3157911,
+            "returncode": 0,
+            "ended": 1792763769.8729043
+          },
+          "iterations": [
+            {
+              "iteration": 1,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    129,
+                    129
+                  ],
+                  "physical_tasks": 6,
+                  "key_tokens": [
+                    64,
+                    128,
+                    64,
+                    128,
+                    129,
+                    129
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    63,
+                    63
+                  ],
+                  "physical_tasks": 2,
+                  "key_tokens": [
+                    63,
+                    63
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 3,
+              "wire_fifo_order_changed": false,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                673.72021484375,
+                109.0341796875,
+                109.0341796875
+              ],
+              "predicted_peak_mib": [
+                873.583984375,
+                201.0234375,
+                199.072265625
+              ],
+              "fallback": "",
+              "planning": {
+                "base": "supply",
+                "base_fallback_reason": "",
+                "seed_makespan_ms": 280.0,
+                "selected_count": 0,
+                "decision": {
+                  "stop": "deadline",
+                  "decision_ms": 0.3509148955345154,
+                  "budget_ms": 0.0,
+                  "max_steps": 32,
+                  "steps": [
+                    {
+                      "kind": "deadline",
+                      "before_ms": 280.0,
+                      "after_ms": null,
+                      "on_path": 10,
+                      "firsts": 10,
+                      "singles_tried": 0,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 0,
+                      "positions_replayed": 0
+                    }
+                  ],
+                  "candidate_order": "input-node-order",
+                  "grouping": null,
+                  "top_k": null
+                },
+                "fraction": 0.6,
+                "full_budget_ms": 174.6,
+                "preparation_ms": 408.60333666205406,
+                "tail_reserve_ms": 16.8,
+                "allocated_decision_budget_ms": 0.0,
+                "tail_actual_ms": 5.0038062036037445,
+                "total_ms": 415.52616469562054,
+                "budget_met": false,
+                "budget_overrun_ms": 240.92616469562054,
+                "fallback_reason": "",
+                "cost_policy": "fused_fw/nonnegative_overhead",
+                "execution_constraint": "per-chunk W accumulation order",
+                "search_capacity_policy": "final audit, otherwise unsplit base",
+                "diagnostic_cost_fixture": true,
+                "unavailable_split_costs": []
+              },
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 2,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    65,
+                    65
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    64,
+                    64,
+                    65,
+                    65
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    65,
+                    65
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    64,
+                    64,
+                    65,
+                    65
+                  ]
+                }
+              ],
+              "selected_h": 8,
+              "delayed_h": 2,
+              "crossed_kinds": [
+                "B"
+              ],
+              "changed_fb_stages": 3,
+              "wire_fifo_order_changed": false,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                724.40478515625,
+                135.4033203125,
+                134.34130859375
+              ],
+              "predicted_peak_mib": [
+                847.0547485351562,
+                187.55667114257812,
+                186.494140625
+              ],
+              "fallback": "",
+              "planning": {
+                "base": "supply",
+                "base_fallback_reason": "",
+                "seed_makespan_ms": 284.0,
+                "selected_count": 8,
+                "decision": {
+                  "stop": "stalled",
+                  "decision_ms": 35.53271293640137,
+                  "budget_ms": 121.72778967916965,
+                  "max_steps": 32,
+                  "steps": [
+                    {
+                      "kind": "single",
+                      "before_ms": 284.0,
+                      "after_ms": 204.0,
+                      "on_path": 12,
+                      "firsts": 12,
+                      "singles_tried": 12,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 48,
+                      "positions_replayed": 12
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 204.0,
+                      "after_ms": 203.3,
+                      "on_path": 11,
+                      "firsts": 11,
+                      "singles_tried": 11,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 45,
+                      "positions_replayed": 11
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 203.3,
+                      "after_ms": 202.60000000000002,
+                      "on_path": 10,
+                      "firsts": 10,
+                      "singles_tried": 10,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 39,
+                      "positions_replayed": 10
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 202.60000000000002,
+                      "after_ms": 202.10000000000002,
+                      "on_path": 9,
+                      "firsts": 9,
+                      "singles_tried": 9,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 36,
+                      "positions_replayed": 9
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 202.10000000000002,
+                      "after_ms": 201.90000000000003,
+                      "on_path": 9,
+                      "firsts": 9,
+                      "singles_tried": 9,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 39,
+                      "positions_replayed": 9
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 201.90000000000003,
+                      "after_ms": 201.40000000000003,
+                      "on_path": 8,
+                      "firsts": 8,
+                      "singles_tried": 8,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 32,
+                      "positions_replayed": 8
+                    },
+                    {
+                      "kind": "pair",
+                      "before_ms": 201.40000000000003,
+                      "after_ms": 201.10000000000002,
+                      "on_path": 8,
+                      "firsts": 8,
+                      "singles_tried": 8,
+                      "second_candidates": 2,
+                      "second_trials": 2,
+                      "positions_scored": 47,
+                      "positions_replayed": 10
+                    },
+                    {
+                      "kind": "stalled",
+                      "before_ms": 201.10000000000002,
+                      "after_ms": null,
+                      "on_path": 4,
+                      "firsts": 4,
+                      "singles_tried": 4,
+                      "second_candidates": 1,
+                      "second_trials": 1,
+                      "positions_scored": 27,
+                      "positions_replayed": 5
+                    }
+                  ],
+                  "candidate_order": "input-node-order",
+                  "grouping": null,
+                  "top_k": null
+                },
+                "fraction": 0.6,
+                "full_budget_ms": 175.2,
+                "preparation_ms": 36.672210320830345,
+                "tail_reserve_ms": 16.8,
+                "allocated_decision_budget_ms": 121.72778967916965,
+                "tail_actual_ms": 5.411883816123009,
+                "total_ms": 79.31594736874104,
+                "budget_met": true,
+                "budget_overrun_ms": 0.0,
+                "fallback_reason": "",
+                "cost_policy": "fused_fw/nonnegative_overhead",
+                "execution_constraint": "per-chunk W accumulation order",
+                "search_capacity_policy": "final audit, otherwise unsplit base",
+                "diagnostic_cost_fixture": true,
+                "unavailable_split_costs": []
+              },
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 3,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    129,
+                    65
+                  ],
+                  "physical_tasks": 5,
+                  "key_tokens": [
+                    64,
+                    128,
+                    64,
+                    129,
+                    65
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    63,
+                    65
+                  ],
+                  "physical_tasks": 2,
+                  "key_tokens": [
+                    64,
+                    128
+                  ]
+                }
+              ],
+              "selected_h": 5,
+              "delayed_h": 3,
+              "crossed_kinds": [
+                "B",
+                "F",
+                "W"
+              ],
+              "changed_fb_stages": 3,
+              "wire_fifo_order_changed": false,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                734.341796875,
+                138.8408203125,
+                137.77880859375
+              ],
+              "predicted_peak_mib": [
+                873.5976715087891,
+                198.78321838378906,
+                198.470703125
+              ],
+              "fallback": "",
+              "planning": {
+                "base": "supply",
+                "base_fallback_reason": "",
+                "seed_makespan_ms": 276.0,
+                "selected_count": 5,
+                "decision": {
+                  "stop": "stalled",
+                  "decision_ms": 21.5565524995327,
+                  "budget_ms": 124.17090109288691,
+                  "max_steps": 32,
+                  "steps": [
+                    {
+                      "kind": "single",
+                      "before_ms": 276.0,
+                      "after_ms": 196.0,
+                      "on_path": 11,
+                      "firsts": 11,
+                      "singles_tried": 11,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 44,
+                      "positions_replayed": 11
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 196.0,
+                      "after_ms": 195.3,
+                      "on_path": 10,
+                      "firsts": 10,
+                      "singles_tried": 10,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 39,
+                      "positions_replayed": 10
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 195.3,
+                      "after_ms": 194.60000000000002,
+                      "on_path": 9,
+                      "firsts": 9,
+                      "singles_tried": 9,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 34,
+                      "positions_replayed": 9
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 194.60000000000002,
+                      "after_ms": 193.90000000000003,
+                      "on_path": 8,
+                      "firsts": 8,
+                      "singles_tried": 8,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 31,
+                      "positions_replayed": 8
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 193.90000000000003,
+                      "after_ms": 193.60000000000002,
+                      "on_path": 7,
+                      "firsts": 7,
+                      "singles_tried": 7,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 28,
+                      "positions_replayed": 7
+                    },
+                    {
+                      "kind": "stalled",
+                      "before_ms": 193.60000000000002,
+                      "after_ms": null,
+                      "on_path": 6,
+                      "firsts": 6,
+                      "singles_tried": 6,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 23,
+                      "positions_replayed": 6
+                    }
+                  ],
+                  "candidate_order": "input-node-order",
+                  "grouping": null,
+                  "top_k": null
+                },
+                "fraction": 0.6,
+                "full_budget_ms": 172.79999999999998,
+                "preparation_ms": 33.629098907113075,
+                "tail_reserve_ms": 15.0,
+                "allocated_decision_budget_ms": 124.17090109288691,
+                "tail_actual_ms": 4.642318934202194,
+                "total_ms": 61.2803790718317,
+                "budget_met": true,
+                "budget_overrun_ms": 0.0,
+                "fallback_reason": "",
+                "cost_policy": "fused_fw/nonnegative_overhead",
+                "execution_constraint": "per-chunk W accumulation order",
+                "search_capacity_policy": "final audit, otherwise unsplit base",
+                "diagnostic_cost_fixture": true,
+                "unavailable_split_costs": []
+              },
+              "all_rank_plan_match": true
+            }
+          ]
+        }
+      }
+    },
+    "mixed": {
+      "pattern": [
+        193,
+        129,
+        65,
+        17
+      ],
+      "arms": {
+        "reference": {
+          "command": {
+            "command": [
+              "/workspace/src/venvs/megatron/bin/python",
+              "-m",
+              "torch.distributed.run",
+              "--master-addr=127.0.0.1",
+              "--master-port=29546",
+              "--nproc-per-node=3",
+              "/workspace/tmp/dspp-p4-lengths-20261023/entry.py",
+              "--tensor-model-parallel-size",
+              "1",
+              "--pipeline-model-parallel-size",
+              "3",
+              "--num-layers-per-virtual-pipeline-stage",
+              "1",
+              "--num-layers",
+              "6",
+              "--hidden-size",
+              "512",
+              "--ffn-hidden-size",
+              "1024",
+              "--num-attention-heads",
+              "4",
+              "--seq-length",
+              "256",
+              "--max-position-embeddings",
+              "256",
+              "--micro-seq-length",
+              "64",
+              "--micro-batch-size",
+              "1",
+              "--global-batch-size",
+              "2",
+              "--train-iters",
+              "3",
+              "--seed",
+              "1234",
+              "--lr",
+              ".001",
+              "--min-lr",
+              ".0001",
+              "--lr-decay-style",
+              "cosine",
+              "--weight-decay",
+              ".1",
+              "--clip-grad",
+              "1",
+              "--bf16",
+              "--use-flash-attn",
+              "--no-masked-softmax-fusion",
+              "--no-position-embedding",
+              "--use-rotary-position-embeddings",
+              "--swiglu",
+              "--rms-norm",
+              "--disable-bias-linear",
+              "--no-query-key-layer-scaling",
+              "--hidden-dropout",
+              "0",
+              "--attention-dropout",
+              "0",
+              "--make-main-grad-addresss-divisible-by",
+              "1",
+              "--data-impl",
+              "mmap",
+              "--split",
+              "100,0,0",
+              "--tokenizer-type",
+              "SentencePieceTokenizer",
+              "--tokenizer-model",
+              "/workspace/src/tokenizers/Mistral-7B-v0.1/tokenizer.model",
+              "--dataloader-type",
+              "cyclic",
+              "--dspp",
+              "--dspp-v-layer-layout",
+              "balanced",
+              "--dspp-microbatch-order",
+              "warmup-short-steady-long",
+              "--dspp-packing-strategy",
+              "baseline",
+              "--dspp-recv-lookahead",
+              "2",
+              "--dspp-send-inflight-depth",
+              "2",
+              "--variable-seq-pad-token-id",
+              "0",
+              "--variable-seq-debug-num-batches",
+              "0",
+              "--eval-iters",
+              "0",
+              "--log-interval",
+              "1",
+              "--data-path",
+              "/workspace/tmp/dspp-p4-lengths-20261023/mixed/data",
+              "--dspp-schedule",
+              "template",
+              "--timing-log-level",
+              "0",
+              "--dspp-split-attention-backward",
+              "--dspp-history-dkv-after-dx",
+              "--dspp-memory-profile",
+              "/workspace/tmp/dspp-p2-split-memory-20261023/memory-profile.json",
+              "--dspp-memory-report-dir",
+              "/workspace/tmp/dspp-p4-lengths-20261023/mixed/reference/memory",
+              "--dspp-execution-profile",
+              "/workspace/tmp/dspp-p2-20261023/stage-profile-final.json",
+              "--dspp-p2p-profile",
+              "/workspace/tmp/dspp-p2-20261023/p2p.json"
+            ],
+            "diagnostic_costs": false,
+            "dataset": {
+              "kind": "synthetic-dspp-indexed-dataset",
+              "training_lengths_pattern": [
+                193,
+                129,
+                65,
+                17
+              ],
+              "raw_lengths_pattern": [
+                194,
+                130,
+                66,
+                18
+              ],
+              "raw_lengths_file": null,
+              "raw_lengths_sha256": null,
+              "repeats": 32,
+              "documents": 128,
+              "vocab_size": 32000,
+              "token_pattern": "sequential"
+            },
+            "started": 1792763774.853258,
+            "returncode": 0,
+            "ended": 1792763800.7307243
+          },
+          "iterations": [
+            {
+              "iteration": 1,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    17
+                  ],
+                  "physical_tasks": 1,
+                  "key_tokens": [
+                    17
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    17
+                  ],
+                  "physical_tasks": 1,
+                  "key_tokens": [
+                    17
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": null,
+              "allocated_peak_mib": [
+                673.72021484375,
+                109.0341796875,
+                109.0341796875
+              ],
+              "predicted_peak_mib": [
+                822.77734375,
+                161.08984375,
+                160.77734375
+              ],
+              "fallback": "",
+              "planning": null,
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 2,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    193
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    64,
+                    128,
+                    192,
+                    193
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    193
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    64,
+                    128,
+                    192,
+                    193
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": null,
+              "allocated_peak_mib": [
+                748.7998046875,
+                143.0390625,
+                143.10009765625
+              ],
+              "predicted_peak_mib": [
+                901.095703125,
+                209.408203125,
+                208.970703125
+              ],
+              "fallback": "",
+              "planning": null,
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 3,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    65
+                  ],
+                  "physical_tasks": 2,
+                  "key_tokens": [
+                    64,
+                    65
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    65
+                  ],
+                  "physical_tasks": 2,
+                  "key_tokens": [
+                    64,
+                    65
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": null,
+              "allocated_peak_mib": [
+                729.29248046875,
+                133.11083984375,
+                133.51416015625
+              ],
+              "predicted_peak_mib": [
+                875.224609375,
+                183.537109375,
+                183.224609375
+              ],
+              "fallback": "",
+              "planning": null,
+              "all_rank_plan_match": true
+            }
+          ]
+        },
+        "measured-b": {
+          "command": {
+            "command": [
+              "/workspace/src/venvs/megatron/bin/python",
+              "-m",
+              "torch.distributed.run",
+              "--master-addr=127.0.0.1",
+              "--master-port=29546",
+              "--nproc-per-node=3",
+              "/workspace/tmp/dspp-p4-lengths-20261023/entry.py",
+              "--tensor-model-parallel-size",
+              "1",
+              "--pipeline-model-parallel-size",
+              "3",
+              "--num-layers-per-virtual-pipeline-stage",
+              "1",
+              "--num-layers",
+              "6",
+              "--hidden-size",
+              "512",
+              "--ffn-hidden-size",
+              "1024",
+              "--num-attention-heads",
+              "4",
+              "--seq-length",
+              "256",
+              "--max-position-embeddings",
+              "256",
+              "--micro-seq-length",
+              "64",
+              "--micro-batch-size",
+              "1",
+              "--global-batch-size",
+              "2",
+              "--train-iters",
+              "3",
+              "--seed",
+              "1234",
+              "--lr",
+              ".001",
+              "--min-lr",
+              ".0001",
+              "--lr-decay-style",
+              "cosine",
+              "--weight-decay",
+              ".1",
+              "--clip-grad",
+              "1",
+              "--bf16",
+              "--use-flash-attn",
+              "--no-masked-softmax-fusion",
+              "--no-position-embedding",
+              "--use-rotary-position-embeddings",
+              "--swiglu",
+              "--rms-norm",
+              "--disable-bias-linear",
+              "--no-query-key-layer-scaling",
+              "--hidden-dropout",
+              "0",
+              "--attention-dropout",
+              "0",
+              "--make-main-grad-addresss-divisible-by",
+              "1",
+              "--data-impl",
+              "mmap",
+              "--split",
+              "100,0,0",
+              "--tokenizer-type",
+              "SentencePieceTokenizer",
+              "--tokenizer-model",
+              "/workspace/src/tokenizers/Mistral-7B-v0.1/tokenizer.model",
+              "--dataloader-type",
+              "cyclic",
+              "--dspp",
+              "--dspp-v-layer-layout",
+              "balanced",
+              "--dspp-microbatch-order",
+              "warmup-short-steady-long",
+              "--dspp-packing-strategy",
+              "baseline",
+              "--dspp-recv-lookahead",
+              "2",
+              "--dspp-send-inflight-depth",
+              "2",
+              "--variable-seq-pad-token-id",
+              "0",
+              "--variable-seq-debug-num-batches",
+              "0",
+              "--eval-iters",
+              "0",
+              "--log-interval",
+              "1",
+              "--data-path",
+              "/workspace/tmp/dspp-p4-lengths-20261023/mixed/data",
+              "--dspp-schedule",
+              "b",
+              "--timing-log-level",
+              "0",
+              "--dspp-split-attention-backward",
+              "--dspp-history-dkv-after-dx",
+              "--dspp-memory-profile",
+              "/workspace/tmp/dspp-p2-split-memory-20261023/memory-profile.json",
+              "--dspp-memory-report-dir",
+              "/workspace/tmp/dspp-p4-lengths-20261023/mixed/measured-b/memory",
+              "--dspp-execution-profile",
+              "/workspace/tmp/dspp-p2-20261023/stage-profile-final.json",
+              "--dspp-p2p-profile",
+              "/workspace/tmp/dspp-p2-20261023/p2p.json"
+            ],
+            "diagnostic_costs": false,
+            "dataset": {
+              "kind": "synthetic-dspp-indexed-dataset",
+              "training_lengths_pattern": [
+                193,
+                129,
+                65,
+                17
+              ],
+              "raw_lengths_pattern": [
+                194,
+                130,
+                66,
+                18
+              ],
+              "raw_lengths_file": null,
+              "raw_lengths_sha256": null,
+              "repeats": 32,
+              "documents": 128,
+              "vocab_size": 32000,
+              "token_pattern": "sequential"
+            },
+            "started": 1792763800.732675,
+            "returncode": 0,
+            "ended": 1792763837.8839018
+          },
+          "iterations": [
+            {
+              "iteration": 1,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    17
+                  ],
+                  "physical_tasks": 1,
+                  "key_tokens": [
+                    17
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    17
+                  ],
+                  "physical_tasks": 1,
+                  "key_tokens": [
+                    17
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                673.72021484375,
+                109.0341796875,
+                109.0341796875
+              ],
+              "predicted_peak_mib": [
+                822.77734375,
+                161.08984375,
+                160.77734375
+              ],
+              "fallback": "unreliable-compute-cost",
+              "planning": null,
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 2,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    193
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    64,
+                    128,
+                    192,
+                    193
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    193
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    64,
+                    128,
+                    192,
+                    193
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                748.7998046875,
+                143.0390625,
+                143.10009765625
+              ],
+              "predicted_peak_mib": [
+                901.095703125,
+                209.408203125,
+                208.970703125
+              ],
+              "fallback": "unreliable-compute-cost",
+              "planning": null,
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 3,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    65
+                  ],
+                  "physical_tasks": 2,
+                  "key_tokens": [
+                    64,
+                    65
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    65
+                  ],
+                  "physical_tasks": 2,
+                  "key_tokens": [
+                    64,
+                    65
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 0,
+              "wire_fifo_order_changed": false,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                729.29248046875,
+                133.11083984375,
+                133.51416015625
+              ],
+              "predicted_peak_mib": [
+                875.224609375,
+                183.537109375,
+                183.224609375
+              ],
+              "fallback": "unreliable-compute-cost",
+              "planning": null,
+              "all_rank_plan_match": true
+            }
+          ]
+        },
+        "split-b": {
+          "command": {
+            "command": [
+              "/workspace/src/venvs/megatron/bin/python",
+              "-m",
+              "torch.distributed.run",
+              "--master-addr=127.0.0.1",
+              "--master-port=29546",
+              "--nproc-per-node=3",
+              "/workspace/tmp/dspp-p4-lengths-20261023/entry.py",
+              "--tensor-model-parallel-size",
+              "1",
+              "--pipeline-model-parallel-size",
+              "3",
+              "--num-layers-per-virtual-pipeline-stage",
+              "1",
+              "--num-layers",
+              "6",
+              "--hidden-size",
+              "512",
+              "--ffn-hidden-size",
+              "1024",
+              "--num-attention-heads",
+              "4",
+              "--seq-length",
+              "256",
+              "--max-position-embeddings",
+              "256",
+              "--micro-seq-length",
+              "64",
+              "--micro-batch-size",
+              "1",
+              "--global-batch-size",
+              "2",
+              "--train-iters",
+              "3",
+              "--seed",
+              "1234",
+              "--lr",
+              ".001",
+              "--min-lr",
+              ".0001",
+              "--lr-decay-style",
+              "cosine",
+              "--weight-decay",
+              ".1",
+              "--clip-grad",
+              "1",
+              "--bf16",
+              "--use-flash-attn",
+              "--no-masked-softmax-fusion",
+              "--no-position-embedding",
+              "--use-rotary-position-embeddings",
+              "--swiglu",
+              "--rms-norm",
+              "--disable-bias-linear",
+              "--no-query-key-layer-scaling",
+              "--hidden-dropout",
+              "0",
+              "--attention-dropout",
+              "0",
+              "--make-main-grad-addresss-divisible-by",
+              "1",
+              "--data-impl",
+              "mmap",
+              "--split",
+              "100,0,0",
+              "--tokenizer-type",
+              "SentencePieceTokenizer",
+              "--tokenizer-model",
+              "/workspace/src/tokenizers/Mistral-7B-v0.1/tokenizer.model",
+              "--dataloader-type",
+              "cyclic",
+              "--dspp",
+              "--dspp-v-layer-layout",
+              "balanced",
+              "--dspp-microbatch-order",
+              "warmup-short-steady-long",
+              "--dspp-packing-strategy",
+              "baseline",
+              "--dspp-recv-lookahead",
+              "2",
+              "--dspp-send-inflight-depth",
+              "2",
+              "--variable-seq-pad-token-id",
+              "0",
+              "--variable-seq-debug-num-batches",
+              "0",
+              "--eval-iters",
+              "0",
+              "--log-interval",
+              "1",
+              "--data-path",
+              "/workspace/tmp/dspp-p4-lengths-20261023/mixed/data",
+              "--dspp-schedule",
+              "b",
+              "--timing-log-level",
+              "0",
+              "--dspp-split-attention-backward",
+              "--dspp-history-dkv-after-dx",
+              "--dspp-memory-profile",
+              "/workspace/tmp/dspp-p2-split-memory-20261023/memory-profile.json",
+              "--dspp-memory-report-dir",
+              "/workspace/tmp/dspp-p4-lengths-20261023/mixed/split-b/memory",
+              "--dspp-execution-profile",
+              "/workspace/tmp/dspp-p2-20261023/stage-profile-final.json",
+              "--dspp-p2p-profile",
+              "/workspace/tmp/dspp-p2-20261023/p2p.json"
+            ],
+            "diagnostic_costs": true,
+            "dataset": {
+              "kind": "synthetic-dspp-indexed-dataset",
+              "training_lengths_pattern": [
+                193,
+                129,
+                65,
+                17
+              ],
+              "raw_lengths_pattern": [
+                194,
+                130,
+                66,
+                18
+              ],
+              "raw_lengths_file": null,
+              "raw_lengths_sha256": null,
+              "repeats": 32,
+              "documents": 128,
+              "vocab_size": 32000,
+              "token_pattern": "sequential"
+            },
+            "started": 1792763837.8859177,
+            "returncode": 0,
+            "ended": 1792763876.6474655
+          },
+          "iterations": [
+            {
+              "iteration": 1,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    17
+                  ],
+                  "physical_tasks": 1,
+                  "key_tokens": [
+                    17
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    17
+                  ],
+                  "physical_tasks": 1,
+                  "key_tokens": [
+                    17
+                  ]
+                }
+              ],
+              "selected_h": 0,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 3,
+              "wire_fifo_order_changed": false,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                673.72021484375,
+                109.0341796875,
+                109.0341796875
+              ],
+              "predicted_peak_mib": [
+                822.77734375,
+                161.08984375,
+                160.77734375
+              ],
+              "fallback": "",
+              "planning": {
+                "base": "supply",
+                "base_fallback_reason": "",
+                "seed_makespan_ms": 78.0,
+                "selected_count": 0,
+                "decision": {
+                  "stop": "stalled",
+                  "decision_ms": 0.3097783774137497,
+                  "budget_ms": 0.0,
+                  "max_steps": 32,
+                  "steps": [
+                    {
+                      "kind": "stalled",
+                      "before_ms": 78.0,
+                      "after_ms": null,
+                      "on_path": 0,
+                      "firsts": 0,
+                      "singles_tried": 0,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 0,
+                      "positions_replayed": 0
+                    }
+                  ],
+                  "candidate_order": "input-node-order",
+                  "grouping": null,
+                  "top_k": null
+                },
+                "fraction": 0.6,
+                "full_budget_ms": 51.0,
+                "preparation_ms": 404.70996499061584,
+                "tail_reserve_ms": 14.4,
+                "allocated_decision_budget_ms": 0.0,
+                "tail_actual_ms": 4.616847261786461,
+                "total_ms": 410.8155518770218,
+                "budget_met": false,
+                "budget_overrun_ms": 359.8155518770218,
+                "fallback_reason": "",
+                "cost_policy": "fused_fw/nonnegative_overhead",
+                "execution_constraint": "per-chunk W accumulation order",
+                "search_capacity_policy": "final audit, otherwise unsplit base",
+                "diagnostic_cost_fixture": true,
+                "unavailable_split_costs": []
+              },
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 2,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    193
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    64,
+                    128,
+                    192,
+                    193
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    193
+                  ],
+                  "physical_tasks": 4,
+                  "key_tokens": [
+                    64,
+                    128,
+                    192,
+                    193
+                  ]
+                }
+              ],
+              "selected_h": 11,
+              "delayed_h": 4,
+              "crossed_kinds": [
+                "B",
+                "D",
+                "H",
+                "W"
+              ],
+              "changed_fb_stages": 3,
+              "wire_fifo_order_changed": false,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                746.943359375,
+                143.912109375,
+                143.10009765625
+              ],
+              "predicted_peak_mib": [
+                902.2246551513672,
+                211.9072265625,
+                212.22463989257812
+              ],
+              "fallback": "",
+              "planning": {
+                "base": "supply",
+                "base_fallback_reason": "",
+                "seed_makespan_ms": 290.0,
+                "selected_count": 11,
+                "decision": {
+                  "stop": "stalled",
+                  "decision_ms": 63.01880441606045,
+                  "budget_ms": 114.62165181338787,
+                  "max_steps": 32,
+                  "steps": [
+                    {
+                      "kind": "single",
+                      "before_ms": 290.0,
+                      "after_ms": 210.0,
+                      "on_path": 11,
+                      "firsts": 11,
+                      "singles_tried": 11,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 40,
+                      "positions_replayed": 11
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 210.0,
+                      "after_ms": 209.3,
+                      "on_path": 10,
+                      "firsts": 10,
+                      "singles_tried": 10,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 37,
+                      "positions_replayed": 10
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 209.3,
+                      "after_ms": 208.60000000000002,
+                      "on_path": 9,
+                      "firsts": 9,
+                      "singles_tried": 9,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 34,
+                      "positions_replayed": 9
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 208.60000000000002,
+                      "after_ms": 207.90000000000003,
+                      "on_path": 8,
+                      "firsts": 8,
+                      "singles_tried": 8,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 31,
+                      "positions_replayed": 8
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 207.90000000000003,
+                      "after_ms": 207.20000000000005,
+                      "on_path": 7,
+                      "firsts": 7,
+                      "singles_tried": 7,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 28,
+                      "positions_replayed": 7
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 207.20000000000005,
+                      "after_ms": 207.10000000000002,
+                      "on_path": 6,
+                      "firsts": 6,
+                      "singles_tried": 6,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 25,
+                      "positions_replayed": 6
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 207.10000000000002,
+                      "after_ms": 206.50000000000006,
+                      "on_path": 10,
+                      "firsts": 10,
+                      "singles_tried": 10,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 46,
+                      "positions_replayed": 10
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 206.50000000000006,
+                      "after_ms": 206.40000000000003,
+                      "on_path": 5,
+                      "firsts": 5,
+                      "singles_tried": 5,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 23,
+                      "positions_replayed": 5
+                    },
+                    {
+                      "kind": "single",
+                      "before_ms": 206.40000000000003,
+                      "after_ms": 206.3,
+                      "on_path": 9,
+                      "firsts": 9,
+                      "singles_tried": 9,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 42,
+                      "positions_replayed": 9
+                    },
+                    {
+                      "kind": "pair",
+                      "before_ms": 206.3,
+                      "after_ms": 205.80000000000007,
+                      "on_path": 6,
+                      "firsts": 6,
+                      "singles_tried": 6,
+                      "second_candidates": 8,
+                      "second_trials": 8,
+                      "positions_scored": 66,
+                      "positions_replayed": 14
+                    },
+                    {
+                      "kind": "stalled",
+                      "before_ms": 205.80000000000007,
+                      "after_ms": null,
+                      "on_path": 4,
+                      "firsts": 4,
+                      "singles_tried": 4,
+                      "second_candidates": 1,
+                      "second_trials": 1,
+                      "positions_scored": 24,
+                      "positions_replayed": 5
+                    }
+                  ],
+                  "candidate_order": "input-node-order",
+                  "grouping": null,
+                  "top_k": null
+                },
+                "fraction": 0.6,
+                "full_budget_ms": 180.0,
+                "preparation_ms": 47.37834818661213,
+                "tail_reserve_ms": 18.0,
+                "allocated_decision_budget_ms": 114.62165181338787,
+                "tail_actual_ms": 7.728075608611107,
+                "total_ms": 120.44047564268112,
+                "budget_met": true,
+                "budget_overrun_ms": 0.0,
+                "fallback_reason": "",
+                "cost_policy": "fused_fw/nonnegative_overhead",
+                "execution_constraint": "per-chunk W accumulation order",
+                "search_capacity_policy": "final audit, otherwise unsplit base",
+                "diagnostic_cost_fixture": true,
+                "unavailable_split_costs": []
+              },
+              "all_rank_plan_match": true
+            },
+            {
+              "iteration": 3,
+              "inputs": [
+                {
+                  "sequence_lengths": [
+                    65
+                  ],
+                  "physical_tasks": 2,
+                  "key_tokens": [
+                    64,
+                    65
+                  ]
+                },
+                {
+                  "sequence_lengths": [
+                    65
+                  ],
+                  "physical_tasks": 2,
+                  "key_tokens": [
+                    64,
+                    65
+                  ]
+                }
+              ],
+              "selected_h": 1,
+              "delayed_h": 0,
+              "crossed_kinds": [],
+              "changed_fb_stages": 3,
+              "wire_fifo_order_changed": true,
+              "max_abs": {
+                "params_before": 0.0,
+                "gradients": 0.0,
+                "params_after": 0.0,
+                "outputs": 0.0,
+                "dx": 0.0,
+                "logits": 0.0,
+                "loss": 0.0
+              },
+              "allocated_peak_mib": [
+                729.91748046875,
+                133.11083984375,
+                132.51416015625
+              ],
+              "predicted_peak_mib": [
+                862.09765625,
+                183.537109375,
+                183.224609375
+              ],
+              "fallback": "",
+              "planning": {
+                "base": "supply",
+                "base_fallback_reason": "",
+                "seed_makespan_ms": 267.0,
+                "selected_count": 1,
+                "decision": {
+                  "stop": "stalled",
+                  "decision_ms": 10.145287960767746,
+                  "budget_ms": 118.87914787232876,
+                  "max_steps": 32,
+                  "steps": [
+                    {
+                      "kind": "single",
+                      "before_ms": 267.0,
+                      "after_ms": 187.0,
+                      "on_path": 10,
+                      "firsts": 10,
+                      "singles_tried": 10,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 39,
+                      "positions_replayed": 10
+                    },
+                    {
+                      "kind": "stalled",
+                      "before_ms": 187.0,
+                      "after_ms": null,
+                      "on_path": 9,
+                      "firsts": 9,
+                      "singles_tried": 9,
+                      "second_candidates": 0,
+                      "second_trials": 0,
+                      "positions_scored": 30,
+                      "positions_replayed": 9
+                    }
+                  ],
+                  "candidate_order": "input-node-order",
+                  "grouping": null,
+                  "top_k": null
+                },
+                "fraction": 0.6,
+                "full_budget_ms": 168.6,
+                "preparation_ms": 34.12085212767124,
+                "tail_reserve_ms": 15.600000000000001,
+                "allocated_decision_budget_ms": 118.87914787232876,
+                "tail_actual_ms": 4.941664636135101,
+                "total_ms": 50.499530509114265,
+                "budget_met": true,
+                "budget_overrun_ms": 0.0,
+                "fallback_reason": "",
+                "cost_policy": "fused_fw/nonnegative_overhead",
+                "execution_constraint": "per-chunk W accumulation order",
+                "search_capacity_policy": "final audit, otherwise unsplit base",
+                "diagnostic_cost_fixture": true,
+                "unavailable_split_costs": []
+              },
+              "all_rank_plan_match": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  "original_pattern": [
+    193,
+    129,
+    33,
+    17
+  ],
+  "new_input_patterns": 3,
+  "completed_runs": 8,
+  "steps_per_run": 3,
+  "coverage_rejection_preserved": "boundary/reference-coverage-rejected",
+  "tolerance": {
+    "atol": 0.004,
+    "rtol": 0.01,
+    "relative_l2_max": 0.02
+  },
+  "deterministic_fa": true,
+  "production_cost_guards_unchanged": true
+}

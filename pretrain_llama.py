@@ -122,6 +122,15 @@ def loss_func(loss_mask, output_tensor):
     return loss, {'lm loss': averaged_loss[0]}
 
 
+def _materialize_dspp_cpu_batch(batch):
+    training_batch = batch.materialize(torch.device('cuda', torch.cuda.current_device()))
+    return training_batch, partial(loss_func, training_batch)
+
+
+# Explicit capability: other training entrypoints keep their existing get_batch.
+get_batch.dspp_materialize_cpu = _materialize_dspp_cpu_batch
+
+
 def forward_step(batch, kv_cache, model):
     """Forward step."""
     args = get_args()

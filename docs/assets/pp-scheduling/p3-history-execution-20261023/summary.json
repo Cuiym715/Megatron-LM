@@ -1,0 +1,431 @@
+{
+  "training": {
+    "adjacent": {
+      "returncode": 0,
+      "steps": 3,
+      "reports": 9,
+      "comparisons_max_abs": {},
+      "moved_h": [],
+      "peaks_by_rank": {
+        "0": {
+          "allocated_peak_mib": 749.08154296875,
+          "predicted_total_mib": 907.6218872070312,
+          "warm_allocated_peak_mib": 749.08154296875
+        },
+        "1": {
+          "allocated_peak_mib": 181.623046875,
+          "predicted_total_mib": 216.81036376953125,
+          "warm_allocated_peak_mib": 142.259765625
+        },
+        "2": {
+          "allocated_peak_mib": 181.123046875,
+          "predicted_total_mib": 216.81060791015625,
+          "warm_allocated_peak_mib": 141.39892578125
+        }
+      },
+      "communication": {
+        "D_local_boundary": 35,
+        "D_with_PP_send": 76,
+        "send_posted_before_H": 2
+      },
+      "plan_hashes": {
+        "1": "33350eeafd9d0081d7ab57f610963814c503fa18c7029ce08c5362891a8f260a",
+        "2": "b4a95d538292f9963ea75123a02648149fcd8a44f1593e151fe5b23ec79d19d1",
+        "3": "469fcadcc580bba51d069b38e4a59b7061737acb2870374fea8abb950b6d6d42"
+      }
+    },
+    "across-w": {
+      "returncode": 0,
+      "steps": 3,
+      "reports": 9,
+      "comparisons_max_abs": {
+        "params_before": 0,
+        "params_after": 0,
+        "gradients": 0,
+        "outputs": 0,
+        "dx": 0,
+        "logits": 0,
+        "loss": 0
+      },
+      "moved_h": [
+        {
+          "iteration": 1,
+          "stage": 0,
+          "task": [
+            0,
+            "H",
+            1,
+            4,
+            3
+          ],
+          "old_slot": 31,
+          "new_slot": 32,
+          "crossed": [
+            "W"
+          ]
+        },
+        {
+          "iteration": 2,
+          "stage": 0,
+          "task": [
+            0,
+            "H",
+            1,
+            1,
+            2
+          ],
+          "old_slot": 16,
+          "new_slot": 17,
+          "crossed": [
+            "W"
+          ]
+        },
+        {
+          "iteration": 3,
+          "stage": 0,
+          "task": [
+            0,
+            "H",
+            1,
+            2,
+            3
+          ],
+          "old_slot": 19,
+          "new_slot": 20,
+          "crossed": [
+            "W"
+          ]
+        }
+      ],
+      "peaks_by_rank": {
+        "0": {
+          "allocated_peak_mib": 749.08154296875,
+          "predicted_total_mib": 907.6218872070312,
+          "warm_allocated_peak_mib": 749.08154296875
+        },
+        "1": {
+          "allocated_peak_mib": 142.259765625,
+          "predicted_total_mib": 216.81036376953125,
+          "warm_allocated_peak_mib": 142.259765625
+        },
+        "2": {
+          "allocated_peak_mib": 141.39892578125,
+          "predicted_total_mib": 216.81060791015625,
+          "warm_allocated_peak_mib": 141.39892578125
+        }
+      },
+      "communication": {
+        "D_local_boundary": 35,
+        "D_with_PP_send": 76,
+        "send_posted_before_H": 4
+      },
+      "plan_hashes": {
+        "1": "db454a718dc6b0a5e24578f8197443e1f102fdd520b86d86ceb881dd5251100f",
+        "2": "f01e65c59f04447baa466e5ff5e330f3801aa8d8aa1c9b6c38ce9d8239ebfd84",
+        "3": "1d9ef9ea5b7f5248b0214943cc2d8114045659c2795e65a364aeec4cf4fba561"
+      }
+    },
+    "across-fb": {
+      "returncode": 0,
+      "steps": 3,
+      "reports": 9,
+      "comparisons_max_abs": {
+        "params_before": 0,
+        "params_after": 0,
+        "gradients": 0,
+        "outputs": 0,
+        "dx": 0,
+        "logits": 0,
+        "loss": 0
+      },
+      "moved_h": [
+        {
+          "iteration": 1,
+          "stage": 0,
+          "task": [
+            0,
+            "H",
+            1,
+            4,
+            3
+          ],
+          "old_slot": 31,
+          "new_slot": 33,
+          "crossed": [
+            "W",
+            "F"
+          ]
+        },
+        {
+          "iteration": 2,
+          "stage": 0,
+          "task": [
+            0,
+            "H",
+            1,
+            1,
+            2
+          ],
+          "old_slot": 16,
+          "new_slot": 18,
+          "crossed": [
+            "W",
+            "F"
+          ]
+        },
+        {
+          "iteration": 3,
+          "stage": 0,
+          "task": [
+            0,
+            "H",
+            1,
+            2,
+            3
+          ],
+          "old_slot": 19,
+          "new_slot": 21,
+          "crossed": [
+            "W",
+            "F"
+          ]
+        }
+      ],
+      "peaks_by_rank": {
+        "0": {
+          "allocated_peak_mib": 749.08154296875,
+          "predicted_total_mib": 907.6218872070312,
+          "warm_allocated_peak_mib": 749.08154296875
+        },
+        "1": {
+          "allocated_peak_mib": 142.259765625,
+          "predicted_total_mib": 216.81036376953125,
+          "warm_allocated_peak_mib": 142.259765625
+        },
+        "2": {
+          "allocated_peak_mib": 141.39892578125,
+          "predicted_total_mib": 216.81060791015625,
+          "warm_allocated_peak_mib": 141.39892578125
+        }
+      },
+      "communication": {
+        "D_local_boundary": 35,
+        "D_with_PP_send": 76,
+        "send_posted_before_H": 4
+      },
+      "plan_hashes": {
+        "1": "f44ad823c412b8043857ce4fc0d1ddd3f2b3978cc65ef728bd33176045efa567",
+        "2": "b4636f52220768d9b49a60db583f6f7f4e8be110368bed563f61e558c6e8d8e6",
+        "3": "3519254e9d06d8fb046ac6ce0392c1737f1034e4f1dd36061f5e10c207e103a7"
+      }
+    }
+  },
+  "base_plan_hashes": {
+    "1": "33350eeafd9d0081d7ab57f610963814c503fa18c7029ce08c5362891a8f260a",
+    "2": "b4a95d538292f9963ea75123a02648149fcd8a44f1593e151fe5b23ec79d19d1",
+    "3": "469fcadcc580bba51d069b38e4a59b7061737acb2870374fea8abb950b6d6d42"
+  },
+  "gpu_multilayer": {
+    "pending_tasks": 2,
+    "layers": 3,
+    "hq": 4,
+    "hk": 2,
+    "checks": {
+      "outputs": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "dx": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "0.ln1.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "0.ln1.bias": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "0.ln2.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "0.ln2.bias": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "0.q.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "0.k.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "0.v.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "0.o.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "0.up.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "0.up.bias": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "0.down.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "0.down.bias": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "1.ln1.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "1.ln1.bias": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "1.ln2.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "1.ln2.bias": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "1.q.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "1.k.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "1.v.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "1.o.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "1.up.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "1.up.bias": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "1.down.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "1.down.bias": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "2.ln1.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "2.ln1.bias": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "2.ln2.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "2.ln2.bias": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "2.q.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "2.k.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "2.v.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "2.o.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "2.up.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "2.up.bias": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "2.down.weight": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      },
+      "2.down.bias": {
+        "delayed_vs_adjacent": 0.0,
+        "fused_max_abs": 0.0,
+        "fused_relative_l2": 0.0
+      }
+    }
+  },
+  "cpu": {
+    "new_contract_cases": 6,
+    "existing_regression_cases": 97,
+    "targeted_calibration_cases": 2
+  }
+}

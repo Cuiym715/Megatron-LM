@@ -1,0 +1,666 @@
+{
+  "branch": "cuiym-dspp",
+  "head": "9550175c1d14ab309e96f090142e105b1a8501fd",
+  "cpu": "110 passed",
+  "gpu_command": {
+    "command": [
+      "/workspace/src/venvs/megatron/bin/python",
+      "-m",
+      "torch.distributed.run",
+      "--master-addr=127.0.0.1",
+      "--master-port=29528",
+      "--nproc-per-node=3",
+      "/workspace/tmp/dspp-p2-split-memory-20261023/validation_entry.py",
+      "--tensor-model-parallel-size",
+      "1",
+      "--pipeline-model-parallel-size",
+      "3",
+      "--num-layers-per-virtual-pipeline-stage",
+      "1",
+      "--num-layers",
+      "6",
+      "--hidden-size",
+      "512",
+      "--ffn-hidden-size",
+      "1024",
+      "--num-attention-heads",
+      "4",
+      "--seq-length",
+      "256",
+      "--max-position-embeddings",
+      "256",
+      "--micro-seq-length",
+      "64",
+      "--micro-batch-size",
+      "4",
+      "--global-batch-size",
+      "8",
+      "--train-iters",
+      "3",
+      "--seed",
+      "1234",
+      "--lr",
+      ".001",
+      "--min-lr",
+      ".0001",
+      "--lr-decay-style",
+      "cosine",
+      "--weight-decay",
+      ".1",
+      "--clip-grad",
+      "1",
+      "--bf16",
+      "--use-flash-attn",
+      "--no-masked-softmax-fusion",
+      "--no-position-embedding",
+      "--use-rotary-position-embeddings",
+      "--swiglu",
+      "--rms-norm",
+      "--disable-bias-linear",
+      "--no-query-key-layer-scaling",
+      "--hidden-dropout",
+      "0",
+      "--attention-dropout",
+      "0",
+      "--make-main-grad-addresss-divisible-by",
+      "1",
+      "--data-impl",
+      "mmap",
+      "--split",
+      "100,0,0",
+      "--tokenizer-type",
+      "SentencePieceTokenizer",
+      "--tokenizer-model",
+      "/workspace/src/tokenizers/Mistral-7B-v0.1/tokenizer.model",
+      "--dataloader-type",
+      "cyclic",
+      "--dspp",
+      "--dspp-v-layer-layout",
+      "balanced",
+      "--dspp-microbatch-order",
+      "warmup-short-steady-long",
+      "--dspp-packing-strategy",
+      "baseline",
+      "--dspp-recv-lookahead",
+      "2",
+      "--dspp-send-inflight-depth",
+      "2",
+      "--variable-seq-pad-token-id",
+      "0",
+      "--variable-seq-debug-num-batches",
+      "0",
+      "--eval-iters",
+      "0",
+      "--log-interval",
+      "1",
+      "--data-path",
+      "/workspace/tmp/dspp-p2-20261023/data",
+      "--dspp-schedule",
+      "template",
+      "--timing-log-level",
+      "0",
+      "--dspp-split-attention-backward",
+      "--dspp-history-dkv-after-dx",
+      "--dspp-memory-profile",
+      "/workspace/tmp/dspp-p2-split-memory-20261023/memory-profile.json",
+      "--dspp-memory-report-dir",
+      "/workspace/tmp/dspp-p2-split-memory-20261023/gpu/memory"
+    ],
+    "started": 1792756051.4789503,
+    "returncode": 0,
+    "ended": 1792756138.5186946
+  },
+  "gpu_records": [
+    {
+      "schema": "dspp-counted-memory-report-v1",
+      "version": "d49b64d696633d69c6dc71c840cb42d99a4520488fa1c2b5e066992d9588d5f2",
+      "scope": "frozen coefficient allowances; not a general allocator guarantee",
+      "baseline_dynamic_bytes": [
+        238075904,
+        105596928,
+        105332736
+      ],
+      "owner_peak_bytes": [
+        138217024,
+        75303776,
+        75303776
+      ],
+      "fixed_bytes": [
+        104189952,
+        34263040,
+        33935360
+      ],
+      "dynamic_peak_bytes": [
+        242406976,
+        109566816,
+        109239136
+      ],
+      "total_peak_bytes": [
+        951244352,
+        225958752,
+        225631072
+      ],
+      "capacity_bytes": [
+        145789747,
+        76613734,
+        76664012
+      ],
+      "owner_records": 228,
+      "category_allowance_bytes": {
+        "activation": 368541696,
+        "weight": 213909504,
+        "shared_kv": 16957440,
+        "history_source": 22490496,
+        "history_created": 2485632
+      },
+      "stage": 0,
+      "iteration": 1,
+      "plan_hash": "3dbbb46958d9f968d5c817946820b0e72ad15a0bbd14ca9fdfab35768a7816aa",
+      "algorithm": "template",
+      "fallback": "",
+      "observed_allocated_bytes": 549836800,
+      "observed_reserved_bytes": 572522496,
+      "observed_within_bound": true
+    },
+    {
+      "schema": "dspp-counted-memory-report-v1",
+      "version": "d49b64d696633d69c6dc71c840cb42d99a4520488fa1c2b5e066992d9588d5f2",
+      "scope": "frozen coefficient allowances; not a general allocator guarantee",
+      "baseline_dynamic_bytes": [
+        238075904,
+        105596928,
+        105332736
+      ],
+      "owner_peak_bytes": [
+        138217024,
+        75303776,
+        75303776
+      ],
+      "fixed_bytes": [
+        104189952,
+        34263040,
+        33935360
+      ],
+      "dynamic_peak_bytes": [
+        242406976,
+        109566816,
+        109239136
+      ],
+      "total_peak_bytes": [
+        951244352,
+        225958752,
+        225631072
+      ],
+      "capacity_bytes": [
+        145789747,
+        76613734,
+        76664012
+      ],
+      "owner_records": 228,
+      "category_allowance_bytes": {
+        "activation": 368541696,
+        "weight": 213909504,
+        "shared_kv": 16957440,
+        "history_source": 22490496,
+        "history_created": 2485632
+      },
+      "stage": 1,
+      "iteration": 1,
+      "plan_hash": "3dbbb46958d9f968d5c817946820b0e72ad15a0bbd14ca9fdfab35768a7816aa",
+      "algorithm": "template",
+      "fallback": "",
+      "observed_allocated_bytes": 190445568,
+      "observed_reserved_bytes": 205520896,
+      "observed_within_bound": true
+    },
+    {
+      "schema": "dspp-counted-memory-report-v1",
+      "version": "d49b64d696633d69c6dc71c840cb42d99a4520488fa1c2b5e066992d9588d5f2",
+      "scope": "frozen coefficient allowances; not a general allocator guarantee",
+      "baseline_dynamic_bytes": [
+        238075904,
+        105596928,
+        105332736
+      ],
+      "owner_peak_bytes": [
+        138217024,
+        75303776,
+        75303776
+      ],
+      "fixed_bytes": [
+        104189952,
+        34263040,
+        33935360
+      ],
+      "dynamic_peak_bytes": [
+        242406976,
+        109566816,
+        109239136
+      ],
+      "total_peak_bytes": [
+        951244352,
+        225958752,
+        225631072
+      ],
+      "capacity_bytes": [
+        145789747,
+        76613734,
+        76664012
+      ],
+      "owner_records": 228,
+      "category_allowance_bytes": {
+        "activation": 368541696,
+        "weight": 213909504,
+        "shared_kv": 16957440,
+        "history_source": 22490496,
+        "history_created": 2485632
+      },
+      "stage": 2,
+      "iteration": 1,
+      "plan_hash": "3dbbb46958d9f968d5c817946820b0e72ad15a0bbd14ca9fdfab35768a7816aa",
+      "algorithm": "template",
+      "fallback": "",
+      "observed_allocated_bytes": 189921280,
+      "observed_reserved_bytes": 205520896,
+      "observed_within_bound": true
+    },
+    {
+      "schema": "dspp-counted-memory-report-v1",
+      "version": "d49b64d696633d69c6dc71c840cb42d99a4520488fa1c2b5e066992d9588d5f2",
+      "scope": "frozen coefficient allowances; not a general allocator guarantee",
+      "baseline_dynamic_bytes": [
+        238759936,
+        106180608,
+        106016768
+      ],
+      "owner_peak_bytes": [
+        138781504,
+        76785472,
+        77113408
+      ],
+      "fixed_bytes": [
+        104091648,
+        34164736,
+        33837056
+      ],
+      "dynamic_peak_bytes": [
+        242873152,
+        110950208,
+        110950464
+      ],
+      "total_peak_bytes": [
+        951710528,
+        227342144,
+        227342400
+      ],
+      "capacity_bytes": [
+        146606284,
+        77324902,
+        77480550
+      ],
+      "owner_records": 228,
+      "category_allowance_bytes": {
+        "activation": 339574784,
+        "weight": 196083712,
+        "shared_kv": 17940480,
+        "history_source": 24682560,
+        "history_created": 2908224
+      },
+      "stage": 0,
+      "iteration": 2,
+      "plan_hash": "8bb054f0ac9d78d02b0ec911721198320bbc0c5674d7fb615ec4f22284aee556",
+      "algorithm": "template",
+      "fallback": "",
+      "observed_allocated_bytes": 786533888,
+      "observed_reserved_bytes": 832569344,
+      "observed_within_bound": true
+    },
+    {
+      "schema": "dspp-counted-memory-report-v1",
+      "version": "d49b64d696633d69c6dc71c840cb42d99a4520488fa1c2b5e066992d9588d5f2",
+      "scope": "frozen coefficient allowances; not a general allocator guarantee",
+      "baseline_dynamic_bytes": [
+        238759936,
+        106180608,
+        106016768
+      ],
+      "owner_peak_bytes": [
+        138781504,
+        76785472,
+        77113408
+      ],
+      "fixed_bytes": [
+        104091648,
+        34164736,
+        33837056
+      ],
+      "dynamic_peak_bytes": [
+        242873152,
+        110950208,
+        110950464
+      ],
+      "total_peak_bytes": [
+        951710528,
+        227342144,
+        227342400
+      ],
+      "capacity_bytes": [
+        146606284,
+        77324902,
+        77480550
+      ],
+      "owner_records": 228,
+      "category_allowance_bytes": {
+        "activation": 339574784,
+        "weight": 196083712,
+        "shared_kv": 17940480,
+        "history_source": 24682560,
+        "history_created": 2908224
+      },
+      "stage": 1,
+      "iteration": 2,
+      "plan_hash": "8bb054f0ac9d78d02b0ec911721198320bbc0c5674d7fb615ec4f22284aee556",
+      "algorithm": "template",
+      "fallback": "",
+      "observed_allocated_bytes": 135735296,
+      "observed_reserved_bytes": 207618048,
+      "observed_within_bound": true
+    },
+    {
+      "schema": "dspp-counted-memory-report-v1",
+      "version": "d49b64d696633d69c6dc71c840cb42d99a4520488fa1c2b5e066992d9588d5f2",
+      "scope": "frozen coefficient allowances; not a general allocator guarantee",
+      "baseline_dynamic_bytes": [
+        238759936,
+        106180608,
+        106016768
+      ],
+      "owner_peak_bytes": [
+        138781504,
+        76785472,
+        77113408
+      ],
+      "fixed_bytes": [
+        104091648,
+        34164736,
+        33837056
+      ],
+      "dynamic_peak_bytes": [
+        242873152,
+        110950208,
+        110950464
+      ],
+      "total_peak_bytes": [
+        951710528,
+        227342144,
+        227342400
+      ],
+      "capacity_bytes": [
+        146606284,
+        77324902,
+        77480550
+      ],
+      "owner_records": 228,
+      "category_allowance_bytes": {
+        "activation": 339574784,
+        "weight": 196083712,
+        "shared_kv": 17940480,
+        "history_source": 24682560,
+        "history_created": 2908224
+      },
+      "stage": 2,
+      "iteration": 2,
+      "plan_hash": "8bb054f0ac9d78d02b0ec911721198320bbc0c5674d7fb615ec4f22284aee556",
+      "algorithm": "template",
+      "fallback": "",
+      "observed_allocated_bytes": 135785984,
+      "observed_reserved_bytes": 207618048,
+      "observed_within_bound": true
+    },
+    {
+      "schema": "dspp-counted-memory-report-v1",
+      "version": "d49b64d696633d69c6dc71c840cb42d99a4520488fa1c2b5e066992d9588d5f2",
+      "scope": "frozen coefficient allowances; not a general allocator guarantee",
+      "baseline_dynamic_bytes": [
+        238444544,
+        105603072,
+        105277440
+      ],
+      "owner_peak_bytes": [
+        139540560,
+        76627568,
+        76630112
+      ],
+      "fixed_bytes": [
+        103839744,
+        33912832,
+        33585152
+      ],
+      "dynamic_peak_bytes": [
+        243380304,
+        110540400,
+        110215264
+      ],
+      "total_peak_bytes": [
+        952217680,
+        226932336,
+        226607200
+      ],
+      "capacity_bytes": [
+        146527027,
+        76970393,
+        76956160
+      ],
+      "owner_records": 204,
+      "category_allowance_bytes": {
+        "activation": 309624832,
+        "weight": 178257920,
+        "shared_kv": 16465920,
+        "history_source": 22899168,
+        "history_created": 2501088
+      },
+      "stage": 0,
+      "iteration": 3,
+      "plan_hash": "c93c2d9174fa1c0d1bdc3a13edc2f35a2192919012e37b7cc304010b284dd19a",
+      "algorithm": "template",
+      "fallback": "",
+      "observed_allocated_bytes": 785746432,
+      "observed_reserved_bytes": 834666496,
+      "observed_within_bound": true
+    },
+    {
+      "schema": "dspp-counted-memory-report-v1",
+      "version": "d49b64d696633d69c6dc71c840cb42d99a4520488fa1c2b5e066992d9588d5f2",
+      "scope": "frozen coefficient allowances; not a general allocator guarantee",
+      "baseline_dynamic_bytes": [
+        238444544,
+        105603072,
+        105277440
+      ],
+      "owner_peak_bytes": [
+        139540560,
+        76627568,
+        76630112
+      ],
+      "fixed_bytes": [
+        103839744,
+        33912832,
+        33585152
+      ],
+      "dynamic_peak_bytes": [
+        243380304,
+        110540400,
+        110215264
+      ],
+      "total_peak_bytes": [
+        952217680,
+        226932336,
+        226607200
+      ],
+      "capacity_bytes": [
+        146527027,
+        76970393,
+        76956160
+      ],
+      "owner_records": 204,
+      "category_allowance_bytes": {
+        "activation": 309624832,
+        "weight": 178257920,
+        "shared_kv": 16465920,
+        "history_source": 22899168,
+        "history_created": 2501088
+      },
+      "stage": 1,
+      "iteration": 3,
+      "plan_hash": "c93c2d9174fa1c0d1bdc3a13edc2f35a2192919012e37b7cc304010b284dd19a",
+      "algorithm": "template",
+      "fallback": "",
+      "observed_allocated_bytes": 136334848,
+      "observed_reserved_bytes": 209715200,
+      "observed_within_bound": true
+    },
+    {
+      "schema": "dspp-counted-memory-report-v1",
+      "version": "d49b64d696633d69c6dc71c840cb42d99a4520488fa1c2b5e066992d9588d5f2",
+      "scope": "frozen coefficient allowances; not a general allocator guarantee",
+      "baseline_dynamic_bytes": [
+        238444544,
+        105603072,
+        105277440
+      ],
+      "owner_peak_bytes": [
+        139540560,
+        76627568,
+        76630112
+      ],
+      "fixed_bytes": [
+        103839744,
+        33912832,
+        33585152
+      ],
+      "dynamic_peak_bytes": [
+        243380304,
+        110540400,
+        110215264
+      ],
+      "total_peak_bytes": [
+        952217680,
+        226932336,
+        226607200
+      ],
+      "capacity_bytes": [
+        146527027,
+        76970393,
+        76956160
+      ],
+      "owner_records": 204,
+      "category_allowance_bytes": {
+        "activation": 309624832,
+        "weight": 178257920,
+        "shared_kv": 16465920,
+        "history_source": 22899168,
+        "history_created": 2501088
+      },
+      "stage": 2,
+      "iteration": 3,
+      "plan_hash": "c93c2d9174fa1c0d1bdc3a13edc2f35a2192919012e37b7cc304010b284dd19a",
+      "algorithm": "template",
+      "fallback": "",
+      "observed_allocated_bytes": 136291840,
+      "observed_reserved_bytes": 209715200,
+      "observed_within_bound": true
+    }
+  ],
+  "whole_step_records": [
+    {
+      "rank": 0,
+      "iteration": 1,
+      "skipped": 0,
+      "whole_step_peak_allocated_bytes": 706758144,
+      "predicted_total_bytes": 951244352,
+      "loss": {
+        "lm loss": 10.464595794677734
+      },
+      "fallback": ""
+    },
+    {
+      "rank": 1,
+      "iteration": 1,
+      "skipped": 0,
+      "whole_step_peak_allocated_bytes": 190445568,
+      "predicted_total_bytes": 225958752,
+      "loss": {},
+      "fallback": ""
+    },
+    {
+      "rank": 2,
+      "iteration": 1,
+      "skipped": 0,
+      "whole_step_peak_allocated_bytes": 189921280,
+      "predicted_total_bytes": 225631072,
+      "loss": {},
+      "fallback": ""
+    },
+    {
+      "rank": 0,
+      "iteration": 2,
+      "skipped": 0,
+      "whole_step_peak_allocated_bytes": 786533888,
+      "predicted_total_bytes": 951710528,
+      "loss": {
+        "lm loss": 9.59391975402832
+      },
+      "fallback": ""
+    },
+    {
+      "rank": 1,
+      "iteration": 2,
+      "skipped": 0,
+      "whole_step_peak_allocated_bytes": 135735296,
+      "predicted_total_bytes": 227342144,
+      "loss": {},
+      "fallback": ""
+    },
+    {
+      "rank": 2,
+      "iteration": 2,
+      "skipped": 0,
+      "whole_step_peak_allocated_bytes": 135785984,
+      "predicted_total_bytes": 227342400,
+      "loss": {},
+      "fallback": ""
+    },
+    {
+      "rank": 0,
+      "iteration": 3,
+      "skipped": 0,
+      "whole_step_peak_allocated_bytes": 785746432,
+      "predicted_total_bytes": 952217680,
+      "loss": {
+        "lm loss": 10.022173881530762
+      },
+      "fallback": ""
+    },
+    {
+      "rank": 1,
+      "iteration": 3,
+      "skipped": 0,
+      "whole_step_peak_allocated_bytes": 136334848,
+      "predicted_total_bytes": 226932336,
+      "loss": {},
+      "fallback": ""
+    },
+    {
+      "rank": 2,
+      "iteration": 3,
+      "skipped": 0,
+      "whole_step_peak_allocated_bytes": 136291840,
+      "predicted_total_bytes": 226607200,
+      "loss": {},
+      "fallback": ""
+    }
+  ],
+  "scope": "PP3 immediate-after-dx execution only; PP4/8 and delayed/multiple H accounting only",
+  "code_unchanged_kernels": true,
+  "online_timing_predictor_replaced": false
+}

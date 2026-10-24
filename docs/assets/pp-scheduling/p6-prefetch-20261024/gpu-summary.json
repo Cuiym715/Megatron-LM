@@ -1,0 +1,539 @@
+{
+  "default_mode": true,
+  "input": {
+    "source": "existing A seed11 InfiniPipe Fig2 length approximation; unchanged synthetic tokens",
+    "data": "/home/cuiym/tmp/dspp-a-performance-20261023/data/seed11/data",
+    "model": "24 layers, hidden2048, FFN5504, MHA16, BF16, PP3/VPP2, chunk2048, micro4/global8",
+    "steps": 3,
+    "sequences": 24,
+    "valid_tokens": 38888
+  },
+  "runs": {
+    "sync-b": {
+      "iterations": [
+        1,
+        2,
+        3
+      ],
+      "valid_tokens": [
+        19448,
+        11512,
+        7928
+      ],
+      "algorithm": [
+        "B",
+        "B",
+        "B"
+      ],
+      "H_count": [
+        0,
+        0,
+        0
+      ],
+      "all_rank_plans_equal": true,
+      "no_skipped_or_nonfinite_loss": true,
+      "all_memory_within_bound": true,
+      "peak_GiB_by_stage": [
+        [
+          21.7216157913208,
+          15.890050888061523,
+          13.85860538482666
+        ],
+        [
+          20.239084243774414,
+          13.348578453063965,
+          11.351287841796875
+        ],
+        [
+          20.551676750183105,
+          13.340981483459473,
+          11.312238693237305
+        ]
+      ],
+      "end_GiB_by_stage": [
+        [
+          9.051482677459717,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ]
+    },
+    "async-b": {
+      "iterations": [
+        1,
+        2
+      ],
+      "valid_tokens": [
+        19448,
+        11512
+      ],
+      "algorithm": [
+        "B",
+        "B"
+      ],
+      "H_count": [
+        0,
+        0
+      ],
+      "all_rank_plans_equal": true,
+      "no_skipped_or_nonfinite_loss": true,
+      "all_memory_within_bound": true,
+      "peak_GiB_by_stage": [
+        [
+          21.7216157913208,
+          15.890050888061523
+        ],
+        [
+          20.239084243774414,
+          13.348578453063965
+        ],
+        [
+          20.551676750183105,
+          13.340981483459473
+        ]
+      ],
+      "end_GiB_by_stage": [
+        [
+          9.051482677459717,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "cpu_input_parity_on_GPU": true,
+      "worker_cuda_initialized": [
+        false,
+        false
+      ],
+      "prefetch_fallback": [
+        "",
+        ""
+      ],
+      "worker_ms": [
+        396.96924202144146,
+        37.21301816403866
+      ],
+      "boundary_wait_max_rank_ms": [
+        6165.179371833801,
+        30.405376106500626
+      ],
+      "input_wait_ms": [
+        null,
+        null
+      ],
+      "optimization_wait_ms": [
+        null,
+        null
+      ],
+      "commit_check_ms": [
+        null,
+        null
+      ],
+      "sample_ids": [
+        null,
+        null
+      ],
+      "consumed_samples": [
+        0,
+        8
+      ],
+      "unconsumed_future_discarded": true
+    },
+    "resume-b": {
+      "iterations": [
+        3
+      ],
+      "valid_tokens": [
+        7928
+      ],
+      "algorithm": [
+        "B"
+      ],
+      "H_count": [
+        0
+      ],
+      "all_rank_plans_equal": true,
+      "no_skipped_or_nonfinite_loss": true,
+      "all_memory_within_bound": true,
+      "peak_GiB_by_stage": [
+        [
+          13.858600616455078
+        ],
+        [
+          11.342994689941406
+        ],
+        [
+          11.323393821716309
+        ]
+      ],
+      "end_GiB_by_stage": [
+        [
+          9.051482677459717
+        ],
+        [
+          6.836733818054199
+        ],
+        [
+          6.836733818054199
+        ]
+      ],
+      "cpu_input_parity_on_GPU": true,
+      "worker_cuda_initialized": [
+        false
+      ],
+      "prefetch_fallback": [
+        ""
+      ],
+      "worker_ms": [
+        358.5386350750923
+      ],
+      "boundary_wait_max_rank_ms": [
+        5916.663968935609
+      ],
+      "input_wait_ms": [
+        null
+      ],
+      "optimization_wait_ms": [
+        null
+      ],
+      "commit_check_ms": [
+        null
+      ],
+      "sample_ids": [
+        [
+          [
+            16,
+            17,
+            18,
+            19
+          ],
+          [
+            20,
+            21,
+            22,
+            23
+          ]
+        ]
+      ],
+      "consumed_samples": [
+        16
+      ],
+      "unconsumed_future_discarded": false
+    },
+    "async-c": {
+      "iterations": [
+        1,
+        2,
+        3
+      ],
+      "valid_tokens": [
+        19448,
+        11512,
+        7928
+      ],
+      "algorithm": [
+        "C",
+        "C",
+        "C"
+      ],
+      "H_count": [
+        0,
+        0,
+        0
+      ],
+      "all_rank_plans_equal": true,
+      "no_skipped_or_nonfinite_loss": true,
+      "all_memory_within_bound": true,
+      "peak_GiB_by_stage": [
+        [
+          21.721631050109863,
+          15.890050888061523,
+          13.85860538482666
+        ],
+        [
+          20.239084243774414,
+          13.348578453063965,
+          11.351287841796875
+        ],
+        [
+          20.551676750183105,
+          13.340981483459473,
+          11.312238693237305
+        ]
+      ],
+      "end_GiB_by_stage": [
+        [
+          9.051482677459717,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "cpu_input_parity_on_GPU": true,
+      "worker_cuda_initialized": [
+        false,
+        false,
+        false
+      ],
+      "prefetch_fallback": [
+        "",
+        "",
+        ""
+      ],
+      "worker_ms": [
+        395.83577401936054,
+        70.4968199133873,
+        50.32301880419254
+      ],
+      "boundary_wait_max_rank_ms": [
+        6224.733440205455,
+        32.16026723384857,
+        42.387865483760834
+      ],
+      "input_wait_ms": [
+        22.3238468170166,
+        0.02541579306125641,
+        0.013967975974082947
+      ],
+      "optimization_wait_ms": [
+        6139.824690297246,
+        0.0,
+        0.0
+      ],
+      "commit_check_ms": [
+        27.591127902269363,
+        20.327560603618622,
+        33.85276906192303
+      ],
+      "sample_ids": [
+        [
+          [
+            0,
+            1,
+            2,
+            3
+          ],
+          [
+            4,
+            5,
+            6,
+            7
+          ]
+        ],
+        [
+          [
+            8,
+            9,
+            10,
+            11
+          ],
+          [
+            12,
+            13,
+            14,
+            15
+          ]
+        ],
+        [
+          [
+            16,
+            17,
+            18,
+            19
+          ],
+          [
+            20,
+            21,
+            22,
+            23
+          ]
+        ]
+      ],
+      "consumed_samples": [
+        0,
+        8,
+        16
+      ],
+      "unconsumed_future_discarded": false,
+      "payload_bytes": [
+        198649,
+        123379,
+        89887
+      ],
+      "verified_before_previous_gpu_end": [
+        true,
+        true
+      ]
+    },
+    "async-c-fault": {
+      "iterations": [
+        1,
+        2,
+        3
+      ],
+      "valid_tokens": [
+        19448,
+        11512,
+        7928
+      ],
+      "algorithm": [
+        "C",
+        "template",
+        "template"
+      ],
+      "H_count": [
+        0,
+        0,
+        0
+      ],
+      "all_rank_plans_equal": true,
+      "no_skipped_or_nonfinite_loss": true,
+      "all_memory_within_bound": true,
+      "peak_GiB_by_stage": [
+        [
+          21.7216157913208,
+          15.639098167419434,
+          13.85860538482666
+        ],
+        [
+          20.239084243774414,
+          12.877876281738281,
+          11.351287841796875
+        ],
+        [
+          20.543864250183105,
+          12.881010055541992,
+          11.312238693237305
+        ]
+      ],
+      "end_GiB_by_stage": [
+        [
+          9.051482677459717,
+          9.051483631134033,
+          9.051483631134033
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ],
+        [
+          6.836733818054199,
+          6.836733818054199,
+          6.836733818054199
+        ]
+      ],
+      "cpu_input_parity_on_GPU": true,
+      "worker_cuda_initialized": [
+        false,
+        null,
+        null
+      ],
+      "prefetch_fallback": [
+        "",
+        "planner-not-ready",
+        "worker-unavailable"
+      ],
+      "worker_ms": [
+        395.7038074731827,
+        null,
+        null
+      ],
+      "boundary_wait_max_rank_ms": [
+        6101.716183125973,
+        27.037009596824646,
+        32.58960880339146
+      ],
+      "input_wait_ms": [
+        null,
+        null,
+        null
+      ],
+      "optimization_wait_ms": [
+        null,
+        null,
+        null
+      ],
+      "commit_check_ms": [
+        null,
+        null,
+        null
+      ],
+      "sample_ids": [
+        [
+          [
+            0,
+            1,
+            2,
+            3
+          ],
+          [
+            4,
+            5,
+            6,
+            7
+          ]
+        ],
+        [
+          [
+            8,
+            9,
+            10,
+            11
+          ],
+          [
+            12,
+            13,
+            14,
+            15
+          ]
+        ],
+        [
+          [
+            16,
+            17,
+            18,
+            19
+          ],
+          [
+            20,
+            21,
+            22,
+            23
+          ]
+        ]
+      ],
+      "consumed_samples": [
+        0,
+        8,
+        16
+      ],
+      "unconsumed_future_discarded": false
+    }
+  }
+}

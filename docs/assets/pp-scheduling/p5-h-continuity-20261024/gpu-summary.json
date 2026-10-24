@@ -1,0 +1,1011 @@
+{
+  "purpose": "Three-step H/feedback continuity. Numerical failures recorded at unchanged thresholds, not accepted.",
+  "command_returncode": 0,
+  "steps": [
+    {
+      "iteration": 1,
+      "ranks": 3,
+      "same_plan": true,
+      "changed_stages": [
+        1,
+        2
+      ],
+      "H_set_unchanged": true,
+      "H": 1,
+      "feedback": {
+        "accepted": true,
+        "reason": "",
+        "passes": 1,
+        "withdraw": false,
+        "seed_ms": 34300.0,
+        "candidate_ms": 34150.0,
+        "selected_count": 1
+      },
+      "allocated_peak_GiB": [
+        21.716,
+        19.808,
+        20.542
+      ],
+      "allocated_end_GiB": [
+        9.051,
+        6.837,
+        6.837
+      ],
+      "numerical_pass": false,
+      "categories": {
+        "params_before": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failures": 0
+        },
+        "params_after": {
+          "max_abs": 0.0020751953125,
+          "max_relative_l2": 0.029570966973272054,
+          "failures": 15
+        },
+        "outputs": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failures": 0
+        },
+        "dx": {
+          "max_abs": 9.5367431640625e-07,
+          "max_relative_l2": 0.01328869293801422,
+          "failures": 0
+        },
+        "gradients": {
+          "max_abs": 0.00011125952005386353,
+          "max_relative_l2": 0.008309649721080154,
+          "failures": 0
+        },
+        "logits": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failures": 0
+        },
+        "loss": {
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "failures": 0
+        }
+      },
+      "H_count_matches": true,
+      "KV_drained": true,
+      "layer_history_jobs": 4
+    },
+    {
+      "iteration": 2,
+      "ranks": 3,
+      "same_plan": true,
+      "changed_stages": [],
+      "H_set_unchanged": true,
+      "H": 1,
+      "feedback": {
+        "accepted": false,
+        "reason": "no-makespan-improvement",
+        "passes": 1,
+        "withdraw": false,
+        "seed_ms": 28250.0,
+        "candidate_ms": 28250.0,
+        "selected_count": 1
+      },
+      "allocated_peak_GiB": [
+        15.906,
+        13.325,
+        13.349
+      ],
+      "allocated_end_GiB": [
+        9.051,
+        6.837,
+        6.837
+      ],
+      "numerical_pass": false,
+      "categories": {
+        "params_before": {
+          "max_abs": 0.0020751953125,
+          "max_relative_l2": 0.029570966973272054,
+          "failures": 15
+        },
+        "params_after": {
+          "max_abs": 0.0035247802734375,
+          "max_relative_l2": 0.03448153330969244,
+          "failures": 24
+        },
+        "outputs": {
+          "max_abs": 0.46484375,
+          "max_relative_l2": 0.09105183432381272,
+          "failures": 42
+        },
+        "dx": {
+          "max_abs": 0.000213623046875,
+          "max_relative_l2": 0.11006598699492635,
+          "failures": 31
+        },
+        "gradients": {
+          "max_abs": 0.05859428644180298,
+          "max_relative_l2": 0.0931518145286367,
+          "failures": 147
+        },
+        "logits": {
+          "max_abs": 0.78515625,
+          "max_relative_l2": 0.12629688120260024,
+          "failures": 7
+        },
+        "loss": {
+          "max_abs": 0.015834808349609375,
+          "max_relative_l2": 0.0015732062994197025,
+          "failures": 0
+        }
+      },
+      "H_count_matches": true,
+      "KV_drained": true,
+      "layer_history_jobs": 4
+    },
+    {
+      "iteration": 3,
+      "ranks": 3,
+      "same_plan": true,
+      "changed_stages": [],
+      "H_set_unchanged": true,
+      "H": 0,
+      "feedback": {
+        "accepted": false,
+        "reason": "no-makespan-improvement",
+        "passes": 1,
+        "withdraw": false,
+        "seed_ms": 13550.0,
+        "candidate_ms": 13550.0,
+        "selected_count": 0
+      },
+      "allocated_peak_GiB": [
+        13.866,
+        11.406,
+        11.371
+      ],
+      "allocated_end_GiB": [
+        9.051,
+        6.837,
+        6.837
+      ],
+      "numerical_pass": false,
+      "categories": {
+        "params_before": {
+          "max_abs": 0.0035247802734375,
+          "max_relative_l2": 0.03448153330969244,
+          "failures": 24
+        },
+        "params_after": {
+          "max_abs": 0.0040435791015625,
+          "max_relative_l2": 0.03656238356425305,
+          "failures": 26
+        },
+        "outputs": {
+          "max_abs": 1.8828125,
+          "max_relative_l2": 0.16343933891084356,
+          "failures": 30
+        },
+        "dx": {
+          "max_abs": 4.00543212890625e-05,
+          "max_relative_l2": 0.1576512268950604,
+          "failures": 25
+        },
+        "gradients": {
+          "max_abs": 0.02881215140223503,
+          "max_relative_l2": 0.2166812866325486,
+          "failures": 147
+        },
+        "logits": {
+          "max_abs": 1.109375,
+          "max_relative_l2": 0.12963034177103724,
+          "failures": 5
+        },
+        "loss": {
+          "max_abs": 0.015522003173828125,
+          "max_relative_l2": 0.001450270237132906,
+          "failures": 0
+        }
+      },
+      "H_count_matches": true,
+      "KV_drained": true,
+      "layer_history_jobs": 0
+    }
+  ],
+  "records": [
+    {
+      "iteration": 1,
+      "rank": 0,
+      "plan_sha256": "a7ebbeffc0dda5507760e5f5fb8ef6b8c15d4457edd24758c56a0c8c844289cc",
+      "total_H": 1,
+      "local_H": 1,
+      "executed_H": 1,
+      "layer_history_jobs": 4,
+      "H_count_matches": true,
+      "KV_drains": 4,
+      "KV_drained": true,
+      "history": [
+        {
+          "physical_task": 1,
+          "jobs": 4,
+          "pending_before": 4,
+          "pending_after": 0
+        }
+      ],
+      "feedback": {
+        "accepted": true,
+        "reason": "",
+        "passes": 1,
+        "withdraw": false,
+        "seed_ms": 34300.0,
+        "candidate_ms": 34150.0,
+        "selected_count": 1
+      },
+      "numerical_pass": false,
+      "categories": {
+        "params_before": {
+          "tensors": 51,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        },
+        "params_after": {
+          "tensors": 51,
+          "max_abs": 0.0020751953125,
+          "max_relative_l2": 0.029570966973272054,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+          "failures": 8
+        },
+        "outputs": {
+          "tensors": 20,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        },
+        "dx": {
+          "tensors": 10,
+          "max_abs": 8.940696716308594e-08,
+          "max_relative_l2": 0.00243514691033767,
+          "worst_name": "l0:p0:c1",
+          "failures": 0
+        },
+        "gradients": {
+          "tensors": 51,
+          "max_abs": 0.00011125952005386353,
+          "max_relative_l2": 0.008309649721080154,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.input_layernorm.weight",
+          "failures": 0
+        },
+        "logits": {
+          "tensors": 10,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        },
+        "loss": {
+          "tensors": 1,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        }
+      },
+      "memory": {
+        "allocated_start": 5389892608,
+        "allocated_end": 9718955520,
+        "allocated_peak": 23317200896,
+        "reserved_end": 24310185984
+      },
+      "predicted_total_bytes": 38694797312,
+      "below_memory_budget": true,
+      "metrics": {
+        "schedule_algorithm": "C",
+        "schedule_fallback": "",
+        "schedule_reference_ms": 47350.0,
+        "schedule_predicted_ms": 34150.0,
+        "valid_tokens": 19448,
+        "physical_microbatches": 10,
+        "physical_token_capacity": 20480,
+        "schedule_padding_slots": 1,
+        "schedule_slots": 11,
+        "order_cost_source": "metadata-proxy"
+      }
+    },
+    {
+      "iteration": 1,
+      "rank": 1,
+      "plan_sha256": "a7ebbeffc0dda5507760e5f5fb8ef6b8c15d4457edd24758c56a0c8c844289cc",
+      "total_H": 1,
+      "local_H": 0,
+      "executed_H": 0,
+      "layer_history_jobs": 0,
+      "H_count_matches": true,
+      "KV_drains": 4,
+      "KV_drained": true,
+      "history": [],
+      "feedback": {
+        "accepted": true,
+        "reason": "",
+        "passes": 1,
+        "withdraw": false,
+        "seed_ms": 34300.0,
+        "candidate_ms": 34150.0,
+        "selected_count": 1
+      },
+      "numerical_pass": false,
+      "categories": {
+        "params_before": {
+          "tensors": 48,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        },
+        "params_after": {
+          "tensors": 48,
+          "max_abs": 0.001983642578125,
+          "max_relative_l2": 0.024367449913491396,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+          "failures": 6
+        },
+        "outputs": {
+          "tensors": 20,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        },
+        "dx": {
+          "tensors": 20,
+          "max_abs": 9.5367431640625e-07,
+          "max_relative_l2": 0.01328869293801422,
+          "worst_name": "l0:p0:c0",
+          "failures": 0
+        },
+        "gradients": {
+          "tensors": 48,
+          "max_abs": 2.7228612452745438e-05,
+          "max_relative_l2": 0.00590934600111806,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight",
+          "failures": 0
+        },
+        "logits": {
+          "tensors": 0,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        },
+        "loss": {
+          "tensors": 0,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        }
+      },
+      "memory": {
+        "allocated_start": 4068805632,
+        "allocated_end": 7340887040,
+        "allocated_peak": 21269212160,
+        "reserved_end": 24010293248
+      },
+      "predicted_total_bytes": 34517336064,
+      "below_memory_budget": true,
+      "metrics": {}
+    },
+    {
+      "iteration": 1,
+      "rank": 2,
+      "plan_sha256": "a7ebbeffc0dda5507760e5f5fb8ef6b8c15d4457edd24758c56a0c8c844289cc",
+      "total_H": 1,
+      "local_H": 0,
+      "executed_H": 0,
+      "layer_history_jobs": 0,
+      "H_count_matches": true,
+      "KV_drains": 4,
+      "KV_drained": true,
+      "history": [],
+      "feedback": {
+        "accepted": true,
+        "reason": "",
+        "passes": 1,
+        "withdraw": false,
+        "seed_ms": 34300.0,
+        "candidate_ms": 34150.0,
+        "selected_count": 1
+      },
+      "numerical_pass": false,
+      "categories": {
+        "params_before": {
+          "tensors": 48,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        },
+        "params_after": {
+          "tensors": 48,
+          "max_abs": 0.001953125,
+          "max_relative_l2": 0.020062444337721894,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+          "failures": 1
+        },
+        "outputs": {
+          "tensors": 20,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        },
+        "dx": {
+          "tensors": 20,
+          "max_abs": 4.76837158203125e-07,
+          "max_relative_l2": 0.01081410255971257,
+          "worst_name": "l0:p0:c0",
+          "failures": 0
+        },
+        "gradients": {
+          "tensors": 48,
+          "max_abs": 1.2796663213521242e-05,
+          "max_relative_l2": 0.005017872099673326,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight",
+          "failures": 0
+        },
+        "logits": {
+          "tensors": 0,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        },
+        "loss": {
+          "tensors": 0,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        }
+      },
+      "memory": {
+        "allocated_start": 4068805632,
+        "allocated_end": 7340887040,
+        "allocated_peak": 22056692736,
+        "reserved_end": 24436015104
+      },
+      "predicted_total_bytes": 35428548608,
+      "below_memory_budget": true,
+      "metrics": {}
+    },
+    {
+      "iteration": 2,
+      "rank": 0,
+      "plan_sha256": "83a8e165867c4ccb7242cf1b16c2d7244715bb042bd1a3fd02bfebd1e6b4a1f4",
+      "total_H": 1,
+      "local_H": 1,
+      "executed_H": 1,
+      "layer_history_jobs": 4,
+      "H_count_matches": true,
+      "KV_drains": 4,
+      "KV_drained": true,
+      "history": [
+        {
+          "physical_task": 1,
+          "jobs": 4,
+          "pending_before": 4,
+          "pending_after": 0
+        }
+      ],
+      "feedback": {
+        "accepted": false,
+        "reason": "no-makespan-improvement",
+        "passes": 1,
+        "withdraw": false,
+        "seed_ms": 28250.0,
+        "candidate_ms": 28250.0,
+        "selected_count": 1
+      },
+      "numerical_pass": false,
+      "categories": {
+        "params_before": {
+          "tensors": 51,
+          "max_abs": 0.0020751953125,
+          "max_relative_l2": 0.029570966973272054,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+          "failures": 8
+        },
+        "params_after": {
+          "tensors": 51,
+          "max_abs": 0.0035247802734375,
+          "max_relative_l2": 0.03448153330969244,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+          "failures": 8
+        },
+        "outputs": {
+          "tensors": 14,
+          "max_abs": 0.4426765441894531,
+          "max_relative_l2": 0.06509466578963921,
+          "worst_name": "l0:p2:c0",
+          "failures": 14
+        },
+        "dx": {
+          "tensors": 7,
+          "max_abs": 5.066394805908203e-07,
+          "max_relative_l2": 0.03312690936843344,
+          "worst_name": "l0:p3:c1",
+          "failures": 5
+        },
+        "gradients": {
+          "tensors": 51,
+          "max_abs": 0.05859428644180298,
+          "max_relative_l2": 0.09295945434315693,
+          "worst_name": "1:module.module.language_model.encoder.layers.3.mlp.dense_h_to_4h.weight",
+          "failures": 51
+        },
+        "logits": {
+          "tensors": 7,
+          "max_abs": 0.78515625,
+          "max_relative_l2": 0.12629688120260024,
+          "worst_name": "l0:p2:c1",
+          "failures": 7
+        },
+        "loss": {
+          "tensors": 1,
+          "max_abs": 0.015834808349609375,
+          "max_relative_l2": 0.0015732062994197025,
+          "worst_name": "lm loss",
+          "failures": 0
+        }
+      },
+      "memory": {
+        "allocated_start": 9718956032,
+        "allocated_end": 9718956544,
+        "allocated_peak": 17078589440,
+        "reserved_end": 24310185984
+      },
+      "predicted_total_bytes": 24189918208,
+      "below_memory_budget": true,
+      "metrics": {
+        "schedule_algorithm": "C",
+        "schedule_fallback": "no-makespan-improvement",
+        "schedule_reference_ms": 36550.0,
+        "schedule_predicted_ms": 28250.0,
+        "valid_tokens": 11512,
+        "physical_microbatches": 7,
+        "physical_token_capacity": 14336,
+        "schedule_padding_slots": 0,
+        "schedule_slots": 7,
+        "order_cost_source": "metadata-proxy"
+      }
+    },
+    {
+      "iteration": 2,
+      "rank": 1,
+      "plan_sha256": "83a8e165867c4ccb7242cf1b16c2d7244715bb042bd1a3fd02bfebd1e6b4a1f4",
+      "total_H": 1,
+      "local_H": 0,
+      "executed_H": 0,
+      "layer_history_jobs": 0,
+      "H_count_matches": true,
+      "KV_drains": 4,
+      "KV_drained": true,
+      "history": [],
+      "feedback": {
+        "accepted": false,
+        "reason": "no-makespan-improvement",
+        "passes": 1,
+        "withdraw": false,
+        "seed_ms": 28250.0,
+        "candidate_ms": 28250.0,
+        "selected_count": 1
+      },
+      "numerical_pass": false,
+      "categories": {
+        "params_before": {
+          "tensors": 48,
+          "max_abs": 0.001983642578125,
+          "max_relative_l2": 0.024367449913491396,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+          "failures": 6
+        },
+        "params_after": {
+          "tensors": 48,
+          "max_abs": 0.00341796875,
+          "max_relative_l2": 0.028784828187590476,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+          "failures": 8
+        },
+        "outputs": {
+          "tensors": 14,
+          "max_abs": 0.46484375,
+          "max_relative_l2": 0.08916450203576756,
+          "worst_name": "l0:p2:c1",
+          "failures": 14
+        },
+        "dx": {
+          "tensors": 14,
+          "max_abs": 0.000213623046875,
+          "max_relative_l2": 0.11006598699492635,
+          "worst_name": "l0:p3:c0",
+          "failures": 12
+        },
+        "gradients": {
+          "tensors": 48,
+          "max_abs": 0.008830800652503967,
+          "max_relative_l2": 0.0931518145286367,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight",
+          "failures": 48
+        },
+        "logits": {
+          "tensors": 0,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        },
+        "loss": {
+          "tensors": 0,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        }
+      },
+      "memory": {
+        "allocated_start": 7340887040,
+        "allocated_end": 7340887040,
+        "allocated_peak": 14307893248,
+        "reserved_end": 24171773952
+      },
+      "predicted_total_bytes": 21128273920,
+      "below_memory_budget": true,
+      "metrics": {}
+    },
+    {
+      "iteration": 2,
+      "rank": 2,
+      "plan_sha256": "83a8e165867c4ccb7242cf1b16c2d7244715bb042bd1a3fd02bfebd1e6b4a1f4",
+      "total_H": 1,
+      "local_H": 0,
+      "executed_H": 0,
+      "layer_history_jobs": 0,
+      "H_count_matches": true,
+      "KV_drains": 4,
+      "KV_drained": true,
+      "history": [],
+      "feedback": {
+        "accepted": false,
+        "reason": "no-makespan-improvement",
+        "passes": 1,
+        "withdraw": false,
+        "seed_ms": 28250.0,
+        "candidate_ms": 28250.0,
+        "selected_count": 1
+      },
+      "numerical_pass": false,
+      "categories": {
+        "params_before": {
+          "tensors": 48,
+          "max_abs": 0.001953125,
+          "max_relative_l2": 0.020062444337721894,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+          "failures": 1
+        },
+        "params_after": {
+          "tensors": 48,
+          "max_abs": 0.00333404541015625,
+          "max_relative_l2": 0.023622849293954935,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+          "failures": 8
+        },
+        "outputs": {
+          "tensors": 14,
+          "max_abs": 0.4052734375,
+          "max_relative_l2": 0.09105183432381272,
+          "worst_name": "l0:p2:c0",
+          "failures": 14
+        },
+        "dx": {
+          "tensors": 14,
+          "max_abs": 2.47955322265625e-05,
+          "max_relative_l2": 0.08621115174406585,
+          "worst_name": "l0:p3:c0",
+          "failures": 14
+        },
+        "gradients": {
+          "tensors": 48,
+          "max_abs": 0.003533612936735153,
+          "max_relative_l2": 0.08710214258152676,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight",
+          "failures": 48
+        },
+        "logits": {
+          "tensors": 0,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        },
+        "loss": {
+          "tensors": 0,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        }
+      },
+      "memory": {
+        "allocated_start": 7340887040,
+        "allocated_end": 7340887040,
+        "allocated_peak": 14333158400,
+        "reserved_end": 24597495808
+      },
+      "predicted_total_bytes": 21108383744,
+      "below_memory_budget": true,
+      "metrics": {}
+    },
+    {
+      "iteration": 3,
+      "rank": 0,
+      "plan_sha256": "f69ff4574cc53a5e1073af7f27a64ec9e24632935b9ad2ca4aeda42045293670",
+      "total_H": 0,
+      "local_H": 0,
+      "executed_H": 0,
+      "layer_history_jobs": 0,
+      "H_count_matches": true,
+      "KV_drains": 4,
+      "KV_drained": true,
+      "history": [],
+      "feedback": {
+        "accepted": false,
+        "reason": "no-makespan-improvement",
+        "passes": 1,
+        "withdraw": false,
+        "seed_ms": 13550.0,
+        "candidate_ms": 13550.0,
+        "selected_count": 0
+      },
+      "numerical_pass": false,
+      "categories": {
+        "params_before": {
+          "tensors": 51,
+          "max_abs": 0.0035247802734375,
+          "max_relative_l2": 0.03448153330969244,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+          "failures": 8
+        },
+        "params_after": {
+          "tensors": 51,
+          "max_abs": 0.0040435791015625,
+          "max_relative_l2": 0.03656238356425305,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+          "failures": 8
+        },
+        "outputs": {
+          "tensors": 10,
+          "max_abs": 0.671483039855957,
+          "max_relative_l2": 0.10166961528298596,
+          "worst_name": "l1:p0:c0",
+          "failures": 10
+        },
+        "dx": {
+          "tensors": 5,
+          "max_abs": 3.725290298461914e-07,
+          "max_relative_l2": 0.036106884480750896,
+          "worst_name": "l1:p0:c1",
+          "failures": 5
+        },
+        "gradients": {
+          "tensors": 51,
+          "max_abs": 0.02881215140223503,
+          "max_relative_l2": 0.19722376547271842,
+          "worst_name": "1:module.module.language_model.encoder.layers.1.input_layernorm.weight",
+          "failures": 51
+        },
+        "logits": {
+          "tensors": 5,
+          "max_abs": 1.109375,
+          "max_relative_l2": 0.12963034177103724,
+          "worst_name": "l0:p1:c1",
+          "failures": 5
+        },
+        "loss": {
+          "tensors": 1,
+          "max_abs": 0.015522003173828125,
+          "max_relative_l2": 0.001450270237132906,
+          "worst_name": "lm loss",
+          "failures": 0
+        }
+      },
+      "memory": {
+        "allocated_start": 9718956032,
+        "allocated_end": 9718956544,
+        "allocated_peak": 14888826880,
+        "reserved_end": 24310185984
+      },
+      "predicted_total_bytes": 20450836480,
+      "below_memory_budget": true,
+      "metrics": {
+        "schedule_algorithm": "C",
+        "schedule_fallback": "no-makespan-improvement",
+        "schedule_reference_ms": 13750.0,
+        "schedule_predicted_ms": 13550.0,
+        "valid_tokens": 7928,
+        "physical_microbatches": 5,
+        "physical_token_capacity": 10240,
+        "schedule_padding_slots": 0,
+        "schedule_slots": 5,
+        "order_cost_source": "metadata-proxy"
+      }
+    },
+    {
+      "iteration": 3,
+      "rank": 1,
+      "plan_sha256": "f69ff4574cc53a5e1073af7f27a64ec9e24632935b9ad2ca4aeda42045293670",
+      "total_H": 0,
+      "local_H": 0,
+      "executed_H": 0,
+      "layer_history_jobs": 0,
+      "H_count_matches": true,
+      "KV_drains": 4,
+      "KV_drained": true,
+      "history": [],
+      "feedback": {
+        "accepted": false,
+        "reason": "no-makespan-improvement",
+        "passes": 1,
+        "withdraw": false,
+        "seed_ms": 13550.0,
+        "candidate_ms": 13550.0,
+        "selected_count": 0
+      },
+      "numerical_pass": false,
+      "categories": {
+        "params_before": {
+          "tensors": 48,
+          "max_abs": 0.00341796875,
+          "max_relative_l2": 0.028784828187590476,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+          "failures": 8
+        },
+        "params_after": {
+          "tensors": 48,
+          "max_abs": 0.00395965576171875,
+          "max_relative_l2": 0.03167433864909477,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+          "failures": 8
+        },
+        "outputs": {
+          "tensors": 10,
+          "max_abs": 1.8828125,
+          "max_relative_l2": 0.12254457720753445,
+          "worst_name": "l0:p1:c1",
+          "failures": 10
+        },
+        "dx": {
+          "tensors": 10,
+          "max_abs": 4.00543212890625e-05,
+          "max_relative_l2": 0.1576512268950604,
+          "worst_name": "l0:p1:c0",
+          "failures": 10
+        },
+        "gradients": {
+          "tensors": 48,
+          "max_abs": 0.0016618454828858376,
+          "max_relative_l2": 0.2166812866325486,
+          "worst_name": "0:module.module.language_model.encoder.layers.3.post_attention_layernorm.weight",
+          "failures": 48
+        },
+        "logits": {
+          "tensors": 0,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        },
+        "loss": {
+          "tensors": 0,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        }
+      },
+      "memory": {
+        "allocated_start": 7340887040,
+        "allocated_end": 7340887040,
+        "allocated_peak": 12246987776,
+        "reserved_end": 24171773952
+      },
+      "predicted_total_bytes": 17479204864,
+      "below_memory_budget": true,
+      "metrics": {}
+    },
+    {
+      "iteration": 3,
+      "rank": 2,
+      "plan_sha256": "f69ff4574cc53a5e1073af7f27a64ec9e24632935b9ad2ca4aeda42045293670",
+      "total_H": 0,
+      "local_H": 0,
+      "executed_H": 0,
+      "layer_history_jobs": 0,
+      "H_count_matches": true,
+      "KV_drains": 4,
+      "KV_drained": true,
+      "history": [],
+      "feedback": {
+        "accepted": false,
+        "reason": "no-makespan-improvement",
+        "passes": 1,
+        "withdraw": false,
+        "seed_ms": 13550.0,
+        "candidate_ms": 13550.0,
+        "selected_count": 0
+      },
+      "numerical_pass": false,
+      "categories": {
+        "params_before": {
+          "tensors": 48,
+          "max_abs": 0.00333404541015625,
+          "max_relative_l2": 0.023622849293954935,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+          "failures": 8
+        },
+        "params_after": {
+          "tensors": 48,
+          "max_abs": 0.00390625,
+          "max_relative_l2": 0.026071452115930607,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+          "failures": 10
+        },
+        "outputs": {
+          "tensors": 10,
+          "max_abs": 1.50390625,
+          "max_relative_l2": 0.16343933891084356,
+          "worst_name": "l0:p1:c1",
+          "failures": 10
+        },
+        "dx": {
+          "tensors": 10,
+          "max_abs": 8.106231689453125e-06,
+          "max_relative_l2": 0.0955309562866804,
+          "worst_name": "l1:p0:c0",
+          "failures": 10
+        },
+        "gradients": {
+          "tensors": 48,
+          "max_abs": 0.000823210459202528,
+          "max_relative_l2": 0.20714266029325848,
+          "worst_name": "0:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight",
+          "failures": 48
+        },
+        "logits": {
+          "tensors": 0,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        },
+        "loss": {
+          "tensors": 0,
+          "max_abs": 0.0,
+          "max_relative_l2": 0.0,
+          "worst_name": "",
+          "failures": 0
+        }
+      },
+      "memory": {
+        "allocated_start": 7340887040,
+        "allocated_end": 7340887040,
+        "allocated_peak": 12209313792,
+        "reserved_end": 24597495808
+      },
+      "predicted_total_bytes": 17400561664,
+      "below_memory_budget": true,
+      "metrics": {}
+    }
+  ],
+  "continuity_pass": true,
+  "numerical_pass": false
+}

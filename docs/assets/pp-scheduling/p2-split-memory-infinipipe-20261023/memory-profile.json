@@ -1,0 +1,127 @@
+{
+  "schema": "dspp-counted-memory-v2",
+  "source": "P2 c64 owners-fixed iterations 2/3; source formulas; 25% padding plus MiB rounding; explicit source/dO/LSE/rounded-delta allowances from fa_split.py",
+  "device_name": "NVIDIA L40",
+  "layout": {
+    "pp": 3,
+    "vpp": 2,
+    "dtype": "torch.bfloat16",
+    "chunk_size": 64,
+    "model": {
+      "num_layers": 6,
+      "hidden_size": 512,
+      "ffn_hidden_size": 1024,
+      "num_attention_heads": 4,
+      "num_query_groups": 1,
+      "group_query_attention": false,
+      "kv_channels": 128,
+      "padded_vocab_size": 32128,
+      "dspp_v_layer_layout": "balanced",
+      "normalization": null,
+      "norm_epsilon": null,
+      "swiglu": true,
+      "position_embedding_type": null,
+      "rotary_percent": 1.0,
+      "rotary_base": null,
+      "hidden_dropout": 0.0,
+      "attention_dropout": 0.0,
+      "gradient_accumulation_fusion": true,
+      "tensor_model_parallel_size": 1,
+      "context_parallel_size": 1,
+      "sequence_parallel": false,
+      "transformer_impl": "local",
+      "untie_embeddings_and_output_weights": false,
+      "recompute_granularity": null,
+      "recompute_method": null,
+      "recompute_num_layers": 1,
+      "use_flash_attn": true,
+      "rms_norm": true,
+      "use_fast_rms_norm": false,
+      "layernorm_epsilon": 1e-05,
+      "use_rotary_position_embeddings": true,
+      "disable_bias_linear": null,
+      "bias_gelu_fusion": false,
+      "bias_dropout_fusion": true,
+      "fp32_residual_connection": false
+    },
+    "mode": "after-dx-eager-v1",
+    "torch": "2.10.0a0+a36e1d39eb.nv26.01.42222806",
+    "cuda": "13.1"
+  },
+  "dynamic_growth": 0.05,
+  "limits": {
+    "max_tasks": 12,
+    "max_logical_batches": 2,
+    "max_key_tokens": 227,
+    "max_items": 3
+  },
+  "stages": [
+    {
+      "resident_bytes": 708837376,
+      "workspace_bytes": 98566144,
+      "physical_bytes": 47576711168,
+      "reserve_bytes": 1073741824,
+      "activation_bytes": [
+        3145728,
+        13631488
+      ],
+      "weight_bytes": [
+        2097152,
+        7340032
+      ],
+      "kv_bytes_per_token": [
+        5120,
+        5120
+      ],
+      "attention_bytes_per_key_token": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "resident_bytes": 116391936,
+      "workspace_bytes": 28311552,
+      "physical_bytes": 47576711168,
+      "reserve_bytes": 1073741824,
+      "activation_bytes": [
+        3145728,
+        3145728
+      ],
+      "weight_bytes": [
+        2097152,
+        2097152
+      ],
+      "kv_bytes_per_token": [
+        5120,
+        5120
+      ],
+      "attention_bytes_per_key_token": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "resident_bytes": 116391936,
+      "workspace_bytes": 28311552,
+      "physical_bytes": 47576711168,
+      "reserve_bytes": 1073741824,
+      "activation_bytes": [
+        3145728,
+        3145728
+      ],
+      "weight_bytes": [
+        2097152,
+        2097152
+      ],
+      "kv_bytes_per_token": [
+        5120,
+        5120
+      ],
+      "attention_bytes_per_key_token": [
+        2048,
+        2048
+      ]
+    }
+  ],
+  "split_state": "fa2-after-dx-v1"
+}

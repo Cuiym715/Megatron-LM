@@ -1,0 +1,72 @@
+{
+  "lookahead": 0,
+  "send_depth": 1,
+  "steps": 3,
+  "groups": 4,
+  "default_FA": true,
+  "payload_KiB": 64,
+  "nvml_interval_ms": 50,
+  "results": {
+    "legacy": {
+      "reports": 9,
+      "accepted_A": 0,
+      "nvml_sampled_peak_MiB": {
+        "0": 2816,
+        "1": 1856,
+        "2": 1716
+      },
+      "nvml_samples": 1425,
+      "allocated_peak_MiB": {
+        "0": 749.66162109375,
+        "1": 130.08642578125,
+        "2": 130.04931640625
+      },
+      "reserved_peak_MiB": {
+        "0": 796.0,
+        "1": 144.0,
+        "2": 144.0
+      }
+    },
+    "template": {
+      "reports": 9,
+      "accepted_A": 0,
+      "nvml_sampled_peak_MiB": {
+        "0": 2816,
+        "1": 1856,
+        "2": 1716
+      },
+      "nvml_samples": 1500,
+      "allocated_peak_MiB": {
+        "0": 749.66162109375,
+        "1": 130.08642578125,
+        "2": 130.04931640625
+      },
+      "reserved_peak_MiB": {
+        "0": 796.0,
+        "1": 144.0,
+        "2": 144.0
+      }
+    },
+    "a": {
+      "reports": 9,
+      "accepted_A": 9,
+      "nvml_sampled_peak_MiB": {
+        "0": 2816,
+        "1": 1856,
+        "2": 1716
+      },
+      "nvml_samples": 1524,
+      "allocated_peak_MiB": {
+        "0": 749.66162109375,
+        "1": 130.08642578125,
+        "2": 130.04931640625
+      },
+      "reserved_peak_MiB": {
+        "0": 796.0,
+        "1": 144.0,
+        "2": 144.0
+      }
+    }
+  },
+  "note": "NVML is sampled, not an exhaustive peak/owner bound; timings are diagnostic."
+}

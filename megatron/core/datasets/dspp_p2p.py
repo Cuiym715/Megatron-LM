@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 import json
+import math
 from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence, Tuple
 
@@ -32,6 +33,15 @@ class DsppP2PPoint:
     overlap: str
     median_ms: float
     p95_ms: float
+
+
+@dataclass(frozen=True)
+class DsppP2PPrediction:
+    duration_ms: float
+    source: str
+    confidence: str
+    extrapolated: bool
+    out_of_range: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -66,6 +76,8 @@ class DsppP2PCostModel:
             duration = row.get("duration_ms", row.get("median_ms"))
             if duration is None:
                 continue
+            if key[0] < 0 or not math.isfinite(float(duration)) or float(duration) <= 0:
+                raise ValueError('invalid P2P calibration sample')
             grouped.setdefault(key, []).append(float(duration))
         points = tuple(
             DsppP2PPoint(
@@ -141,6 +153,22 @@ class DsppP2PCostModel:
                     rv = right.p95_ms if percentile >= 0.95 else right.median_ms
                     return float(lv + ratio * (rv - lv)), "profile-interpolated"
         return float(fallback_latency_ms + size / max(1.0, fallback_bandwidth_bytes_per_ms)), "analytical-fallback"
+
+    def predict_detailed(self, payload_bytes, *, direction, overlap, percentile=0.5):
+        """Strict overlap/size coverage; preserve legacy predict() separately."""
+        candidates = sorted((p for p in self.points if p.direction == direction
+                             and p.overlap == overlap), key=lambda p: p.bytes)
+        size = int(payload_bytes)
+        if size < 0:
+            raise ValueError('negative P2P payload size')
+        if candidates and candidates[0].bytes <= size <= candidates[-1].bytes:
+            value, _ = self.predict(size, direction=direction, overlap=overlap, percentile=percentile)
+            exact = any(p.bytes == size for p in candidates)
+            return DsppP2PPrediction(value, 'exact-profile' if exact else 'interpolated-profile',
+                                     'high' if exact else 'medium', False)
+        value, _ = DsppP2PCostModel.empty().predict(size)
+        return DsppP2PPrediction(value, 'analytical-fallback', 'low', True,
+                                 ('bytes',) if candidates else ('direction/overlap',))
 
 
 @lru_cache(maxsize=16)

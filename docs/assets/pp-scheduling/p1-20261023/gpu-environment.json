@@ -1,0 +1,46 @@
+[
+  {
+    "command": [
+      "nvidia-smi",
+      "--query-gpu=index,name,memory.total",
+      "--format=csv"
+    ],
+    "exit_code": 0,
+    "output": "index, name, memory.total [MiB]\n0, NVIDIA L40, 46068 MiB\n1, NVIDIA L40, 46068 MiB\n2, NVIDIA L40, 46068 MiB\n"
+  },
+  {
+    "command": [
+      "docker",
+      "exec",
+      "nvidia_pytorch_v",
+      "nvidia-smi",
+      "--query-gpu=index,name,memory.total",
+      "--format=csv"
+    ],
+    "exit_code": 255,
+    "output": "Failed to initialize NVML: Unknown Error\n"
+  },
+  {
+    "command": [
+      "docker",
+      "exec",
+      "nvidia_pytorch_v",
+      "/workspace/src/venvs/megatron/bin/python",
+      "-c",
+      "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.device_count())"
+    ],
+    "exit_code": 0,
+    "output": "/usr/local/lib/python3.10/dist-packages/torch/cuda/__init__.py:714: UserWarning: Can't initialize NVML\n  warnings.warn(\"Can't initialize NVML\")\n2.5.0a0+b465a5843b.nv24.09\nFalse\n0\n"
+  },
+  {
+    "environment": "P1 disposable local image, read-only existing 26.01 dist-packages",
+    "image": "nvcr.io/nvidia/pytorch:26.01-py3",
+    "python": "3.12",
+    "torch": "2.10.0a0+a36e1d39eb.nv26.01.42222806",
+    "flash_attention": "2.7.4.post1",
+    "cuda_available": true,
+    "device_count": 3,
+    "gpu": "NVIDIA L40 SM89",
+    "notes": "Original containers unchanged. No network/download. Localhost rendezvous. 24.09/FA2.4.2 cannot run baseline wrapped varlen API; those failed trials are retained externally."
+  }
+]

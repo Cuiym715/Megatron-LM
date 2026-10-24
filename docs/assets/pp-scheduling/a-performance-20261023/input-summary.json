@@ -1,0 +1,287 @@
+[
+  {
+    "seed": 11,
+    "distribution": {
+      "kind": "infinipipe-figure-2-aligned-sequence-lengths",
+      "source": "src/numerical-simulator/scripts/sample_infinipipe_seq_lens.py",
+      "sampler": {
+        "num_sequences": 1024,
+        "seed": 11,
+        "min_seq_len": 512,
+        "tail_max_seq_len": 524288,
+        "global_mean": 4096.0,
+        "alignment": 256,
+        "max_seq_len": 16384,
+        "over_max_policy": "drop"
+      },
+      "sha256": "81a6e603dc61bcd96a5c4a3d5f4a9ed154bdcb9a1a49bda1acb8c230f40d2970",
+      "summary": {
+        "num_sequences": 978,
+        "total_tokens": 2224640,
+        "mean_sequence_length": 2274.683026584867,
+        "min_sequence_length": 512,
+        "max_sequence_length": 15872,
+        "clipped_sequences": 0,
+        "dropped_sequences": 46,
+        "buckets": [
+          {
+            "bucket": "0-2K",
+            "configured_sample_share": 0.699,
+            "observed_sample_share": 0.7198364008179959,
+            "configured_token_share": 0.125,
+            "observed_token_share": 0.27974683544303797
+          },
+          {
+            "bucket": "2K-4K",
+            "configured_sample_share": 0.133,
+            "observed_sample_share": 0.1492842535787321,
+            "configured_token_share": 0.107,
+            "observed_token_share": 0.22474108170310703
+          },
+          {
+            "bucket": "4K-8K",
+            "configured_sample_share": 0.083,
+            "observed_sample_share": 0.08793456032719836,
+            "configured_token_share": 0.131,
+            "observed_token_share": 0.25512082853855006
+          },
+          {
+            "bucket": "8K-16K",
+            "configured_sample_share": 0.045,
+            "observed_sample_share": 0.04294478527607362,
+            "configured_token_share": 0.142,
+            "observed_token_share": 0.24039125431530495
+          },
+          {
+            "bucket": "16K-32K",
+            "configured_sample_share": 0.023,
+            "observed_sample_share": 0.0,
+            "configured_token_share": 0.143,
+            "observed_token_share": 0.0
+          },
+          {
+            "bucket": "32K-64K",
+            "configured_sample_share": 0.011,
+            "observed_sample_share": 0.0,
+            "configured_token_share": 0.135,
+            "observed_token_share": 0.0
+          },
+          {
+            "bucket": "64K-128K",
+            "configured_sample_share": 0.004,
+            "observed_sample_share": 0.0,
+            "configured_token_share": 0.093,
+            "observed_token_share": 0.0
+          },
+          {
+            "bucket": ">128K",
+            "configured_sample_share": 0.002,
+            "observed_sample_share": 0.0,
+            "configured_token_share": 0.123,
+            "observed_token_share": 0.0
+          }
+        ]
+      }
+    },
+    "measured_documents": 192,
+    "measured_raw_mean": 2349.3333333333335,
+    "measured_target_tokens": 450880,
+    "measured_max": 15104,
+    "measured_bucket_counts": {
+      "0-2K": 138,
+      "2K-4K": 24,
+      "4K-8K": 22,
+      "8K-16K": 8
+    }
+  },
+  {
+    "seed": 19,
+    "distribution": {
+      "kind": "infinipipe-figure-2-aligned-sequence-lengths",
+      "source": "src/numerical-simulator/scripts/sample_infinipipe_seq_lens.py",
+      "sampler": {
+        "num_sequences": 1024,
+        "seed": 19,
+        "min_seq_len": 512,
+        "tail_max_seq_len": 524288,
+        "global_mean": 4096.0,
+        "alignment": 256,
+        "max_seq_len": 16384,
+        "over_max_policy": "drop"
+      },
+      "sha256": "37a3045f84f65bcad17ff695b80c2d4a11e839a01a5c6ed99eb908900eda3f92",
+      "summary": {
+        "num_sequences": 987,
+        "total_tokens": 2166528,
+        "mean_sequence_length": 2195.063829787234,
+        "min_sequence_length": 512,
+        "max_sequence_length": 15872,
+        "clipped_sequences": 0,
+        "dropped_sequences": 37,
+        "buckets": [
+          {
+            "bucket": "0-2K",
+            "configured_sample_share": 0.699,
+            "observed_sample_share": 0.7649442755825735,
+            "configured_token_share": 0.125,
+            "observed_token_share": 0.3067470164244358
+          },
+          {
+            "bucket": "2K-4K",
+            "configured_sample_share": 0.133,
+            "observed_sample_share": 0.11651469098277609,
+            "configured_token_share": 0.107,
+            "observed_token_share": 0.18125960061443933
+          },
+          {
+            "bucket": "4K-8K",
+            "configured_sample_share": 0.083,
+            "observed_sample_share": 0.06585612968591692,
+            "configured_token_share": 0.131,
+            "observed_token_share": 0.1946118397731301
+          },
+          {
+            "bucket": "8K-16K",
+            "configured_sample_share": 0.045,
+            "observed_sample_share": 0.05268490374873354,
+            "configured_token_share": 0.142,
+            "observed_token_share": 0.3173815431879948
+          },
+          {
+            "bucket": "16K-32K",
+            "configured_sample_share": 0.023,
+            "observed_sample_share": 0.0,
+            "configured_token_share": 0.143,
+            "observed_token_share": 0.0
+          },
+          {
+            "bucket": "32K-64K",
+            "configured_sample_share": 0.011,
+            "observed_sample_share": 0.0,
+            "configured_token_share": 0.135,
+            "observed_token_share": 0.0
+          },
+          {
+            "bucket": "64K-128K",
+            "configured_sample_share": 0.004,
+            "observed_sample_share": 0.0,
+            "configured_token_share": 0.093,
+            "observed_token_share": 0.0
+          },
+          {
+            "bucket": ">128K",
+            "configured_sample_share": 0.002,
+            "observed_sample_share": 0.0,
+            "configured_token_share": 0.123,
+            "observed_token_share": 0.0
+          }
+        ]
+      }
+    },
+    "measured_documents": 192,
+    "measured_raw_mean": 2046.6666666666667,
+    "measured_target_tokens": 392768,
+    "measured_max": 15872,
+    "measured_bucket_counts": {
+      "0-2K": 157,
+      "2K-4K": 16,
+      "4K-8K": 8,
+      "8K-16K": 11
+    }
+  },
+  {
+    "seed": 29,
+    "distribution": {
+      "kind": "infinipipe-figure-2-aligned-sequence-lengths",
+      "source": "src/numerical-simulator/scripts/sample_infinipipe_seq_lens.py",
+      "sampler": {
+        "num_sequences": 1024,
+        "seed": 29,
+        "min_seq_len": 512,
+        "tail_max_seq_len": 524288,
+        "global_mean": 4096.0,
+        "alignment": 256,
+        "max_seq_len": 16384,
+        "over_max_policy": "drop"
+      },
+      "sha256": "e4adf830db0092b7adb006cb48340fdbbf8e1ee57054be4ecba16300889ba9c9",
+      "summary": {
+        "num_sequences": 978,
+        "total_tokens": 2108672,
+        "mean_sequence_length": 2156.106339468303,
+        "min_sequence_length": 512,
+        "max_sequence_length": 15872,
+        "clipped_sequences": 0,
+        "dropped_sequences": 46,
+        "buckets": [
+          {
+            "bucket": "0-2K",
+            "configured_sample_share": 0.699,
+            "observed_sample_share": 0.7413087934560327,
+            "configured_token_share": 0.125,
+            "observed_token_share": 0.3042369794828214
+          },
+          {
+            "bucket": "2K-4K",
+            "configured_sample_share": 0.133,
+            "observed_sample_share": 0.14519427402862986,
+            "configured_token_share": 0.107,
+            "observed_token_share": 0.23066650479543524
+          },
+          {
+            "bucket": "4K-8K",
+            "configured_sample_share": 0.083,
+            "observed_sample_share": 0.07464212678936605,
+            "configured_token_share": 0.131,
+            "observed_token_share": 0.23018089110112905
+          },
+          {
+            "bucket": "8K-16K",
+            "configured_sample_share": 0.045,
+            "observed_sample_share": 0.03885480572597137,
+            "configured_token_share": 0.142,
+            "observed_token_share": 0.2349156246206143
+          },
+          {
+            "bucket": "16K-32K",
+            "configured_sample_share": 0.023,
+            "observed_sample_share": 0.0,
+            "configured_token_share": 0.143,
+            "observed_token_share": 0.0
+          },
+          {
+            "bucket": "32K-64K",
+            "configured_sample_share": 0.011,
+            "observed_sample_share": 0.0,
+            "configured_token_share": 0.135,
+            "observed_token_share": 0.0
+          },
+          {
+            "bucket": "64K-128K",
+            "configured_sample_share": 0.004,
+            "observed_sample_share": 0.0,
+            "configured_token_share": 0.093,
+            "observed_token_share": 0.0
+          },
+          {
+            "bucket": ">128K",
+            "configured_sample_share": 0.002,
+            "observed_sample_share": 0.0,
+            "configured_token_share": 0.123,
+            "observed_token_share": 0.0
+          }
+        ]
+      }
+    },
+    "measured_documents": 192,
+    "measured_raw_mean": 2093.3333333333335,
+    "measured_target_tokens": 401728,
+    "measured_max": 13312,
+    "measured_bucket_counts": {
+      "0-2K": 136,
+      "2K-4K": 35,
+      "4K-8K": 17,
+      "8K-16K": 4
+    }
+  }
+]

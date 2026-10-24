@@ -1,0 +1,589 @@
+{
+  "scope": "archived native InfiniPipe 1/3-layer profiler validation, not full 24-layer stage accuracy",
+  "runs": [
+    {
+      "source_file": "/workspace/src/InfiniPipe-code/infiniPipe/profiler/logs/2026_9_5_6_54_llama-dspp-benchmark_comp/layer_1/result_1.json",
+      "sha256": "434ae7a6cfe842ccec39e0b51e320038b81f939b490d4ffa603026c27075e6e5",
+      "max_prediction_reproduction_difference_seconds": 5.881302042598513e-10,
+      "anchor_lengths": [
+        256,
+        512,
+        768
+      ],
+      "summary": {
+        "F": {
+          "multi_seqs": {
+            "samples": 4,
+            "positive_predictions": 4,
+            "median_actual_ms": 6.311424016952515,
+            "median_absolute_ms": 3.9267839193344036,
+            "median_relative": 0.6235576651010989,
+            "p95_relative": 0.7690062679713421,
+            "total_bias": 0.4597743302612247
+          },
+          "single_seq_ctx": {
+            "samples": 4,
+            "positive_predictions": 4,
+            "median_actual_ms": 6.535168170928955,
+            "median_absolute_ms": 2.2735356092452994,
+            "median_relative": 0.3582726234276089,
+            "p95_relative": 0.6436399153210975,
+            "total_bias": 0.38863460862553123
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 9.655296325683594,
+            "median_absolute_ms": 1.8925562519580117,
+            "median_relative": 0.22112283017529227,
+            "p95_relative": 0.3325411220033823,
+            "total_bias": -0.1573658872231647
+          }
+        },
+        "B": {
+          "multi_seqs": {
+            "samples": 4,
+            "positive_predictions": 4,
+            "median_actual_ms": 16.09113597869873,
+            "median_absolute_ms": 0.3133435249328622,
+            "median_relative": 0.019498272189965374,
+            "p95_relative": 0.1661994685584493,
+            "total_bias": -0.04745264428122109
+          },
+          "single_seq_ctx": {
+            "samples": 4,
+            "positive_predictions": 4,
+            "median_actual_ms": 16.483839988708496,
+            "median_absolute_ms": 2.518015384674084,
+            "median_relative": 0.15277130407173908,
+            "p95_relative": 0.23948026048734505,
+            "total_bias": -0.15626073670519358
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 16.27033519744873,
+            "median_absolute_ms": 3.1139463991858154,
+            "median_relative": 0.1912457126905469,
+            "p95_relative": 0.2554118707920573,
+            "total_bias": -0.199661558597926
+          }
+        }
+      }
+    },
+    {
+      "source_file": "/workspace/src/InfiniPipe-code/infiniPipe/profiler/logs/2026_9_5_6_54_llama-dspp-benchmark_comp/layer_3/result_3.json",
+      "sha256": "0c3d368150b140ae903d9fed8076357ecd017657359bbf85c3f8dc5812432a39",
+      "max_prediction_reproduction_difference_seconds": 7.404014866485564e-10,
+      "anchor_lengths": [
+        256,
+        512,
+        768
+      ],
+      "summary": {
+        "F": {
+          "multi_seqs": {
+            "samples": 4,
+            "positive_predictions": 4,
+            "median_actual_ms": 10.446335792541504,
+            "median_absolute_ms": 9.784959316253651,
+            "median_relative": 0.9428903250004453,
+            "p95_relative": 0.9772680348281593,
+            "total_bias": 0.8880271946732385
+          },
+          "single_seq_ctx": {
+            "samples": 4,
+            "positive_predictions": 4,
+            "median_actual_ms": 11.944447994232178,
+            "median_absolute_ms": 8.364799976348872,
+            "median_relative": 0.7069102476563189,
+            "p95_relative": 0.9543676373101279,
+            "total_bias": 0.7164415906817589
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 14.77990436553955,
+            "median_absolute_ms": 5.544969907961788,
+            "median_relative": 0.37519012910547117,
+            "p95_relative": 0.7198946415491957,
+            "total_bias": 0.3686877611403101
+          }
+        },
+        "B": {
+          "multi_seqs": {
+            "samples": 4,
+            "positive_predictions": 4,
+            "median_actual_ms": 26.958847999572754,
+            "median_absolute_ms": 1.1680006980896227,
+            "median_relative": 0.04326729316491591,
+            "p95_relative": 0.13472731220701334,
+            "total_bias": -0.05911522554262638
+          },
+          "single_seq_ctx": {
+            "samples": 4,
+            "positive_predictions": 4,
+            "median_actual_ms": 25.926143646240234,
+            "median_absolute_ms": 1.4932479858397905,
+            "median_relative": 0.05678138731942858,
+            "p95_relative": 0.2753750888459387,
+            "total_bias": 0.08351318309685807
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 23.98566436767578,
+            "median_absolute_ms": 2.1114081260747835,
+            "median_relative": 0.08792275131654784,
+            "p95_relative": 0.17788742881642375,
+            "total_bias": 0.11145038345236902
+          }
+        }
+      }
+    },
+    {
+      "source_file": "/workspace/src/InfiniPipe-code/infiniPipe/profiler/logs/2026_9_5_6_57_llama-dspp-benchmark_comp/layer_1/result_1.json",
+      "sha256": "5dd6a7de811dab8d1bca3aa4648e97f1f4f0d434778b4275b7296cd817fcd592",
+      "max_prediction_reproduction_difference_seconds": 2.9369883677854425e-09,
+      "anchor_lengths": [
+        256,
+        512,
+        768,
+        1280,
+        2048,
+        3072,
+        4096
+      ],
+      "summary": {
+        "F": {
+          "multi_seqs": {
+            "samples": 18,
+            "positive_predictions": 18,
+            "median_actual_ms": 6.77836799621582,
+            "median_absolute_ms": 3.8407391148741894,
+            "median_relative": 0.6652771638635891,
+            "p95_relative": 1.4057706215085877,
+            "total_bias": 0.6776198858033173
+          },
+          "single_seq_ctx": {
+            "samples": 30,
+            "positive_predictions": 30,
+            "median_actual_ms": 7.9339518547058105,
+            "median_absolute_ms": 3.0932870943146726,
+            "median_relative": 0.4132408031910475,
+            "p95_relative": 0.6111767073017257,
+            "total_bias": -0.4319760640641087
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 12.310527801513672,
+            "median_absolute_ms": 6.506354348956279,
+            "median_relative": 0.5246545116528696,
+            "p95_relative": 0.625931846316344,
+            "total_bias": -0.5295774568011525
+          }
+        },
+        "B": {
+          "multi_seqs": {
+            "samples": 18,
+            "positive_predictions": 18,
+            "median_actual_ms": 16.666624069213867,
+            "median_absolute_ms": 0.44810572810129834,
+            "median_relative": 0.02848644024900581,
+            "p95_relative": 0.11068676156137375,
+            "total_bias": -0.03739013183731821
+          },
+          "single_seq_ctx": {
+            "samples": 30,
+            "positive_predictions": 30,
+            "median_actual_ms": 15.014912128448486,
+            "median_absolute_ms": 1.188696044222457,
+            "median_relative": 0.076634250792178,
+            "p95_relative": 0.1673986939027045,
+            "total_bias": -0.038898242387763626
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 16.274944305419922,
+            "median_absolute_ms": 2.2649503699248887,
+            "median_relative": 0.13937968789585986,
+            "p95_relative": 0.14580785608978317,
+            "total_bias": -0.13935973721447836
+          }
+        }
+      }
+    },
+    {
+      "source_file": "/workspace/src/InfiniPipe-code/infiniPipe/profiler/logs/2026_9_5_6_57_llama-dspp-benchmark_comp/layer_3/result_3.json",
+      "sha256": "6659b743dd5f772e4a58b86407b2f9007d94cba8f7171b8a580750411df7ae86",
+      "max_prediction_reproduction_difference_seconds": 3.578998541975409e-09,
+      "anchor_lengths": [
+        256,
+        512,
+        768,
+        1280,
+        2048,
+        3072,
+        4096
+      ],
+      "summary": {
+        "F": {
+          "multi_seqs": {
+            "samples": 18,
+            "positive_predictions": 18,
+            "median_actual_ms": 10.713600158691406,
+            "median_absolute_ms": 6.875711166092849,
+            "median_relative": 0.6803301714221632,
+            "p95_relative": 1.1612603826058654,
+            "total_bias": 0.5401421650893081
+          },
+          "single_seq_ctx": {
+            "samples": 30,
+            "positive_predictions": 30,
+            "median_actual_ms": 10.418176174163818,
+            "median_absolute_ms": 2.3415282784518547,
+            "median_relative": 0.1963300635296641,
+            "p95_relative": 0.38272613837574593,
+            "total_bias": 0.0049111691416372505
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 14.643199920654297,
+            "median_absolute_ms": 1.5316034918303245,
+            "median_relative": 0.10495320065868707,
+            "p95_relative": 0.28001507346254817,
+            "total_bias": -0.09989228421375573
+          }
+        },
+        "B": {
+          "multi_seqs": {
+            "samples": 18,
+            "positive_predictions": 18,
+            "median_actual_ms": 26.768911361694336,
+            "median_absolute_ms": 2.5501849958390768,
+            "median_relative": 0.09992996535905962,
+            "p95_relative": 0.4188793371697208,
+            "total_bias": -0.13464018078408313
+          },
+          "single_seq_ctx": {
+            "samples": 30,
+            "positive_predictions": 30,
+            "median_actual_ms": 20.796415328979492,
+            "median_absolute_ms": 4.141786534178964,
+            "median_relative": 0.211799450061499,
+            "p95_relative": 0.4381149039753707,
+            "total_bias": 0.1747606078056516
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 22.67750358581543,
+            "median_absolute_ms": 0.8263408614451997,
+            "median_relative": 0.03551029060290066,
+            "p95_relative": 0.1282807381475947,
+            "total_bias": 0.02454068348129046
+          }
+        }
+      }
+    },
+    {
+      "source_file": "/workspace/src/InfiniPipe-code/infiniPipe/profiler/logs/2026_9_5_6_58_llama-dspp-benchmark_comp/layer_1/result_1.json",
+      "sha256": "3fa267356f919aa49fe0a790f5979edc9cc645b864a78024740a3d62209fae2e",
+      "max_prediction_reproduction_difference_seconds": 1.7377195429130188e-09,
+      "anchor_lengths": [
+        256,
+        512,
+        768,
+        1280,
+        2048,
+        3072,
+        4096
+      ],
+      "summary": {
+        "F": {
+          "multi_seqs": {
+            "samples": 18,
+            "positive_predictions": 18,
+            "median_actual_ms": 7.6426239013671875,
+            "median_absolute_ms": 4.661181596074127,
+            "median_relative": 0.6090195427249999,
+            "p95_relative": 1.5335800004851026,
+            "total_bias": 0.6635909341743071
+          },
+          "single_seq_ctx": {
+            "samples": 30,
+            "positive_predictions": 30,
+            "median_actual_ms": 7.698431968688965,
+            "median_absolute_ms": 1.6571491510372063,
+            "median_relative": 0.21658305612513684,
+            "p95_relative": 0.552075106374161,
+            "total_bias": -0.28223584697936466
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 12.982271671295166,
+            "median_absolute_ms": 4.860855846295236,
+            "median_relative": 0.37300501440097034,
+            "p95_relative": 0.501016784470823,
+            "total_bias": -0.3816246401750536
+          }
+        },
+        "B": {
+          "multi_seqs": {
+            "samples": 18,
+            "positive_predictions": 18,
+            "median_actual_ms": 17.052159309387207,
+            "median_absolute_ms": 1.3317824579145476,
+            "median_relative": 0.08044996166622424,
+            "p95_relative": 0.3612888752104308,
+            "total_bias": -0.12306401547477008
+          },
+          "single_seq_ctx": {
+            "samples": 30,
+            "positive_predictions": 30,
+            "median_actual_ms": 15.196671962738037,
+            "median_absolute_ms": 1.1891137763139135,
+            "median_relative": 0.07607434294790119,
+            "p95_relative": 0.34585031687545165,
+            "total_bias": 0.06718709017067925
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 16.29542350769043,
+            "median_absolute_ms": 1.1316222734501133,
+            "median_relative": 0.06964009347540726,
+            "p95_relative": 0.07809070429531985,
+            "total_bias": -0.06645288160321328
+          }
+        }
+      }
+    },
+    {
+      "source_file": "/workspace/src/InfiniPipe-code/infiniPipe/profiler/logs/2026_9_5_6_58_llama-dspp-benchmark_comp/layer_3/result_3.json",
+      "sha256": "f71aab5a06dbfa8d6f454883d99f0e1194b108978837a3681f0cf6db16947447",
+      "max_prediction_reproduction_difference_seconds": 3.3804982216278923e-09,
+      "anchor_lengths": [
+        256,
+        512,
+        768,
+        1280,
+        2048,
+        3072,
+        4096
+      ],
+      "summary": {
+        "F": {
+          "multi_seqs": {
+            "samples": 18,
+            "positive_predictions": 18,
+            "median_actual_ms": 13.501440048217773,
+            "median_absolute_ms": 6.490352480091886,
+            "median_relative": 0.5849712151804287,
+            "p95_relative": 0.9255288616202234,
+            "total_bias": 0.4758767353414033
+          },
+          "single_seq_ctx": {
+            "samples": 30,
+            "positive_predictions": 30,
+            "median_actual_ms": 13.097472190856934,
+            "median_absolute_ms": 1.0511924940476343,
+            "median_relative": 0.08308665308733418,
+            "p95_relative": 0.3336931538825773,
+            "total_bias": -0.09282449926268854
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 14.753279685974121,
+            "median_absolute_ms": 1.5716126349502533,
+            "median_relative": 0.11225075381586717,
+            "p95_relative": 0.31722732533292775,
+            "total_bias": -0.026772347667932017
+          }
+        },
+        "B": {
+          "multi_seqs": {
+            "samples": 18,
+            "positive_predictions": 18,
+            "median_actual_ms": 27.650047302246094,
+            "median_absolute_ms": 3.4425949605328228,
+            "median_relative": 0.12747655823193094,
+            "p95_relative": 0.4562688284849682,
+            "total_bias": -0.14817224255000627
+          },
+          "single_seq_ctx": {
+            "samples": 30,
+            "positive_predictions": 30,
+            "median_actual_ms": 20.554240226745605,
+            "median_absolute_ms": 5.088624815153183,
+            "median_relative": 0.2552121872916298,
+            "p95_relative": 0.46568201952301574,
+            "total_bias": 0.2117843494392897
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 22.595072746276855,
+            "median_absolute_ms": 1.3535013256534114,
+            "median_relative": 0.06038897338074452,
+            "p95_relative": 0.14531743972259784,
+            "total_bias": 0.05876962268562158
+          }
+        }
+      }
+    },
+    {
+      "source_file": "/workspace/src/InfiniPipe-code/infiniPipe/profiler/logs/2026_9_5_7_4_llama-dspp-benchmark_comp/layer_1/result_1.json",
+      "sha256": "890b4bea03eaed1d09e0e9da7b245b4bb483ec354270a057dca3da4c3c4d3dcd",
+      "max_prediction_reproduction_difference_seconds": 2.585548752528921e-09,
+      "anchor_lengths": [
+        256,
+        512,
+        768,
+        1280,
+        2048,
+        3072,
+        4096
+      ],
+      "summary": {
+        "F": {
+          "multi_seqs": {
+            "samples": 18,
+            "positive_predictions": 18,
+            "median_actual_ms": 7.550463914871216,
+            "median_absolute_ms": 4.690868852854484,
+            "median_relative": 0.7126185365208559,
+            "p95_relative": 1.406061452395879,
+            "total_bias": 0.677485796320112
+          },
+          "single_seq_ctx": {
+            "samples": 30,
+            "positive_predictions": 30,
+            "median_actual_ms": 7.458816051483154,
+            "median_absolute_ms": 1.1620816280075403,
+            "median_relative": 0.1510559434553197,
+            "p95_relative": 0.46944157926008,
+            "total_bias": -0.23065630076058175
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 11.803135871887207,
+            "median_absolute_ms": 3.779884482377982,
+            "median_relative": 0.32129576848136143,
+            "p95_relative": 0.4774520167008608,
+            "total_bias": -0.34575028932066787
+          }
+        },
+        "B": {
+          "multi_seqs": {
+            "samples": 18,
+            "positive_predictions": 18,
+            "median_actual_ms": 17.005056381225586,
+            "median_absolute_ms": 1.1339165417462134,
+            "median_relative": 0.06971745149798672,
+            "p95_relative": 0.372365073085535,
+            "total_bias": -0.12272539445312003
+          },
+          "single_seq_ctx": {
+            "samples": 30,
+            "positive_predictions": 30,
+            "median_actual_ms": 14.640639781951904,
+            "median_absolute_ms": 1.211203644804427,
+            "median_relative": 0.08027263235746626,
+            "p95_relative": 0.31628396846941526,
+            "total_bias": 0.07652648976768184
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 16.21350383758545,
+            "median_absolute_ms": 1.031420741023772,
+            "median_relative": 0.06361250612709074,
+            "p95_relative": 0.08494759077635519,
+            "total_bias": -0.060524088675054544
+          }
+        }
+      }
+    },
+    {
+      "source_file": "/workspace/src/InfiniPipe-code/infiniPipe/profiler/logs/2026_9_5_7_4_llama-dspp-benchmark_comp/layer_3/result_3.json",
+      "sha256": "eb6e772b34c2a9c47e83f38ccba4133e855d98a987e7548b09e4e68a59766690",
+      "max_prediction_reproduction_difference_seconds": 2.884688890536502e-09,
+      "anchor_lengths": [
+        256,
+        512,
+        768,
+        1280,
+        2048,
+        3072,
+        4096
+      ],
+      "summary": {
+        "F": {
+          "multi_seqs": {
+            "samples": 18,
+            "positive_predictions": 18,
+            "median_actual_ms": 12.889600276947021,
+            "median_absolute_ms": 6.619774383716539,
+            "median_relative": 0.5226004694615005,
+            "p95_relative": 1.0122049980488386,
+            "total_bias": 0.5281947898426131
+          },
+          "single_seq_ctx": {
+            "samples": 30,
+            "positive_predictions": 30,
+            "median_actual_ms": 12.630527973175049,
+            "median_absolute_ms": 0.8150910081334484,
+            "median_relative": 0.06578777326898969,
+            "p95_relative": 0.4857610527966911,
+            "total_bias": -0.03028528237036332
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 15.119359970092773,
+            "median_absolute_ms": 1.3664948349172166,
+            "median_relative": 0.0941670559394734,
+            "p95_relative": 0.2468030905037992,
+            "total_bias": -0.02476055621445672
+          }
+        },
+        "B": {
+          "multi_seqs": {
+            "samples": 18,
+            "positive_predictions": 18,
+            "median_actual_ms": 27.94649600982666,
+            "median_absolute_ms": 2.887199606244673,
+            "median_relative": 0.10549767666818577,
+            "p95_relative": 0.48328572272415604,
+            "total_bias": -0.14931754373274264
+          },
+          "single_seq_ctx": {
+            "samples": 30,
+            "positive_predictions": 30,
+            "median_actual_ms": 20.858880043029785,
+            "median_absolute_ms": 5.839524811384374,
+            "median_relative": 0.2885286600754613,
+            "p95_relative": 0.48299506571189194,
+            "total_bias": 0.23413404439357066
+          },
+          "multi_seqs_ctx": {
+            "samples": 16,
+            "positive_predictions": 16,
+            "median_actual_ms": 23.065088272094727,
+            "median_absolute_ms": 1.5761226843140612,
+            "median_relative": 0.06847858437313098,
+            "p95_relative": 0.1925848610266446,
+            "total_bias": 0.07792808257204253
+          }
+        }
+      }
+    }
+  ]
+}

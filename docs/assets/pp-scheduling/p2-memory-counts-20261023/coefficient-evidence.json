@@ -1,0 +1,44 @@
+{
+  "evidence": [
+    {
+      "stage": 0,
+      "measured_new_F_storage_bytes": [
+        1779808,
+        10071456
+      ],
+      "measured_new_W_storage_bytes": [
+        917504,
+        5095424
+      ],
+      "resident_observed_bytes": 706780160,
+      "trace_new_allocation_peak_bytes": 78652432
+    },
+    {
+      "stage": 1,
+      "measured_new_F_storage_bytes": [
+        1779808,
+        1779808
+      ],
+      "measured_new_W_storage_bytes": [
+        917504,
+        917504
+      ],
+      "resident_observed_bytes": 114353152,
+      "trace_new_allocation_peak_bytes": 22082392
+    },
+    {
+      "stage": 2,
+      "measured_new_F_storage_bytes": [
+        1779808,
+        1714272
+      ],
+      "measured_new_W_storage_bytes": [
+        917504,
+        917504
+      ],
+      "resident_observed_bytes": 114353152,
+      "trace_new_allocation_peak_bytes": 21844232
+    }
+  ],
+  "caveat": "workspace reserves the entire traced new-allocation peak, including retained state; intentionally loose. No arbitrary-shape or hard-bound certification."
+}

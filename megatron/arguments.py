@@ -211,6 +211,15 @@ def validate_args(args, defaults={}):
         assert args.transformer_impl == 'local', 'DSPP split attention backward requires local transformer'
         assert not args.use_alibi, 'DSPP split attention backward does not support ALiBi'
 
+    if args.dspp_memory_report_dir:
+        assert args.dspp_memory_profile, '--dspp-memory-report-dir requires --dspp-memory-profile'
+    if args.dspp_memory_profile:
+        assert args.dspp and args.pipeline_model_parallel_size > 1, 'counted memory requires distributed DSPP'
+        assert args.dspp_schedule != 'legacy', 'counted memory requires the Plan IR path'
+        assert not args.dspp_split_attention_backward or args.dspp_history_dkv_after_dx, \
+            'counted split memory requires the after-dx boundary'
+        assert not args.dspp_auto_chunk_size, 'counted memory requires fixed capacity'
+
     if args.dspp:
         assert not args.variable_seq_slicing, \
             '--dspp and --variable-seq-slicing select different runtimes; enable only --dspp'
@@ -222,14 +231,13 @@ def validate_args(args, defaults={}):
             'DSPP B2/B3 currently supports TP=1 and CP=1'
         assert args.world_size == args.pipeline_model_parallel_size, \
             'DSPP B2/B3 currently supports one pipeline replica (DP=1)'
-        assert args.pipeline_model_parallel_size in (1, 3), \
-            'DSPP currently supports the B1 single-GPU path or the PP=3 B2/B3 path'
+        assert args.pipeline_model_parallel_size >= 1, 'DSPP requires positive PP size'
         if args.pipeline_model_parallel_size == 1:
             assert args.virtual_pipeline_model_parallel_size is None, \
                 'single-GPU DSPP does not use virtual pipeline chunks'
         else:
             assert args.virtual_pipeline_model_parallel_size == 2, \
-                'DSPP PP=3 requires exactly two virtual pipeline chunks'
+                'distributed DSPP requires exactly two virtual pipeline chunks'
             assert args.gradient_accumulation_fusion, \
                 'DSPP V-ZB requires gradient accumulation fusion for B/W splitting'
             assert not getattr(args, 'overlap_grad_reduce', False), \
@@ -276,6 +284,34 @@ def validate_args(args, defaults={}):
             '--dspp-recv-lookahead must be non-negative'
         assert args.dspp_send_inflight_depth > 0, \
             '--dspp-send-inflight-depth must be positive'
+        if args.dspp_schedule in ('b', 'c'):
+            assert args.pipeline_model_parallel_size > 1, 'schedule B/C requires distributed DSPP'
+            assert not args.dspp_auto_chunk_size, 'schedule B/C requires fixed chunk size'
+            assert args.dspp_split_attention_backward and args.dspp_history_dkv_after_dx, \
+                'schedule B/C requires split/after-dx support'
+            assert args.dspp_execution_profile and args.dspp_p2p_profile and args.dspp_memory_profile, \
+                'schedule B/C requires versioned compute/P2P and counted memory profiles'
+            if args.dspp_schedule == 'b':
+                assert 0 <= args.dspp_b_budget_fraction <= 1, 'invalid B planning budget fraction'
+            else:
+                assert 0 <= args.dspp_c_b_budget_fraction <= args.dspp_c_budget_fraction <= 1, \
+                    'C planning budgets require 0 <= B fraction <= C fraction <= 1'
+        if args.dspp_schedule == 'a':
+            assert args.pipeline_model_parallel_size > 1, 'schedule A requires distributed DSPP'
+            assert not args.dspp_split_attention_backward, 'schedule A uses fused attention backward'
+            assert not args.dspp_auto_chunk_size, 'P1 schedule A requires fixed chunk size'
+            assert args.dspp_execution_profile, 'schedule A requires an explicit execution profile'
+        if args.dspp_prefetch:
+            assert args.pipeline_model_parallel_size > 1, 'DSPP prefetch requires PP>1'
+            assert args.dspp_schedule in ('template', 'a', 'b', 'c'), 'DSPP prefetch requires Plan IR'
+            assert not args.dspp_auto_chunk_size, 'DSPP prefetch requires fixed chunk size'
+            assert args.tensor_model_parallel_size == args.context_parallel_size == args.data_parallel_size == 1, \
+                'DSPP prefetch currently supports one PP replica, TP=CP=DP=1'
+            assert args.dataloader_type == 'single', 'DSPP prefetch replay requires deterministic single-pass input'
+            assert args.dspp_prefetch_max_bytes > 0 and args.dspp_prefetch_timeout > 0, \
+                'DSPP prefetch needs positive CPU byte limit and timeout'
+    elif args.dspp_prefetch:
+        raise ValueError('--dspp-prefetch requires --dspp')
 
     if args.variable_seq_slicing:
         assert args.micro_seq_length > 0, \
@@ -1413,17 +1449,48 @@ def _add_distributed_args(parser):
                        help='Sequence length per model instance forward, for token level pipeline parallel.')
     group.add_argument('--dspp', action='store_true',
                        help='Enable the DSPP variable-length packed training runtime. '
-                       'Supports the single-GPU B1 path and PP=3/VPP=2 B2/B3 path.')
+                       'Supports the single-GPU path and distributed PP/VPP=2 path.')
+    group.add_argument('--dspp-schedule', choices=['legacy', 'template', 'a', 'b', 'c'], default='template',
+                       help='Execute template, fixed-FB/W-only A, supply/cp-all B, or one fixed-H feedback C. '
+                       'legacy retains the pre-Plan path for paired validation.')
+    group.add_argument('--dspp-planner-backend', choices=['python', 'cpp'], default='cpp',
+                       help='CPU ready-construction backend; cpp reuses research 027/028 rules. '
+                       'Python remains available for paired plan checks.')
+    group.add_argument('--dspp-b-budget-fraction', type=float, default=.60,
+                       help='Standalone algorithm B soft full-planning budget / original unsplit model time.')
+    group.add_argument('--dspp-c-budget-fraction', type=float, default=.50,
+                       help='Algorithm C total soft planning budget / original unsplit model time.')
+    group.add_argument('--dspp-c-b-budget-fraction', type=float, default=.30,
+                       help='B stage soft budget within C / original unsplit model time; includes preparation.')
+    group.add_argument('--dspp-prefetch', action='store_true',
+                       help='Prepare one future CPU input and A/B/C plan in a spawn worker; GPU inputs stay current-iteration only.')
+    group.add_argument('--dspp-prefetch-full-validation', action='store_true',
+                       help='Use the original repeated per-rank graph validation for prefetch diagnostics and timing controls.')
+    group.add_argument('--dspp-prefetch-max-bytes', type=int, default=256 * 1024 * 1024,
+                       help='Maximum compact future CPU input plus planner metadata bytes (one iteration).')
+    group.add_argument('--dspp-prefetch-timeout', type=float, default=30.,
+                       help='Seconds allowed for input preparation/cold planner start; warm boundaries use ready plans or fallback.')
+    group.add_argument('--dspp-prefetch-report-dir', type=str, default=None,
+                       help='Write per-rank prefetch/IPC/commit/wait records at shutdown, outside the training hot path.')
     group.add_argument('--dspp-split-attention-backward', action='store_true',
                        help='Experimental FA2 dQ/current-dKV/history-dKV split. By default all '
                        'execute inside packed backward; --dspp-history-dkv-after-dx moves '
                        'history to a separate task after complete dx. Requires BF16/head-dim 128.')
     group.add_argument('--dspp-history-dkv-after-dx', action='store_true',
                        help='With split attention backward, publish complete stage dx first, '
-                       'then immediately run a separate history-dKV task. No intervening compute tasks.')
+                       'then run history-dKV separately (immediate in legacy/template; selected/placed by B/C).')
     group.add_argument('--dspp-task-timing-only', action='store_true',
                        help='Measure only B/H boundary CUDA events, with internal annotations and '
                        'synchronizing timers disabled. Excludes profiler/progress diagnostics.')
+    group.add_argument('--dspp-memory-audit-dir', type=str, default=None,
+                       help='Opt-in task-boundary storage ownership audit; diagnostic overhead, '
+                       'no CUDA synchronization and no certified workspace bound.')
+    group.add_argument('--dspp-memory-profile', type=str, default=None,
+                       help='Frozen counted state-size profile for fixed-capacity fused-B or after-dx plans. '
+                       'Feeds existing planner counters; keeps the P1 retention guard.')
+    group.add_argument('--dspp-memory-report-dir', type=str, default=None,
+                       help='With counted profile, save predicted/observed per-stage peaks. '
+                       'Resets allocator peak stats once per iteration; no tensor traversal.')
     group.add_argument('--dspp-microbatch-order', type=str,
                        default='warmup-short-steady-long',
                        choices=['input', 'warmup-short-steady-long',

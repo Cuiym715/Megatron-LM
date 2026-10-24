@@ -64,55 +64,120 @@ class DsppSequenceKVState:
             Tuple[int, torch.device], Tuple[torch.Tensor, torch.Tensor]
         ] = {}
         self.validate_runtime = bool(validate_runtime)
-        # Original split mode runs inside attention backward. Optional after-dx
-        # mode holds history states until a separate, immediately following H.
+        # Legacy after-dx drains H immediately. Explicit plans freeze a mode
+        # for each physical task before forward and may retain independent Hs.
         self.split_attention_backward = bool(split_attention_backward)
         if history_dkv_after_dx and not split_attention_backward:
             raise ValueError("history dKV after dx requires split attention backward")
         self.history_dkv_after_dx = bool(history_dkv_after_dx)
         self._history_task_id = None
         self._history_task_ready = False
-        self._history_jobs = []
+        self._history_records = {}
+        self._task_modes = None
+        self._required_history = {}
+        self._completed_history = set()
+
+    def configure_task_modes(self, metas, deferred_tasks) -> None:
+        """Freeze selective paths and all history consumers before any F.
+
+        IDs are physical tasks within this logical batch/model chunk. Every
+        later segment contributes to each earlier segment, not just its direct
+        predecessor. A physical H completes all layers before releasing gates.
+        """
+        if (not self.history_dkv_after_dx or self._task_modes is not None
+                or self._current_meta is not None or self._entries):
+            raise RuntimeError('task modes must be frozen once before forward')
+        by_id = {m.microbatch_id: m for m in metas}
+        deferred = set(deferred_tasks)
+        if len(by_id) != len(metas) or not deferred <= by_id.keys():
+            raise ValueError('invalid selective backward task IDs')
+        chains = {}
+        for task, meta in by_id.items():
+            if task in deferred and not any(i.has_history for i in meta.items):
+                raise ValueError('cannot defer history-free task')
+            for item in meta.items:
+                chain = chains.setdefault(item.sequence_id, {})
+                if item.segment_id in chain:
+                    raise ValueError('duplicate sequence segment')
+                chain[item.segment_id] = task
+        required = {task: set() for task in by_id}
+        for chain in chains.values():
+            if sorted(chain) != list(range(len(chain))):
+                raise ValueError('incomplete sequence segment chain')
+            for segment, source in chain.items():
+                if source in deferred:
+                    for target_segment in range(segment):
+                        required[chain[target_segment]].add(source)
+        self._task_modes = {task: task in deferred for task in by_id}
+        self._required_history = required
+
+    def task_after_dx(self, microbatch_id):
+        return (self.history_dkv_after_dx if self._task_modes is None
+                else self._task_modes[microbatch_id])
+
+    def check_history_consumers(self, microbatch_id):
+        missing = self._required_history.get(microbatch_id, set()) - self._completed_history
+        if missing:
+            raise RuntimeError(f'backward consumer requires unfinished H tasks: {sorted(missing)}')
+
+    @property
+    def _history_jobs(self):
+        # Preserve the existing opt-in audit/diagnostic view without retaining
+        # an additional copy of any tensors. During backward append to its job list.
+        if self._history_task_id is not None:
+            return self._history_records[self._history_task_id]['jobs']
+        return [job for record in self._history_records.values() for job in record['jobs']]
 
     @property
     def pending_history_count(self) -> int:
-        return len(self._history_jobs)
+        return sum(len(record['jobs']) for record in self._history_records.values())
+
+    def history_job_count(self, microbatch_id):
+        return len(self._history_records[microbatch_id]['jobs'])
 
     def begin_backward_task(self, microbatch_id: int) -> None:
-        """Own one B/H pair; no next backward until its H has been drained."""
-        if not self.history_dkv_after_dx:
+        """Begin a D; configured independent tasks can retain multiple Hs."""
+        if not self.task_after_dx(microbatch_id):
             raise RuntimeError("after-dx task mode is not enabled")
-        if self._history_task_id is not None or self._history_jobs:
+        if (self._history_task_id is not None
+                or (self._task_modes is None and self._history_records)):
             raise RuntimeError("previous history task has not completed")
+        if microbatch_id in self._history_records or microbatch_id in self._completed_history:
+            raise RuntimeError('duplicate backward task')
+        self.check_history_consumers(microbatch_id)
         self._history_task_id = microbatch_id
         self._history_task_ready = False
+        self._history_records[microbatch_id] = dict(ready=False, jobs=[])
 
     def mark_dx_ready(self, microbatch_id: int) -> None:
         """Called only after the complete stage backward has returned."""
         if self._history_task_id != microbatch_id or self._history_task_ready:
             raise RuntimeError("invalid or duplicate dx-ready boundary")
-        self._history_task_ready = True
+        self._history_records[microbatch_id]['ready'] = True
+        self._history_task_id = None
 
     def run_history_task(self, microbatch_id: int) -> int:
-        """Execute all layers' history dKV immediately after dx publication.
+        """Execute this task's layers after dx publication on the compute stream.
 
         This state owns tensor references until kernels and routing have been
         submitted on the same stream used for B. No autograd graph is retained.
         A failed task stays blocked rather than being silently retried.
         """
-        if self._history_task_id != microbatch_id or not self._history_task_ready:
+        record = self._history_records.get(microbatch_id)
+        if record is None or not record['ready'] or self._history_task_id is not None:
             raise RuntimeError("history task requires its completed stage dx")
-        self._history_task_ready = False
+        record['ready'] = False  # A failed H cannot be retried with partial contributions.
         from .fa_split import backward_dkv
-        count = len(self._history_jobs)
-        for split_state, layer_idx, layouts, current_shape in self._history_jobs:
+        count = len(record['jobs'])
+        for split_state, layer_idx, layouts, current_shape in record['jobs']:
             dk, dv = backward_dkv(split_state, "history", compact=True)
             self._route_key_value_grads(
                 layer_idx, layouts, dk, dv, current_shape,
                 route_history=True, return_current=False, compact_region="history",
             )
-        self._history_jobs.clear()
-        self._history_task_id = None
+        record['jobs'].clear()
+        del self._history_records[microbatch_id]
+        self._completed_history.add(microbatch_id)
         return count
 
     def __bool__(self) -> bool:
@@ -398,11 +463,14 @@ class DsppSequenceKVState:
         return current_key_grad, current_value_grad
 
     def clear(self) -> None:
-        if self._history_task_id is not None or self._history_jobs:
+        if self._history_task_id is not None or self._history_records:
             raise RuntimeError("cannot clear an unfinished history task")
         self._entries.clear()
         self._current_meta = None
         self._prepared_cu_seqlens.clear()
+        self._completed_history.clear()
+        self._task_modes = None
+        self._required_history.clear()
 
     def finish_iteration(self) -> None:
         """Verify gradients drained all KV state, then release device metadata."""
@@ -410,9 +478,12 @@ class DsppSequenceKVState:
         self.assert_empty()
         self._current_meta = None
         self._prepared_cu_seqlens.clear()
+        self._completed_history.clear()
+        self._task_modes = None
+        self._required_history.clear()
 
     def assert_empty(self) -> None:
-        if self._history_task_id is not None or self._history_jobs:
+        if self._history_task_id is not None or self._history_records:
             raise RuntimeError("DSPP history task has not completed")
         if self._entries:
             summary = {
@@ -457,8 +528,9 @@ class _DsppPackedFlashAttention(torch.autograd.Function):
             raise ValueError(
                 "query and K/V sequence, batch, and head dimensions must match"
             )
-        ctx.split_attention_backward = state.split_attention_backward
-        ctx.history_dkv_after_dx = state.history_dkv_after_dx
+        ctx.history_dkv_after_dx = state.task_after_dx(meta.microbatch_id)
+        ctx.split_attention_backward = (state.split_attention_backward
+            and (state._task_modes is None or ctx.history_dkv_after_dx))
         if ctx.split_attention_backward:
             # Reject unsupported configurations before mutating retained KV state.
             if query.dtype != torch.bfloat16 or query.size(-1) != 128:

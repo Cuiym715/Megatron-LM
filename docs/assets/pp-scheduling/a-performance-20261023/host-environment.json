@@ -1,0 +1,15 @@
+{
+  "cpu_model": "Intel(R) Xeon(R) Gold 6348 CPU @ 2.60GHz",
+  "logical_cpus": 112,
+  "memory": [
+    "MemTotal:       527967804 kB",
+    "MemFree:        307479856 kB",
+    "MemAvailable:   513530276 kB"
+  ],
+  "kernel": "Linux 6.8.0-49-generic x86_64 GNU/Linux",
+  "gpu": "3 x NVIDIA L40 46068 MiB",
+  "container": "nvcr.io/nvidia/pytorch:26.01-py3",
+  "torch": "2.10.0a0",
+  "flash_attention": "2.7.4.post1",
+  "dependencies": "existing venv plus read-only existing image overlay dependencies; no download"
+}

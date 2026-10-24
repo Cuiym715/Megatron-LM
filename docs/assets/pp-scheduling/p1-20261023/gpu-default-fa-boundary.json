@@ -1,0 +1,30 @@
+{
+  "criteria": {
+    "atol": 0.004,
+    "rtol": 0.01,
+    "relative_l2_max": 0.02
+  },
+  "conclusion": "Default fused FA is not numerically repeatable over these 3 optimizer steps at the fixed criteria; legacy self-repeat also fails. No tolerance relaxation. Deterministic FA runs are separate diagnostics, not default-path numerical acceptance.",
+  "failures": [
+    {
+      "comparison": "template-vs-legacy",
+      "failed_iteration": 2,
+      "failed_check": "outputs",
+      "first_iteration_reports": 3,
+      "first_iteration_output_max_abs": 0.0,
+      "first_iteration_gradient_max_abs": 0.0009765625,
+      "log": "/home/cuiym/tmp/dspp-p1-20261023/pp3-run6/hkv4/template/numerical/train.log",
+      "log_sha256": "9226753c73ce13029729a138d3c42359c882adcedbb8d5dfa945c0dc4037c5c9"
+    },
+    {
+      "comparison": "legacy-repeat-vs-legacy",
+      "failed_iteration": 2,
+      "failed_check": "outputs",
+      "first_iteration_reports": 3,
+      "first_iteration_output_max_abs": 0.0,
+      "first_iteration_gradient_max_abs": 0.00048828125,
+      "log": "/home/cuiym/tmp/dspp-p1-20261023/pp3-run6/hkv4/legacy-repeat/train.log",
+      "log_sha256": "b671866b3f90c7161f95b9c37d19087cb6a53537af6bd37c7e2e9974e3ce4060"
+    }
+  ]
+}

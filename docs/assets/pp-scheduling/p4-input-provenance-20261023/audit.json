@@ -1,0 +1,643 @@
+{
+  "paper": "https://arxiv.org/html/2509.21275v1",
+  "source_commit": "af813274f6d78d17e69be9944a5ec911061f39f0",
+  "datasets": {
+    "github": {
+      "path": "/home/cuiym/src/InfiniPipe-code/datasets/github.txt",
+      "sha256": "6d08d0192cce25e6cec26430b2f7e8d4eba492b0369f60612efb910827f669e3",
+      "tracked_bytes_unchanged": true,
+      "statistics": {
+        "n": 1000000,
+        "min": 1,
+        "max": 779594,
+        "mean": 3625.727986,
+        "buckets": [
+          {
+            "bucket": "≤2K",
+            "count": 699391,
+            "sample_percent": 69.9391,
+            "token_percent": 12.523350145219636
+          },
+          {
+            "bucket": "2–4K",
+            "count": 132710,
+            "sample_percent": 13.271,
+            "token_percent": 10.681880755960274
+          },
+          {
+            "bucket": "4–8K",
+            "count": 83195,
+            "sample_percent": 8.3195,
+            "token_percent": 13.139410922151841
+          },
+          {
+            "bucket": "8–16K",
+            "count": 45315,
+            "sample_percent": 4.5315,
+            "token_percent": 14.19796424298003
+          },
+          {
+            "bucket": "16–32K",
+            "count": 22836,
+            "sample_percent": 2.2836,
+            "token_percent": 14.265186550042532
+          },
+          {
+            "bucket": "32–64K",
+            "count": 10800,
+            "sample_percent": 1.08,
+            "token_percent": 13.541988006157062
+          },
+          {
+            "bucket": "64–128K",
+            "count": 3814,
+            "sample_percent": 0.3814,
+            "token_percent": 9.349833310964769
+          },
+          {
+            "bucket": ">128K",
+            "count": 1939,
+            "sample_percent": 0.1939,
+            "token_percent": 12.300386066523854
+          }
+        ]
+      }
+    },
+    "common_crawl": {
+      "path": "/home/cuiym/src/InfiniPipe-code/datasets/common_crawl.txt",
+      "sha256": "fda3698b0e24b2dc1f0fcf42cba62da6329bd4072c93553a24a95d5039b115fc",
+      "tracked_bytes_unchanged": true,
+      "statistics": {
+        "n": 1000000,
+        "min": 1,
+        "max": 1352614,
+        "mean": 3661.597093,
+        "buckets": [
+          {
+            "bucket": "≤2K",
+            "count": 591731,
+            "sample_percent": 59.1731,
+            "token_percent": 14.331510586001004
+          },
+          {
+            "bucket": "2–4K",
+            "count": 204720,
+            "sample_percent": 20.472,
+            "token_percent": 16.1986051150713
+          },
+          {
+            "bucket": "4–8K",
+            "count": 123098,
+            "sample_percent": 12.3098,
+            "token_percent": 19.10060416906716
+          },
+          {
+            "bucket": "8–16K",
+            "count": 52408,
+            "sample_percent": 5.2408,
+            "token_percent": 15.902493262111621
+          },
+          {
+            "bucket": "16–32K",
+            "count": 17216,
+            "sample_percent": 1.7216,
+            "token_percent": 10.573546410667308
+          },
+          {
+            "bucket": "32–64K",
+            "count": 6449,
+            "sample_percent": 0.6449,
+            "token_percent": 7.774521602724027
+          },
+          {
+            "bucket": "64–128K",
+            "count": 2721,
+            "sample_percent": 0.2721,
+            "token_percent": 6.786529202654684
+          },
+          {
+            "bucket": ">128K",
+            "count": 1657,
+            "sample_percent": 0.1657,
+            "token_percent": 9.332189651702894
+          }
+        ]
+      }
+    }
+  },
+  "prepared_inputs": [
+    {
+      "dataset": "github",
+      "seed": 11,
+      "sampling": "uniform without replacement over original row indices",
+      "source_indices_zero_based": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/github-seed11-source-rows.json",
+      "sampled_raw": {
+        "n": 256,
+        "min": 4,
+        "max": 417340,
+        "mean": 4923.86328125,
+        "buckets": [
+          {
+            "bucket": "≤2K",
+            "count": 185,
+            "sample_percent": 72.265625,
+            "token_percent": 9.722500989679565
+          },
+          {
+            "bucket": "2–4K",
+            "count": 29,
+            "sample_percent": 11.328125,
+            "token_percent": 6.608600176595328
+          },
+          {
+            "bucket": "4–8K",
+            "count": 18,
+            "sample_percent": 7.03125,
+            "token_percent": 8.350674211766833
+          },
+          {
+            "bucket": "8–16K",
+            "count": 12,
+            "sample_percent": 4.6875,
+            "token_percent": 11.06021456411656
+          },
+          {
+            "bucket": "16–32K",
+            "count": 7,
+            "sample_percent": 2.734375,
+            "token_percent": 12.164213028229073
+          },
+          {
+            "bucket": "32–64K",
+            "count": 3,
+            "sample_percent": 1.171875,
+            "token_percent": 8.76733129235888
+          },
+          {
+            "bucket": "64–128K",
+            "count": 1,
+            "sample_percent": 0.390625,
+            "token_percent": 10.217618438265811
+          },
+          {
+            "bucket": ">128K",
+            "count": 1,
+            "sample_percent": 0.390625,
+            "token_percent": 33.108847298987946
+          }
+        ]
+      },
+      "model_input_raw": {
+        "n": 256,
+        "min": 256,
+        "max": 16384,
+        "mean": 2650,
+        "buckets": [
+          {
+            "bucket": "≤2K",
+            "count": 185,
+            "sample_percent": 72.265625,
+            "token_percent": 21.547169811320753
+          },
+          {
+            "bucket": "2–4K",
+            "count": 29,
+            "sample_percent": 11.328125,
+            "token_percent": 12.830188679245284
+          },
+          {
+            "bucket": "4–8K",
+            "count": 18,
+            "sample_percent": 7.03125,
+            "token_percent": 15.849056603773585
+          },
+          {
+            "bucket": "8–16K",
+            "count": 24,
+            "sample_percent": 9.375,
+            "token_percent": 49.77358490566038
+          },
+          {
+            "bucket": "16–32K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          },
+          {
+            "bucket": "32–64K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          },
+          {
+            "bucket": "64–128K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          },
+          {
+            "bucket": ">128K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          }
+        ]
+      },
+      "alignment": 256,
+      "max_context": 16384,
+      "over_context_policy": "clip, matching author loader",
+      "clipped_count": 12,
+      "output": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/github-seed11-raw-lengths-max16k.txt",
+      "output_sha256": "3d5e727d0014b27f4cbb79edb0f547a34f82e4ba83b407cdab28e63038c1cb65",
+      "next_token_training_length": "each raw input length minus one",
+      "gpu_run": false
+    },
+    {
+      "dataset": "github",
+      "seed": 19,
+      "sampling": "uniform without replacement over original row indices",
+      "source_indices_zero_based": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/github-seed19-source-rows.json",
+      "sampled_raw": {
+        "n": 256,
+        "min": 4,
+        "max": 74180,
+        "mean": 3909.6171875,
+        "buckets": [
+          {
+            "bucket": "≤2K",
+            "count": 180,
+            "sample_percent": 70.3125,
+            "token_percent": 12.167111949499532
+          },
+          {
+            "bucket": "2–4K",
+            "count": 32,
+            "sample_percent": 12.5,
+            "token_percent": 9.527687133690758
+          },
+          {
+            "bucket": "4–8K",
+            "count": 17,
+            "sample_percent": 6.640625,
+            "token_percent": 10.770216073744432
+          },
+          {
+            "bucket": "8–16K",
+            "count": 14,
+            "sample_percent": 5.46875,
+            "token_percent": 17.482430145214824
+          },
+          {
+            "bucket": "16–32K",
+            "count": 7,
+            "sample_percent": 2.734375,
+            "token_percent": 18.40203744372351
+          },
+          {
+            "bucket": "32–64K",
+            "count": 4,
+            "sample_percent": 1.5625,
+            "token_percent": 17.509306977385492
+          },
+          {
+            "bucket": "64–128K",
+            "count": 2,
+            "sample_percent": 0.78125,
+            "token_percent": 14.141210276741448
+          },
+          {
+            "bucket": ">128K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          }
+        ]
+      },
+      "model_input_raw": {
+        "n": 256,
+        "min": 256,
+        "max": 16384,
+        "mean": 2913,
+        "buckets": [
+          {
+            "bucket": "≤2K",
+            "count": 180,
+            "sample_percent": 70.3125,
+            "token_percent": 19.77342945417096
+          },
+          {
+            "bucket": "2–4K",
+            "count": 32,
+            "sample_percent": 12.5,
+            "token_percent": 13.250944043940954
+          },
+          {
+            "bucket": "4–8K",
+            "count": 17,
+            "sample_percent": 6.640625,
+            "token_percent": 14.727085478887744
+          },
+          {
+            "bucket": "8–16K",
+            "count": 27,
+            "sample_percent": 10.546875,
+            "token_percent": 52.24854102300034
+          },
+          {
+            "bucket": "16–32K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          },
+          {
+            "bucket": "32–64K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          },
+          {
+            "bucket": "64–128K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          },
+          {
+            "bucket": ">128K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          }
+        ]
+      },
+      "alignment": 256,
+      "max_context": 16384,
+      "over_context_policy": "clip, matching author loader",
+      "clipped_count": 13,
+      "output": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/github-seed19-raw-lengths-max16k.txt",
+      "output_sha256": "43666772675d769f95ecdc23ec48f89d50e04ff82fa42a29dcb5cbb2ee749eb8",
+      "next_token_training_length": "each raw input length minus one",
+      "gpu_run": false
+    },
+    {
+      "dataset": "common_crawl",
+      "seed": 11,
+      "sampling": "uniform without replacement over original row indices",
+      "source_indices_zero_based": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/common_crawl-seed11-source-rows.json",
+      "sampled_raw": {
+        "n": 256,
+        "min": 9,
+        "max": 59282,
+        "mean": 3336.25,
+        "buckets": [
+          {
+            "bucket": "≤2K",
+            "count": 155,
+            "sample_percent": 60.546875,
+            "token_percent": 17.017492506556763
+          },
+          {
+            "bucket": "2–4K",
+            "count": 53,
+            "sample_percent": 20.703125,
+            "token_percent": 17.53969183214687
+          },
+          {
+            "bucket": "4–8K",
+            "count": 27,
+            "sample_percent": 10.546875,
+            "token_percent": 17.76004589733983
+          },
+          {
+            "bucket": "8–16K",
+            "count": 12,
+            "sample_percent": 4.6875,
+            "token_percent": 15.816316972648933
+          },
+          {
+            "bucket": "16–32K",
+            "count": 7,
+            "sample_percent": 2.734375,
+            "token_percent": 18.925393405769952
+          },
+          {
+            "bucket": "32–64K",
+            "count": 2,
+            "sample_percent": 0.78125,
+            "token_percent": 12.941059385537654
+          },
+          {
+            "bucket": "64–128K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          },
+          {
+            "bucket": ">128K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          }
+        ]
+      },
+      "model_input_raw": {
+        "n": 256,
+        "min": 256,
+        "max": 16384,
+        "mean": 2971,
+        "buckets": [
+          {
+            "bucket": "≤2K",
+            "count": 155,
+            "sample_percent": 60.546875,
+            "token_percent": 21.608885897004377
+          },
+          {
+            "bucket": "2–4K",
+            "count": 53,
+            "sample_percent": 20.703125,
+            "token_percent": 20.632783574554022
+          },
+          {
+            "bucket": "4–8K",
+            "count": 27,
+            "sample_percent": 10.546875,
+            "token_percent": 20.39717266913497
+          },
+          {
+            "bucket": "8–16K",
+            "count": 21,
+            "sample_percent": 8.203125,
+            "token_percent": 37.36115785930663
+          },
+          {
+            "bucket": "16–32K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          },
+          {
+            "bucket": "32–64K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          },
+          {
+            "bucket": "64–128K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          },
+          {
+            "bucket": ">128K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          }
+        ]
+      },
+      "alignment": 256,
+      "max_context": 16384,
+      "over_context_policy": "clip, matching author loader",
+      "clipped_count": 9,
+      "output": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/common_crawl-seed11-raw-lengths-max16k.txt",
+      "output_sha256": "61620073189426f77ddb75500dd0cacbd2d70fff28e8d38eeb1db921eb104d87",
+      "next_token_training_length": "each raw input length minus one",
+      "gpu_run": false
+    },
+    {
+      "dataset": "common_crawl",
+      "seed": 19,
+      "sampling": "uniform without replacement over original row indices",
+      "source_indices_zero_based": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/common_crawl-seed19-source-rows.json",
+      "sampled_raw": {
+        "n": 256,
+        "min": 8,
+        "max": 136530,
+        "mean": 4764.2734375,
+        "buckets": [
+          {
+            "bucket": "≤2K",
+            "count": 151,
+            "sample_percent": 58.984375,
+            "token_percent": 9.985618872237536
+          },
+          {
+            "bucket": "2–4K",
+            "count": 57,
+            "sample_percent": 22.265625,
+            "token_percent": 13.702574664617998
+          },
+          {
+            "bucket": "4–8K",
+            "count": 27,
+            "sample_percent": 10.546875,
+            "token_percent": 12.535194407594284
+          },
+          {
+            "bucket": "8–16K",
+            "count": 11,
+            "sample_percent": 4.296875,
+            "token_percent": 10.57824596155959
+          },
+          {
+            "bucket": "16–32K",
+            "count": 4,
+            "sample_percent": 1.5625,
+            "token_percent": 7.484335721442311
+          },
+          {
+            "bucket": "32–64K",
+            "count": 2,
+            "sample_percent": 0.78125,
+            "token_percent": 7.990544859443744
+          },
+          {
+            "bucket": "64–128K",
+            "count": 2,
+            "sample_percent": 0.78125,
+            "token_percent": 15.49324644530334
+          },
+          {
+            "bucket": ">128K",
+            "count": 2,
+            "sample_percent": 0.78125,
+            "token_percent": 22.230239067801197
+          }
+        ]
+      },
+      "model_input_raw": {
+        "n": 256,
+        "min": 256,
+        "max": 16384,
+        "mean": 2993,
+        "buckets": [
+          {
+            "bucket": "≤2K",
+            "count": 151,
+            "sample_percent": 58.984375,
+            "token_percent": 18.476445038422987
+          },
+          {
+            "bucket": "2–4K",
+            "count": 57,
+            "sample_percent": 22.265625,
+            "token_percent": 22.753090544604078
+          },
+          {
+            "bucket": "4–8K",
+            "count": 27,
+            "sample_percent": 10.546875,
+            "token_percent": 20.380888740394255
+          },
+          {
+            "bucket": "8–16K",
+            "count": 21,
+            "sample_percent": 8.203125,
+            "token_percent": 38.38957567657869
+          },
+          {
+            "bucket": "16–32K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          },
+          {
+            "bucket": "32–64K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          },
+          {
+            "bucket": "64–128K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          },
+          {
+            "bucket": ">128K",
+            "count": 0,
+            "sample_percent": 0.0,
+            "token_percent": 0.0
+          }
+        ]
+      },
+      "alignment": 256,
+      "max_context": 16384,
+      "over_context_policy": "clip, matching author loader",
+      "clipped_count": 10,
+      "output": "/home/cuiym/tmp/dspp-p4-input-audit-20261023/common_crawl-seed19-raw-lengths-max16k.txt",
+      "output_sha256": "fd78674cb1a3788298dbf403733c6fafd7427630d6771c69bbe4dcc51e9d3e2b",
+      "next_token_training_length": "each raw input length minus one",
+      "gpu_run": false
+    }
+  ],
+  "source_hashes": {
+    "/home/cuiym/src/InfiniPipe-code/infiniPipe/utils/dataloader.py": "34198e5b0ceb3f0e859074a3cafde867f966340135b4ce8707c18174bcb7ec4a",
+    "/home/cuiym/src/InfiniPipe-code/scripts/generate_dspp_compare_lengths.py": "2a89c9cb97df6bf50499fd205ee1c4b948f26c41307d5c210c259885ed7a85e8"
+  },
+  "local_sampler": {
+    "path": "/home/cuiym/src/numerical-simulator/scripts/sample_infinipipe_seq_lens.py",
+    "method": "beta within Figure 2 buckets, global_mean=4096, minimum=512",
+    "author_original": false
+  }
+}

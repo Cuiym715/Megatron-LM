@@ -34,23 +34,85 @@ __global__ void split_kernel(const Flash_bwd_params p, int first_k_block) {
             p, blockIdx.y, blockIdx.z, blockIdx.x + first_k_block);
 }
 
-__global__ void dq_current_kernel(const Flash_bwd_params p, int history) {
+__device__ __forceinline__ void dq_current_column(
+    const Flash_bwd_params& p, int history, int n_block) {
     // Tiles wholly within history need only dQ. A boundary tile also computes
     // dKV, but its surplus history rows are discarded by the current-only
     // output slice. H later computes/routes those rows exactly once.
-    if ((int(blockIdx.x) + 1) * 64 <= history) {
+    if ((n_block + 1) * 64 <= history) {
         dspp_flash_split::compute_dq_dk_dv_1colblock<
             Traits, false, true, false, false, false, true, false,
-            false, false, true, true, false>(p, blockIdx.y, blockIdx.z, blockIdx.x);
+            false, false, true, true, false>(p, blockIdx.y, blockIdx.z, n_block);
     } else {
         dspp_flash_split::compute_dq_dk_dv_1colblock<
             Traits, false, true, false, false, false, true, false,
-            false, false, true, true, true>(p, blockIdx.y, blockIdx.z, blockIdx.x);
+            false, false, true, true, true>(p, blockIdx.y, blockIdx.z, n_block);
+    }
+}
+
+__global__ void dq_current_kernel(const Flash_bwd_params p, int history) {
+    dq_current_column(p, history, blockIdx.x);
+}
+
+// Match FA2's deterministic seq-K traversal: each CTA owns a separate FP32
+// dQ partition, visits its KV columns in order, then convert_dQ sums partitions.
+// Default kernels above keep the original one-CTA-per-KV-column launch.
+template<bool CurrentDkv>
+__global__ void deterministic_dq_kernel(const Flash_bwd_params p, int history) {
+    for (int n_block = blockIdx.x; n_block < (p.seqlen_k + 63) / 64;
+         n_block += gridDim.x) {
+        if constexpr (CurrentDkv) {
+            dq_current_column(p, history, n_block);
+        } else {
+            dspp_flash_split::compute_dq_dk_dv_1colblock<
+                Traits, false, true, false, false, false, true, false,
+                false, false, true, true, false>(p, blockIdx.y, blockIdx.z, n_block);
+        }
     }
 }
 
 __global__ void convert_dq_kernel(const Flash_bwd_params p) {
     dspp_flash_split::convert_dQ<Traits>(p, 1);
+}
+
+__global__ void convert_dq_deterministic_kernel(const Flash_bwd_params p, int nsplits) {
+    dspp_flash_split::convert_dQ<Traits>(p, nsplits);
+}
+
+at::Tensor dq_accumulator(Flash_bwd_params& p, const at::Tensor& q,
+                          bool deterministic, int& nsplits) {
+    p.deterministic = deterministic;
+    nsplits = 1;
+    if (!deterministic) {
+        return at::zeros({p.seqlen_q_rounded, p.h, 128}, q.options().dtype(at::kFloat));
+    }
+    // Same SM/head partition count and layout as pinned FA2 (batch=1 here).
+    const int sms = at::cuda::getDeviceProperties(q.get_device())->multiProcessorCount;
+    nsplits = (sms + p.h - 1) / p.h;
+    p.dq_accum_split_stride = int64_t(p.seqlen_q_rounded) * p.h * 128;
+    return at::zeros({nsplits, p.seqlen_q_rounded, p.h, 128}, q.options().dtype(at::kFloat));
+}
+
+template<bool CurrentDkv>
+void launch_deterministic_dq(const Flash_bwd_params& p, cudaStream_t stream,
+                              int nsplits, int history) {
+    auto kernel = deterministic_dq_kernel<CurrentDkv>;
+    C10_CUDA_CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                        Traits::kSmemSize1colblock));
+    kernel<<<dim3(nsplits, 1, p.h), Traits::kNThreads,
+              Traits::kSmemSize1colblock, stream>>>(p, history);
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
+void finish_dq(const Flash_bwd_params& p, cudaStream_t stream, int nsplits) {
+    const dim3 grid((p.seqlen_q + 63) / 64, 1, p.h);
+    if (p.deterministic) {
+        convert_dq_deterministic_kernel<<<grid, Traits::kNThreads,
+            Traits::kSmemdQSize, stream>>>(p, nsplits);
+    } else {
+        convert_dq_kernel<<<grid, Traits::kNThreads, Traits::kSmemdQSize, stream>>>(p);
+    }
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
 // Joint K/V output pass. Each thread owns one [token, KV-head, dim]
@@ -207,20 +269,23 @@ at::Tensor split_prepare(const at::Tensor& q, const at::Tensor& k, const at::Ten
 
 at::Tensor split_dq(const at::Tensor& q, const at::Tensor& k, const at::Tensor& v,
                      const at::Tensor& o, const at::Tensor& dout, const at::Tensor& lse,
-                     const at::Tensor& delta, double scale) {
+                     const at::Tensor& delta, double scale, bool deterministic) {
     check_inputs(q, k, v, o, dout, lse, scale);
     check_delta(q, delta);
     const c10::cuda::CUDAGuard guard(q.device());
     auto dq = at::empty_like(q);
-    auto accum = at::zeros({(q.size(0) + 127) / 128 * 128, q.size(1), 128}, q.options().dtype(at::kFloat));
     auto p = params(q, k, v, o, dout, lse, delta, scale);
+    int nsplits;
+    auto accum = dq_accumulator(p, q, deterministic, nsplits);
     p.dq_ptr = dq.data_ptr(); p.dq_accum_ptr = accum.data_ptr();
     p.dq_row_stride = dq.stride(0); p.dq_head_stride = 128; p.dq_batch_stride = dq.numel();
     auto stream = at::cuda::getCurrentCUDAStream();
-    launch<true>(p, stream, 0, p.seqlen_k);
-    convert_dq_kernel<<<dim3((p.seqlen_q + 63) / 64, 1, p.h), Traits::kNThreads,
-                         Traits::kSmemdQSize, stream>>>(p);
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    if (deterministic) {
+        launch_deterministic_dq<false>(p, stream, nsplits, 0);
+    } else {
+        launch<true>(p, stream, 0, p.seqlen_k);
+    }
+    finish_dq(p, stream, nsplits);
     return dq;
 }
 
@@ -259,7 +324,7 @@ std::vector<at::Tensor> split_dkv(const at::Tensor& q, const at::Tensor& k, cons
 std::vector<at::Tensor> split_dq_current(
     const at::Tensor& q, const at::Tensor& k, const at::Tensor& v,
     const at::Tensor& o, const at::Tensor& dout, const at::Tensor& lse,
-    const at::Tensor& delta, double scale) {
+    const at::Tensor& delta, double scale, bool deterministic) {
     check_inputs(q, k, v, o, dout, lse, scale);
     check_delta(q, delta);
     const c10::cuda::CUDAGuard guard(q.device());
@@ -267,12 +332,13 @@ std::vector<at::Tensor> split_dq_current(
     auto dq = at::empty_like(q);
     auto dk = at::empty({q.size(0), k.size(1), 128}, k.options());
     auto dv = at::empty_like(dk);
-    auto accum = at::zeros({(q.size(0) + 127) / 128 * 128, q.size(1), 128}, q.options().dtype(at::kFloat));
+    auto p = params(q, k, v, o, dout, lse, delta, scale);
+    int nsplits;
+    auto accum = dq_accumulator(p, q, deterministic, nsplits);
     // Keep upstream full-address per-Q-head partials and rounding semantics.
     // Only current-intersecting tiles write dKV; only current rows are read.
     auto partial_k = at::empty({k.size(0), q.size(1), 128}, q.options());
     auto partial_v = at::empty_like(partial_k);
-    auto p = params(q, k, v, o, dout, lse, delta, scale);
     p.dq_ptr = dq.data_ptr(); p.dq_accum_ptr = accum.data_ptr();
     p.dq_row_stride = dq.stride(0); p.dq_head_stride = 128; p.dq_batch_stride = dq.numel();
     p.dk_ptr = partial_k.data_ptr(); p.dv_ptr = partial_v.data_ptr();
@@ -280,14 +346,16 @@ std::vector<at::Tensor> split_dq_current(
     p.dk_head_stride = p.dv_head_stride = 128;
     p.dk_batch_stride = partial_k.numel(); p.dv_batch_stride = partial_v.numel();
     auto stream = at::cuda::getCurrentCUDAStream();
-    C10_CUDA_CHECK(cudaFuncSetAttribute(dq_current_kernel,
-        cudaFuncAttributeMaxDynamicSharedMemorySize, Traits::kSmemSize1colblock));
-    dq_current_kernel<<<dim3((p.seqlen_k + 63) / 64, 1, p.h), Traits::kNThreads,
-        Traits::kSmemSize1colblock, stream>>>(p, history);
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
-    convert_dq_kernel<<<dim3((p.seqlen_q + 63) / 64, 1, p.h), Traits::kNThreads,
-        Traits::kSmemdQSize, stream>>>(p);
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    if (deterministic) {
+        launch_deterministic_dq<true>(p, stream, nsplits, history);
+    } else {
+        C10_CUDA_CHECK(cudaFuncSetAttribute(dq_current_kernel,
+            cudaFuncAttributeMaxDynamicSharedMemorySize, Traits::kSmemSize1colblock));
+        dq_current_kernel<<<dim3((p.seqlen_k + 63) / 64, 1, p.h), Traits::kNThreads,
+            Traits::kSmemSize1colblock, stream>>>(p, history);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+    finish_dq(p, stream, nsplits);
     write_dkv_output(partial_k, partial_v, dk, dv, history, p.h_h_k_ratio);
     return {dq, dk, dv};
 }

@@ -23,10 +23,12 @@ from .dspp_batch_plan import DsppMicrobatchMeta
 
 def _op_kind(kind: str) -> str:
     value = str(kind)
+    if value in {"B_fused", "D", "H"}:
+        return value
     return value[0] if value and value[0] in "FBW" else value
 
 
-def _features(meta: DsppMicrobatchMeta) -> Tuple[float, ...]:
+def _features(meta: DsppMicrobatchMeta, extended: bool = False) -> Tuple[float, ...]:
     token_work = 0.0
     attention_work = 0.0
     for item in meta.items:
@@ -34,13 +36,16 @@ def _features(meta: DsppMicrobatchMeta) -> Tuple[float, ...]:
         k = float(item.token_offset + item.token_length)
         token_work += q
         attention_work += q * k
-    return (
+    base = (
         1.0,
         token_work,
         attention_work,
         float(len(meta.items)),
         float(meta.padding_token_count),
     )
+    return base + (float(meta.chunk_size), sum(
+        float(i.token_length * i.token_offset) for i in meta.items
+    )) if extended else base
 
 
 def _signature(meta: DsppMicrobatchMeta) -> str:
@@ -102,6 +107,7 @@ class DsppExecutionCostModel:
     w_capacity_p95_ms: Mapping[Tuple[int, int], float] = None
     source: str = "profile"
     stage_op_calibrations: Mapping[Tuple[int, str], _StageOpCalibration] = None
+    extended_features: bool = False
 
     def __post_init__(self):
         if self.points is None:
@@ -174,7 +180,8 @@ class DsppExecutionCostModel:
 
     @classmethod
     def from_records(
-        cls, records: Sequence[Mapping[str, Any]], *, ridge: float = 1e-6
+        cls, records: Sequence[Mapping[str, Any]], *, ridge: float = 1e-6,
+        extended_features: bool = False,
     ) -> "DsppExecutionCostModel":
         grouped: Dict[Tuple[int, str], list[Tuple[Tuple[float, ...], float, str]]]
         grouped = defaultdict(list)
@@ -183,14 +190,14 @@ class DsppExecutionCostModel:
             if "duration_ms" not in record or "items" not in record:
                 continue
             stage = int(record["stage"])
-            op = _op_kind(str(record.get("kind", "")))
-            if op not in "FBW":
+            op = _op_kind(str(record.get("calibration_operation") or record.get("kind", "")))
+            if op not in {"F", "B", "W", "B_fused", "D", "H"}:
                 continue
             items = tuple(record.get("items", ()))
             if not items:
                 continue
             meta = meta_from_timeline_record(record, items)
-            features = _features(meta)
+            features = _features(meta, extended_features)
             duration = float(record["duration_ms"])
             signature = str(record.get("signature", _signature(meta)))
             grouped[(stage, op)].append((features, duration, signature))
@@ -214,6 +221,20 @@ class DsppExecutionCostModel:
                 gram = x_scaled.T @ x_scaled
                 gram = gram + ridge * torch.eye(gram.shape[0], dtype=gram.dtype)
                 beta_scaled = torch.linalg.solve(gram, x_scaled.T @ y)
+                if extended_features:
+                    # Clipping an unconstrained solution is not nonnegative
+                    # least squares: correlated capacity/padding/history terms
+                    # can cancel before clipping and explode afterwards. P2
+                    # uses projected gradient on the small normalized system.
+                    beta_scaled = torch.zeros(x.shape[1], dtype=x.dtype)
+                    beta_scaled[0] = torch.mean(y)
+                    step = 1.0 / max(float(torch.linalg.eigvalsh(gram)[-1]), 1e-12)
+                    target = x_scaled.T @ y
+                    for _ in range(512):
+                        updated = torch.clamp(beta_scaled - step * (gram @ beta_scaled - target), min=0.0)
+                        if torch.max(torch.abs(updated - beta_scaled)) < 1e-9:
+                            break
+                        beta_scaled = updated
                 beta = beta_scaled.clone()
                 beta[1:] = beta_scaled[1:] / scale
                 beta = torch.clamp(beta, min=0.0)
@@ -248,11 +269,14 @@ class DsppExecutionCostModel:
             exact_p95_ms={key: _percentile(values, 0.95) for key, values in exact.items()},
             fitted=fitted,
             points=profile_points,
+            extended_features=extended_features,
         )
 
     @classmethod
     def from_json(cls, path: str | Path) -> "DsppExecutionCostModel":
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        if isinstance(payload, Mapping) and payload.get('schema') == 'dspp-stage-calibration-v2':
+            raise ValueError('stage calibration v2 requires the context-aware StageCalibration API')
         records = payload.get("records") if isinstance(payload, Mapping) else None
         if records and "query_lengths" in records[0] and "median_ms" in records[0]:
             return cls.from_compute_profile(payload)
@@ -329,6 +353,7 @@ class DsppExecutionCostModel:
             w_p95,
             stage_op_calibrations=calibrations,
             source=str(payload.get("source", "profile")),
+            extended_features=bool(payload.get("extended_features", False)),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -338,6 +363,7 @@ class DsppExecutionCostModel:
             # new optional fields are ignored by older readers.
             "version": 1,
             "source": self.source,
+            "extended_features": self.extended_features,
             "exact": [
                 {
                     "stage": stage,
@@ -495,7 +521,7 @@ class DsppExecutionCostModel:
             value = self.exact_p95_ms[key] if percentile >= 0.95 else self.exact_median_ms[key]
             return DsppCostPrediction(float(value), "exact-profile", 0.0, "high", False)
         fitted = self.fitted.get((profile_stage, op))
-        features = _features(meta)
+        features = _features(meta, self.extended_features)
         in_bounds = _features_in_bounds(features, fitted)
         points = self.points.get((profile_stage, op), ())
         if points and in_bounds:
@@ -521,6 +547,8 @@ class DsppExecutionCostModel:
             return DsppCostPrediction(
                 max(0.0, value), source, float(error), confidence, not in_bounds
             )
+        if op in {'D', 'H', 'B_fused'} and fallback is None:
+            raise ValueError(f'missing {op} execution cost; explicit fallback required')
         return DsppCostPrediction(
             float(fallback or 0.0), "metadata-fallback", 0.0, "none", True
         )
@@ -583,6 +611,7 @@ class DsppExecutionCostModel:
                 if calibrations else self.source
             ),
             stage_op_calibrations=calibrations,
+            extended_features=self.extended_features,
         )
 
     def predict_task_workload(
