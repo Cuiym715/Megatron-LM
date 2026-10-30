@@ -9,8 +9,7 @@ from dataclasses import dataclass, replace
 import math
 import time
 
-from .dspp_plan import (_graph, _plan_unsplit, node_key, replay_plan,
-                        validate_plan)
+from .dspp_plan import _graph, _plan_unsplit, node_key, replay_plan
 
 
 @dataclass(frozen=True)
@@ -135,12 +134,15 @@ def predecessors(model):
     return out
 
 
-def best_insertion(optional, backend, current, h, preds, counters):
-    """One-H best legal placement, including zero-gain/worse moves for diagnosis."""
+def insertion_candidates(optional, backend, current, h, preds, counters,
+                         deadline=float('inf')):
+    """Yield legal placements in time order; no memory work for diagnostic states."""
     model = optional.m
     scores = score_positions(optional, current, h, preds, backend)
     counters['positions_scored'] += len(scores)
     for predicted, position in sorted(scores):
+        if time.perf_counter() >= deadline:
+            return
         orders = [list(rank) for rank in current.orders]
         orders[model.meta[h]['rank']].insert(position, h)
         selected = current.selected | {h}
@@ -150,8 +152,13 @@ def best_insertion(optional, backend, current, h, preds, counters):
         if actual is None:
             continue
         assert abs(actual - predicted) < 1e-6
-        return State(selected, tuple(tuple(rank) for rank in orders), actual), position
-    return None, None
+        yield State(selected, tuple(tuple(rank) for rank in orders), actual), position
+
+
+def best_insertion(optional, backend, current, h, preds, counters):
+    """One-H best legal placement, including zero-gain/worse moves for diagnosis."""
+    return next(insertion_candidates(optional, backend, current, h, preds, counters),
+                (None, None))
 
 
 def critical_path(optional, state):
@@ -162,7 +169,7 @@ def critical_path(optional, state):
 
 
 
-def step_cp(o, backend, current, deadline):
+def step_cp(o, backend, current, deadline, feasible=None):
     m = o.m
     path = set(critical_path(o, current))
     eligible = [h for h in m.hs if h not in current.selected
@@ -173,46 +180,71 @@ def step_cp(o, backend, current, deadline):
                     second_candidates=0, second_trials=0, positions_scored=0,
                     positions_replayed=0)
     singles = []
-
-    def best_single():
-        improving = [s for s, h in singles if s.makespan < current.makespan-1e-8]
-        return min(improving, key=lambda s:s.makespan) if improving else None
-
     for h in firsts:
         if time.perf_counter() >= deadline:
-            return best_single(), 'deadline', counters
-        one, _ = best_insertion(o, backend, current, h, preds, counters)
+            break
+        placements = insertion_candidates(o, backend, current, h, preds, counters, deadline)
+        one, _ = next(placements, (None, None))
         counters['singles_tried'] += 1
         if one is not None:
-            singles.append((one, h))
-    best = best_single()
+            singles.append((one, h, placements))
+
+    # Check only candidates which can beat the incumbent. Start with the best
+    # time score; an infeasible slot does not discard other positions of H.
+    best = None
+    if feasible is None:
+        improving = [one for one, _, _ in singles if one.makespan < current.makespan-1e-8]
+        if improving:
+            best = min(improving, key=lambda state: state.makespan)
+            return best, 'deadline' if time.perf_counter() >= deadline else 'single', counters
+    for one, h, placements in sorted(singles, key=lambda entry: entry[0].makespan):
+        trial = one
+        while trial is not None:
+            if time.perf_counter() >= deadline:
+                return best, 'deadline', counters
+            limit = best.makespan if best is not None else current.makespan
+            if trial.makespan >= limit-1e-8:
+                break
+            if feasible is None or feasible(trial):
+                best = trial
+                break
+            trial, _ = next(placements, (None, None))
+    if time.perf_counter() >= deadline:
+        return best, 'deadline', counters
     if best is not None:
         return best, 'single', counters
-    for one, h1 in singles:
+    for one, h1, _ in singles:
         if time.perf_counter() >= deadline:
             return best, 'deadline', counters
+        # Keep the time-best single as a diagnostic intermediate even if its
+        # memory exceeds capacity: a complete pair may have different lifetimes.
         exposed = set(critical_path(o, one))-path
         seconds = [h for h in eligible if h != h1 and m.release[h] in exposed]
         counters['second_candidates'] += len(seconds)
         for h2 in seconds:
             if time.perf_counter() >= deadline:
                 return best, 'deadline', counters
-            two, _ = best_insertion(o, backend, one, h2, preds, counters)
             counters['second_trials'] += 1
-            if two is not None and two.makespan < current.makespan-1e-8 and (
-                    best is None or two.makespan < best.makespan):
-                best = two
+            for two, _ in insertion_candidates(o, backend, one, h2, preds, counters, deadline):
+                if time.perf_counter() >= deadline:
+                    return best, 'deadline', counters
+                limit = best.makespan if best is not None else current.makespan
+                if two.makespan >= limit-1e-8:
+                    break
+                if feasible is None or feasible(two):
+                    best = two
+                    break
     return best, 'pair' if best is not None else 'stalled', counters
 
 
-def run_cp(o, backend, budget_ms):
+def run_cp(o, backend, budget_ms, feasible=None):
     state = initial(o, backend)
     begin = time.perf_counter()
     deadline = begin+budget_ms/1000
     records = []
     stop = 'step_limit'
     for _ in range(32):
-        candidate, kind, counters = step_cp(o, backend, state, deadline)
+        candidate, kind, counters = step_cp(o, backend, state, deadline, feasible)
         records.append(dict(kind=kind, before_ms=state.makespan,
                             after_ms=None if candidate is None else candidate.makespan,
                             **counters))
@@ -292,9 +324,9 @@ def plan_configuration_b(reference, compute, messages, split_costs, *, owners=()
                          planning_started=None, feedback_reserve_ms=0., backend='python'):
     """027 supply -> 030 cp-all -> full audit, with 031's soft full budget.
 
-    Deployed per-chunk W order is retained as a final execution restriction;
-    the research supply priority itself is unchanged. Invalid supply output
-    falls back to the same-input unsplit template before the split search.
+    Deployed per-chunk W order constrains readiness as well as final validation;
+    the supply priority itself is unchanged. Invalid supply output falls back
+    to the same-input unsplit template before the split search.
     """
     begin = time.perf_counter() if planning_started is None else planning_started
     if reference.schema_version != 2:
@@ -310,8 +342,8 @@ def plan_configuration_b(reference, compute, messages, split_costs, *, owners=()
     base = _plan_unsplit(reference, compute, messages, owners=owners,
                          capacities=capacities, tokens=tokens,
                          order_based_capacity=memory is not None, supply=True, backend=backend)
-    # A counted byte model audits every accepted base; split trials are audited
-    # once at the end, as in 030/031, rather than changing the search algorithm.
+    # The base is feasible before search. Only improving complete split trials
+    # pay for memory accounting; accepted states remain feasible throughout.
     base_reason = base.fallback_reason
     if memory is not None:
         memory.check(base)
@@ -321,7 +353,26 @@ def plan_configuration_b(reference, compute, messages, split_costs, *, owners=()
     reserve = .10 * (len(compute) + len(optional.m.hs))
     preparation = (prepared-begin)*1000
     decision_budget = max(0., full_budget-preparation-reserve-feedback_reserve_ms)
-    state, decision = run_cp(optional, Backend(), decision_budget)
+    memory_stats = dict(checks=0, rejected=0, cache_hits=0, check_ms=0.)
+    checked = {}
+    def feasible(trial):
+        key = (trial.selected, trial.orders)
+        if key in checked:
+            memory_stats['cache_hits'] += 1
+            return checked[key]
+        start = time.perf_counter()
+        try:
+            memory.check(optional.materialize(trial))
+            accepted = True
+        except ValueError:
+            accepted = False
+            memory_stats['rejected'] += 1
+        memory_stats['checks'] += 1
+        memory_stats['check_ms'] += (time.perf_counter()-start)*1000
+        checked[key] = accepted
+        return accepted
+    state, decision = run_cp(optional, Backend(), decision_budget,
+                             feasible if memory is not None else None)
     searched = time.perf_counter()
     candidate = optional.materialize(state)
     actual_compute = dict(compute)
@@ -331,13 +382,12 @@ def plan_configuration_b(reference, compute, messages, split_costs, *, owners=()
         actual_compute[(bk[0], 'D', *bk[2:])] = optional.split_cost[h]
         actual_compute[hk] = optional.hcost[h]
     reject = ''
-    validate_plan(candidate, reference)
-    actual = replay_plan(candidate, actual_compute, messages, tokens=tokens)
+    actual = replay_plan(candidate, actual_compute, messages, tokens=tokens, reference=reference)
     if abs(actual['makespan_ms']-state.makespan) > 1e-6:
         raise ValueError('split fast score differs from materialized replay')
     try:
-        if memory is not None:
-            memory.check(candidate)
+        # This exact state was already checked before acceptance (or is the
+        # checked base). Runtime publication reuses CountedMemory's cached result.
         if any(a>b+1e-8 for a,b in zip(actual['token_peaks'],original['token_peaks'])):
             reject = 'final-forward-token-capacity'
     except ValueError as exc:
@@ -358,6 +408,7 @@ def plan_configuration_b(reference, compute, messages, split_costs, *, owners=()
         budget_overrun_ms=max(0., (finish-begin)*1000-full_budget),
         fallback_reason=reject, cost_policy='fused_fw/nonnegative_overhead',
         execution_constraint='per-chunk W accumulation order',
-        search_capacity_policy='final audit, otherwise unsplit base')
+        search_capacity_policy='improving complete candidates, cached acceptance',
+        memory_search=memory_stats)
     return replace(candidate, algorithm='B', reference_ms=total, predicted_ms=final_ms,
                    fallback_reason=reject, planning_info=info)

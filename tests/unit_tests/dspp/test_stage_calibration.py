@@ -62,6 +62,58 @@ def test_path_labels_cannot_mix_fused_and_split():
             build_dspp_batch_plan([64], chunk_size=64).microbatches[0])
 
 
+@pytest.mark.parametrize('kv_groups', [1, 4])
+def test_stage_costs_separate_mha_from_group_query_attention(kv_groups):
+    args = SimpleNamespace(num_layers=12, pipeline_model_parallel_size=3,
+                           num_attention_heads=16, num_query_groups=kv_groups,
+                           group_query_attention=False)
+    hardware = {'gpu': 'test', 'kernel': 'v1'}
+    mha = stage_context(args, 0, 0, hardware=hardware)
+    args.group_query_attention = True
+    gqa = stage_context(args, 0, 0, hardware=hardware)
+    # num_query_groups is ignored by MHA but controls the actual KV heads in GQA.
+    # Both the separate-profile and mixed-profile cases must distinguish them.
+    for op in ('F', 'B_fused', 'D', 'H', 'W'):
+        row = record(op=op, history=64, duration=2.)
+        row['context'] = mha
+        meta = meta_from_timeline_record(row)
+        model = StageCalibration([row])
+        assert model.predict_detailed(mha, op, meta).duration_ms == 2.
+        missing = model.predict_detailed(gqa, op, meta)
+        assert missing.duration_ms is None and missing.source == 'missing-stage-path'
+        mixed = StageCalibration([row, dict(row, context=gqa, duration_ms=7.)])
+        assert mixed.predict_detailed(mha, op, meta).duration_ms == 2.
+        assert mixed.predict_detailed(gqa, op, meta).duration_ms == 7.
+
+
+def test_stage_profile_without_attention_mode_cannot_match_current_context():
+    args = SimpleNamespace(num_layers=12, pipeline_model_parallel_size=3,
+                           num_attention_heads=16, num_query_groups=1,
+                           group_query_attention=False)
+    current = stage_context(args, 0, 0, hardware={'gpu': 'test', 'kernel': 'v1'})
+    legacy = {**current, 'model': dict(current['model'])}
+    legacy['model'].pop('group_query_attention', None)
+    row = dict(record(), context=legacy)
+    model = StageCalibration([row])
+    prediction = model.predict_detailed(current, 'F', meta_from_timeline_record(row))
+    assert prediction.duration_ms is None
+    assert prediction.source == 'missing-stage-path' and prediction.extrapolated
+
+
+def test_runtime_plan_binding_separates_attention_modes():
+    from megatron.core.pipeline_parallel.dspp_plan_runtime import runtime_inputs
+    args = SimpleNamespace(num_layers=12, hidden_size=2048,
+                           num_attention_heads=16, num_query_groups=1,
+                           group_query_attention=False)
+    batch = SimpleNamespace(plan=build_dspp_batch_plan([65], chunk_size=64))
+    groups = [tuple((0, p) for p in range(len(batch.plan.microbatches)))]
+    mha = runtime_inputs(args, 3, groups, [batch], torch.bfloat16, (64, 1, 2048), 64)[0]
+    args.group_query_attention = True
+    gqa = runtime_inputs(args, 3, groups, [batch], torch.bfloat16, (64, 1, 2048), 64)[0]
+    assert mha.input_hash == gqa.input_hash
+    assert mha.layout_version != gqa.layout_version
+
+
 def test_unmeasured_capacity_and_history_are_low_confidence():
     rows = [record(capacity=c, history=h) for c in (64, 128) for h in (0, 64)]
     model = StageCalibration(rows)

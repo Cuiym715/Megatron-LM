@@ -306,6 +306,12 @@ def _replay(succ, pred, costs):
 
 
 def validate_plan(plan, reference=None, binding=None):
+    _, _, succ, pred = _validated_graph(plan, reference, binding)
+    _replay(succ, pred, dict.fromkeys(succ, 0.0))
+
+
+def _validated_graph(plan, reference=None, binding=None):
+    """Validate structure once; the caller's replay also verifies acyclicity."""
     if (plan.schema_version not in (1, 2)
             or plan.algorithm not in ({'template', 'A'} if plan.schema_version == 1
                                      else {'template', 'explicit-DH', 'B', 'C'})):
@@ -405,8 +411,7 @@ def validate_plan(plan, reference=None, binding=None):
                 raise ValueError('plan changed relative F/B order')
         if len(plan.schedules) != len(reference.schedules):
             raise ValueError('plan changes PP size')
-    _, _, succ, pred = _graph(plan)
-    _replay(succ, pred, dict.fromkeys(succ, 0.0))
+    return _graph(plan)
 
 
 @dataclass(frozen=True)
@@ -490,9 +495,8 @@ def _token_peaks(plan, start, end, tokens):
     return tuple(peaks)
 
 
-def replay_plan(plan, compute_costs, message_costs, owners=(), tokens=None):
-    validate_plan(plan)
-    nodes, messages, succ, pred = _graph(plan)
+def replay_plan(plan, compute_costs, message_costs, owners=(), tokens=None, *, reference=None):
+    nodes, messages, succ, pred = _validated_graph(plan, reference)
     costs = {k: compute_costs[k] for k in nodes}
     costs.update({m: message_costs[m] for m in messages})
     if any(not math.isfinite(c) or c < 0 for c in costs.values()):
@@ -512,12 +516,13 @@ def _plan_unsplit(reference, compute_costs, message_costs, *, owners=(),
     A fixes merged F/B and per-chunk W order. B preserves separate F/F and
     B/B order; B/C candidates must satisfy the deployed W accumulation order.
     """
-    validate_plan(reference)
+    replay_owners = () if order_based_capacity else owners
+    ref = replay_plan(reference, compute_costs, message_costs, replay_owners, tokens)
     if feedback and not supply:
         raise ValueError('fixed-H feedback requires supply priority')
     tokens = tokens or {}
     nodes, messages, succ, pred = _graph(reference, resource=False,
-                                         fixed_fb=not supply, fixed_w=not supply)
+                                         fixed_fb=not supply, fixed_w=True)
     if supply:
         # 027 mode 1 preserves each kind's order, opens their merged interleave.
         for seq in reference.schedules:
@@ -536,10 +541,6 @@ def _plan_unsplit(reference, compute_costs, message_costs, *, owners=(),
                 or not math.isfinite(o.bytes) or o.bytes < 0
                 or any(k not in nodes or nodes[k].stage != o.stage for k in (*o.born, *o.users))):
             raise ValueError('invalid owner contract')
-    # The deployed byte contract uses local order. Do not also sort owner
-    # events on the predicted millisecond timeline for each complete replay.
-    replay_owners = () if order_based_capacity else owners
-    ref = replay_plan(reference, compute_costs, message_costs, replay_owners, tokens)
     token_limits = ref['token_peaks'] if token_limits is None else token_limits
     reference_peaks = (order_owner_peaks(reference, owners) if order_based_capacity
                        else ref['owner_peaks'])
@@ -709,8 +710,8 @@ def _plan_unsplit(reference, compute_costs, message_costs, *, owners=(),
         candidate = replace(reference, algorithm='C' if feedback else 'B' if supply else 'A', schedules=tuple(
             tuple(replace(n, slot=i) for i, n in enumerate(seq)) for seq in orders))
         try:
-            validate_plan(candidate, reference)
-            actual = replay_plan(candidate, compute_costs, message_costs, replay_owners, tokens)
+            actual = replay_plan(candidate, compute_costs, message_costs, replay_owners, tokens,
+                                 reference=reference)
             final_peaks = (order_owner_peaks(candidate, owners) if order_based_capacity
                            else actual['owner_peaks'])
             if any(p > c + 1e-8 for p, c in zip(final_peaks, capacities)):
@@ -724,7 +725,10 @@ def _plan_unsplit(reference, compute_costs, message_costs, *, owners=(),
     if reason:
         return replace(reference, algorithm='C' if feedback else 'B' if supply else 'A', fallback_reason=reason,
                        reference_ms=total, predicted_ms=total)
-    return replace(candidate, reference_ms=total, predicted_ms=actual['makespan_ms'])
+    # A verified seed can carry an earlier stage's fallback diagnostic (e.g.
+    # B's rejected split). Acceptance here describes this construction only.
+    return replace(candidate, reference_ms=total, predicted_ms=actual['makespan_ms'],
+                   fallback_reason='')
 
 
 def plan_configuration_a(reference, compute_costs, message_costs, **kwargs):

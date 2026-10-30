@@ -14,6 +14,9 @@ import torch
 
 from .dspp_plan import PlanOwner, digest, node_key, order_owner_peaks
 from .dspp_progress import dspp_communication_buffer_count
+from .dspp_memory_lifetimes import (
+    ACCOUNTING, CompiledStorage, stage_attention_sizes, records as storage_records,
+)
 
 
 def memory_layout(args, pp, dtype, chunk_size):
@@ -43,7 +46,8 @@ def history_state_bytes(args, pp, stage, chunk, meta):
     D additions: physical dO backing, per-sequence contiguous LSE and delta
     rounded to 128 query rows, exactly as prepare_backward allocates them.
     No GQA expansion of retained K/V; H scratch does use query-head partials.
-    These allowances deliberately overlap F/W accounting until D completes.
+    v1/v2 source allowances deliberately overlap F/W accounting. v3 uses a
+    shared capture owner and only consumes the created/scratch values here.
     """
     if not any(i.has_history for i in meta.items):
         return 0, 0, 0
@@ -74,7 +78,8 @@ class CountedMemory:
     def __init__(self, profile, args, reference, slot_meta, dtype, chunk_size):
         self.profile = profile
         pp = len(reference.schedules)
-        if profile.get('schema') not in ('dspp-counted-memory-v1', 'dspp-counted-memory-v2'):
+        self.v3 = profile.get('schema') == 'dspp-counted-memory-v3'
+        if profile.get('schema') not in ('dspp-counted-memory-v1', 'dspp-counted-memory-v2', 'dspp-counted-memory-v3'):
             raise ValueError('unsupported counted memory profile')
         if profile.get('layout') != memory_layout(args, pp, dtype, chunk_size):
             raise ValueError('counted memory layout mismatch')
@@ -83,7 +88,7 @@ class CountedMemory:
         if (getattr(args, 'dspp_auto_chunk_size', False) or (split and not self.after_dx)
                 or (self.after_dx and not split)):
             raise ValueError('counted memory requires fixed capacity and fused B or after-dx')
-        if split and (profile.get('schema') != 'dspp-counted-memory-v2'
+        if split and (profile.get('schema') not in ('dspp-counted-memory-v2', 'dspp-counted-memory-v3')
                       or profile.get('split_state') != 'fa2-after-dx-v1'
                       or str(dtype) != 'torch.bfloat16'):
             raise ValueError('missing versioned BF16 split-state allowance')
@@ -98,6 +103,11 @@ class CountedMemory:
         scalar = ('resident_bytes', 'workspace_bytes', 'physical_bytes', 'reserve_bytes')
         vectors = ('activation_bytes', 'weight_bytes', 'kv_bytes_per_token',
                    'attention_bytes_per_key_token')
+        if self.v3:
+            if profile.get('accounting') != ACCOUNTING or str(dtype) != 'torch.bfloat16':
+                raise ValueError('v3 requires versioned BF16 storage calibration')
+            vectors += ('weight_forward_bytes', 'weight_backward_bytes', 'capture_bytes',
+                        'pending_bytes_per_token')
         for stage in self.stages:
             values = [stage[name] for name in scalar]
             for name in vectors:
@@ -110,6 +120,16 @@ class CountedMemory:
                 raise ValueError('counted physical memory has no dynamic capacity')
             if any(v <= 0 for name in ('activation_bytes', 'weight_bytes') for v in stage[name]):
                 raise ValueError('missing activation/W allowance')
+        if self.v3:
+            for r, stage in enumerate(self.stages):
+                for c in range(2):
+                    capture, kv = stage_attention_sizes(args, pp, r, c, chunk_size)
+                    if (stage['capture_bytes'][c] < capture
+                            or stage['attention_bytes_per_key_token'][c] < kv
+                            or stage['pending_bytes_per_token'][c] < kv
+                            or stage['weight_forward_bytes'][c] + stage['weight_backward_bytes'][c]
+                            < stage['weight_bytes'][c]):
+                        raise ValueError('v3 storage allowance below required floor')
         limits = profile['limits']
         for name in ('max_tasks', 'max_logical_batches', 'max_key_tokens', 'max_items'):
             if type(limits[name]) is not int or limits[name] <= 0:
@@ -121,8 +141,12 @@ class CountedMemory:
             raise ValueError('input outside counted memory calibration coverage')
         self.version = digest(profile)
         self.mapping = {(g, s): l for g, s, l, _ in reference.task_map}
-        _, self.owners, self.category_sizes = self.records(reference)
-        _, baseline_owners, _ = self.records(reference, expand_after_dx=False)
+        accounting, self.owners, self.category_sizes = self.records(reference)
+        same_baseline = reference.schema_version == 2 or not self.after_dx
+        if same_baseline:
+            baseline_owners = self.owners
+        else:
+            _, baseline_owners, _ = self.records(reference, expand_after_dx=False)
         self.fixed = []
         for r, seq in enumerate(reference.schedules):
             neighbors = int(r > 0) + int(r < pp - 1)
@@ -134,7 +158,7 @@ class CountedMemory:
             queued = sum(n.kind in 'FB' for n in seq)
             scratch = max((history_state_bytes(args, pp, r, n.chunk,
                 slot_meta[n.microbatch, n.split])[2] for n in seq
-                if self.after_dx and n.kind == 'F' and (n.microbatch, n.split) in slot_meta), default=0)
+                if self.after_dx and not self.v3 and n.kind == 'F' and (n.microbatch, n.split) in slot_meta), default=0)
             self.fixed.append(self.stages[r]['workspace_bytes'] + scratch + (pools + queued) * reference.wire_bytes)
         reference_peaks = order_owner_peaks(reference, baseline_owners)
         self.baseline_dynamic = tuple(p + f for p, f in zip(reference_peaks, self.fixed))
@@ -143,7 +167,14 @@ class CountedMemory:
             math.floor(base * (1 + growth)) - f)
             for s, f, base in zip(self.stages, self.fixed, self.baseline_dynamic))
         self._check_cache = {}
-        self.check(reference)  # fallback must itself fit before any tasks launch
+        self._compiled_storage = None
+        self._compile_eligible = (
+            self.v3 and (reference.schema_version == 2 or not self.after_dx)
+            and all(n.kind in ('F', 'B', 'W') for seq in reference.schedules for n in seq))
+        # These exact records/peaks were just built to establish capacity.
+        # Reuse them for fallback admission instead of building them again.
+        peaks = reference_peaks if same_baseline else order_owner_peaks(accounting, self.owners)
+        self._store_check(reference, peaks, len(self.owners), self.category_sizes)
 
     def records(self, plan, *, expand_after_dx=True):
         """Reuse PlanOwner counters for legacy adjacent H and explicit D/H."""
@@ -175,6 +206,8 @@ class CountedMemory:
         if canonical != expected or len(canonical) != sum(k[1] != 'H' for k in keys):
             raise ValueError('incomplete memory task set')
         pos = {node_key(n): i for seq in seqs for i, n in enumerate(seq)}
+        if self.v3:
+            return storage_records(self, accounting, pos, actual)
         owners, grouped = [], {}
         sizes = dict(activation=0, weight=0, shared_kv=0, history_source=0, history_created=0)
         expected_h, chains = set(), {}
@@ -248,8 +281,20 @@ class CountedMemory:
                plan.history_dependencies, tuple(self.capacities))
         if key in self._check_cache:
             return deepcopy(self._check_cache[key])
+        # The common v3 path has an unsplit reference. Legacy implicit D/H
+        # expansion retains its original audit. No new budget or allowance.
+        if self._compile_eligible:
+            if self._compiled_storage is None:
+                self._compiled_storage = CompiledStorage(self)
+            peaks, count, sizes = self._compiled_storage.evaluate(plan)
+            return self._store_check(plan, peaks, count, sizes)
         accounting, owners, sizes = self.records(plan)
         peaks = order_owner_peaks(accounting, owners)
+        return self._store_check(plan, peaks, len(owners), sizes)
+
+    def _store_check(self, plan, peaks, owner_count, sizes):
+        key = (plan.schema_version, plan.schedules, plan.task_map, plan.split_counts,
+               plan.history_dependencies, tuple(self.capacities))
         if any(p > cap for p, cap in zip(peaks, self.capacities)):
             raise ValueError('counted memory capacity exceeded')
         result = dict(schema='dspp-counted-memory-report-v1', version=self.version,
@@ -258,7 +303,7 @@ class CountedMemory:
             owner_peak_bytes=list(peaks), fixed_bytes=self.fixed,
             dynamic_peak_bytes=[p + f for p, f in zip(peaks, self.fixed)],
             total_peak_bytes=[s['resident_bytes'] + p + f for s, p, f in zip(self.stages, peaks, self.fixed)],
-            capacity_bytes=list(self.capacities), owner_records=len(owners),
+            capacity_bytes=list(self.capacities), owner_records=owner_count,
             category_allowance_bytes=sizes)
         if len(self._check_cache) >= 8:
             self._check_cache.pop(next(iter(self._check_cache)))

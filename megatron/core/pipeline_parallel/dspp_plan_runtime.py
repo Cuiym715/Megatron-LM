@@ -9,12 +9,12 @@ import time
 from pathlib import Path
 
 from megatron.core.datasets.dspp_calibration import (
-    StageCalibration, load_runtime_calibration, stage_context,
+    INTERPOLATION_POLICY, StageCalibration, load_runtime_calibration, stage_context,
 )
 from megatron.core.datasets.dspp_p2p import load_p2p_cost_model
 from .dspp_plan import (
     PlanBinding, digest, node_key, receive_orders, template_plan,
-    plan_configuration_a, preserves_retention_envelope, history_dependencies,
+    plan_configuration_a, preserves_retention_envelope, history_dependencies, replay_plan,
 )
 from .dspp_memory_counts import CountedMemory
 from .dspp_plan_b import plan_configuration_b
@@ -42,7 +42,7 @@ def runtime_inputs(args, pp, schedule_groups, batches, dtype, tensor_shape, chun
     layout = dict(pp=pp, vpp=2, dtype=str(dtype), shape=list(tensor_shape),
                   chunk_size=chunk_size, model={name: getattr(args, name, None) for name in (
                       'num_layers', 'hidden_size', 'ffn_hidden_size', 'num_attention_heads',
-                      'num_query_groups', 'dspp_v_layer_layout', 'kv_channels')})
+                      'num_query_groups', 'group_query_attention', 'dspp_v_layer_layout', 'kv_channels')})
     execution_version = _file_version(getattr(args, 'dspp_execution_profile', None))
     input_metadata = dict(tasks=task_map, metadata=[(l, p, asdict(m))
                                                   for (l, p), m in sorted(metadata.items())])
@@ -53,7 +53,8 @@ def runtime_inputs(args, pp, schedule_groups, batches, dtype, tensor_shape, chun
         iteration_id=int(getattr(args, 'curr_iteration', -1)) + 1,
         input_hash=digest(input_metadata),
         layout_version=digest(layout),
-        cost_version=digest([execution_version,
+        cost_version=digest([execution_version, INTERPOLATION_POLICY,
+                             'construct-per-chunk-W-order-v1',
                              _file_version(getattr(args, 'dspp_p2p_profile', None))]),
         capacity_version='p1-template-W-retention-envelope-v1',
         protocol_version=digest(dict(protocol='stage-local-v1',
@@ -67,9 +68,67 @@ def runtime_inputs(args, pp, schedule_groups, batches, dtype, tensor_shape, chun
                    [getattr(args, 'dspp_c_budget_fraction', .50),
                     getattr(args, 'dspp_c_b_budget_fraction', .30)])
         binding = replace(binding, cost_version=digest([binding.cost_version,
-            'supply-cp-all-v1' if mode == 'b' else 'supply-cp-all-fixed-H-feedback-v1',
+            'supply-cp-memory-v2' if mode == 'b' else 'supply-cp-memory-fixed-H-feedback-v2',
             *budgets]))
     return binding, task_map, metadata, slot_meta, execution_version
+
+
+def check_interpolated_improvement(reference, candidate, compute, messages, errors,
+                                  split_costs=None, split_errors=None, *, enforce=True):
+    """Require improvement under the empirical interpolation error envelope.
+
+    Legacy profiles enforce their empirical error envelope. Current v3 profiles
+    retain the solver's nominal acceptance and only publish interpolation counts.
+    """
+    if not enforce:
+        return replace(candidate, planning_info={**candidate.planning_info,
+            'cost_acceptance_policy': 'nominal-makespan-v1',
+            'interpolated_compute_costs': len(errors),
+            'interpolated_split_costs': len(split_errors or {})})
+    if not errors and not split_errors:
+        return candidate
+    upper = dict(compute)
+    used_errors = {k: e for k, e in errors.items() if e > 0}
+    for k, e in used_errors.items():
+        upper[k] += e
+    for seq in candidate.schedules:
+        for n in seq:
+            if n.kind != 'D':
+                continue
+            d = node_key(n)
+            b, h = (d[0], 'B', *d[2:]), (d[0], 'H', *d[2:])
+            cd, ch = split_costs[b]
+            ed, eh = (split_errors or {}).get(b, (0., 0.))
+            upper[d] = cd + ed
+            # H's nonnegative-overhead normalization grows when D shrinks.
+            # Bound each node separately: using D's upper endpoint here would
+            # underestimate H on paths that do not include its D predecessor.
+            upper[h] = max(ch + eh, upper[b] - max(0., cd-ed))
+            if ed: used_errors[d] = ed
+            if eh: used_errors[h] = eh
+    if not used_errors or candidate.schedules == reference.schedules:
+        return candidate
+    lower = {k: max(0., c-errors.get(k, 0.)) for k, c in compute.items()}
+    reference_lower = replay_plan(reference, lower, messages)['makespan_ms']
+    candidate_upper = replay_plan(candidate, upper, messages)['makespan_ms']
+    accepted = candidate_upper < reference_lower - 1e-8
+    info = dict(interpolated_costs=len(used_errors), reference_lower_ms=reference_lower,
+                candidate_upper_ms=candidate_upper, accepted=accepted,
+                policy='empirical-error-envelope-v1')
+    if not accepted:
+        rejected_info = {**candidate.planning_info, 'cost_uncertainty': info,
+                         'fallback_reason': 'interpolation-uncertain-improvement'}
+        if 'selected_count' in rejected_info:
+            info['rejected_selected_count'] = rejected_info['selected_count']
+            rejected_info['selected_count'] = 0
+        if 'feedback' in rejected_info:
+            rejected_info['feedback'] = {**rejected_info['feedback'], 'accepted': False,
+                                        'reason': 'interpolation-uncertain-improvement'}
+        return replace(reference, algorithm=candidate.algorithm,
+            reference_ms=candidate.reference_ms, predicted_ms=candidate.reference_ms,
+            fallback_reason='interpolation-uncertain-improvement',
+            planning_info=rejected_info)
+    return replace(candidate, planning_info={**candidate.planning_info, 'cost_uncertainty': info})
 
 
 def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
@@ -112,10 +171,12 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
     model = load_runtime_calibration(execution_path, execution_version)
     if mode in ('b', 'c') and not isinstance(model, StageCalibration):
         raise ValueError('B/C requires a versioned complete-stage calibration')
+    enforce_uncertainty = not (isinstance(model, StageCalibration) and
+        model.interpolation_policy.get('acceptance') == 'nominal-makespan-v1')
     contexts = calibration_contexts or ({(stage, chunk): stage_context(args, stage, chunk)
                 for stage in range(len(schedules)) for chunk in range(2)
                 } if isinstance(model, StageCalibration) else {})
-    compute, tokens, unreliable = {}, {}, False
+    compute, tokens, errors, unreliable = {}, {}, {}, False
     for seq in schedules:
         for n in seq:
             key, meta = node_key(n), slot_meta.get((n.microbatch, n.split))
@@ -128,6 +189,8 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
             else:
                 prediction = model.predict_detailed(n.stage, n.kind, meta)
             compute[key] = prediction.duration_ms
+            if prediction.source == 'validated-query-interpolation':
+                errors[key] = prediction.error_ms
             if (prediction.duration_ms is None or not math.isfinite(prediction.duration_ms) or prediction.duration_ms <= 0 or prediction.extrapolated
                     or prediction.confidence not in {'high', 'medium'}):
                 unreliable = True
@@ -153,7 +216,7 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
         for msg in lane:
             messages[('message', sender, receiver, *msg)] = duration
     if mode in ('b', 'c'):
-        split_costs, unavailable = {}, []
+        split_costs, split_errors, unavailable = {}, {}, []
         history_sources = {edge[:2] for edge in reference.history_dependencies}
         for seq in reference.schedules:
             for n in seq:
@@ -168,6 +231,10 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
                     unavailable.append(node_key(n))
                 else:
                     split_costs[node_key(n)] = tuple(p.duration_ms for p in estimates)
+                    uncertainty = tuple(p.error_ms
+                        if p.source == 'validated-query-interpolation' else 0. for p in estimates)
+                    if any(uncertainty):
+                        split_errors[node_key(n)] = uncertainty
         solver = plan_configuration_c if mode == 'c' else plan_configuration_b
         budgets = (dict(budget_fraction=getattr(args, 'dspp_c_budget_fraction', .50),
                         b_budget_fraction=getattr(args, 'dspp_c_b_budget_fraction', .30))
@@ -178,6 +245,9 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
             **budgets,
             planning_started=planning_begin,
             backend=getattr(args, 'dspp_planner_backend', 'python'))
+        candidate = check_interpolated_improvement(reference, candidate, compute, messages,
+                                                  errors, split_costs, split_errors,
+                                                  enforce=enforce_uncertainty)
         args._dspp_memory_plan = memory.check(candidate)
         candidate.planning_info['unavailable_split_costs'] = unavailable
         # Export cost belongs to planning; collective publication is recorded
@@ -196,6 +266,8 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
     if not preserves_retention_envelope(candidate, reference):
         candidate = replace(reference, algorithm='A', fallback_reason='template-W-retention-envelope',
                             reference_ms=candidate.reference_ms, predicted_ms=candidate.reference_ms)
+    candidate = check_interpolated_improvement(reference, candidate, compute, messages, errors,
+                                               enforce=enforce_uncertainty)
     if memory is not None:
         args._dspp_memory_plan = memory.check(candidate)
     return reference, candidate

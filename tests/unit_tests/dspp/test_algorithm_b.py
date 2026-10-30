@@ -44,7 +44,10 @@ def fixture(pp=4):
 
 
 @pytest.mark.parametrize('pp',[4,8])
-def test_b_plan_replay_fifo_split_identity_and_internal_orders(pp):
+def test_b_plan_replay_fifo_split_identity_and_internal_orders(pp, monkeypatch):
+    # This is a structural/numerical check; deadline behavior has separate tests.
+    from megatron.core.pipeline_parallel import dspp_plan_b as module
+    monkeypatch.setattr(module.time, 'perf_counter', lambda: 0.)
     ref,compute,messages,split,tokens = fixture(pp)
     plan = plan_configuration_b(ref,compute,messages,split,tokens=tokens)
     validate_plan(plan,ref)
@@ -111,15 +114,16 @@ def test_deadline_and_unprofitable_costs_preserve_unsplit():
     assert other.planning_info['selected_count']==0
 
 
-def test_final_counted_capacity_rejection_restores_verified_base():
+def test_infeasible_splits_never_replace_verified_base():
     ref,compute,messages,split,tokens=fixture()
     class Memory:
         def check(self,plan):
             if any(n.kind=='D' for seq in plan.schedules for n in seq):
                 raise ValueError('counted memory capacity exceeded')
     plan=plan_configuration_b(ref,compute,messages,split,tokens=tokens,memory=Memory())
-    assert plan.planning_info['decision']['steps'][0]['after_ms'] is not None
-    assert plan.fallback_reason.startswith('final-capacity')
+    assert plan.planning_info['decision']['steps'][0]['after_ms'] is None
+    assert plan.planning_info['memory_search']['rejected'] > 0
+    assert not plan.fallback_reason
     assert plan.planning_info['selected_count']==0
     assert plan.predicted_ms==plan.planning_info['seed_makespan_ms']
 
@@ -162,3 +166,81 @@ def test_distributed_rejection_is_published_before_raise(monkeypatch, failure):
     with pytest.raises(RuntimeError, match='agreement failed' if failure=='reference' else 'coordinator failed'):
         runtime.build_distributed_b_plan(None, group=object())
     assert calls == (['gather'] if failure=='reference' else ['gather','broadcast'])
+
+
+def placement_optional():
+    # Base=15. H after x gives 12; H before x gives 14, both improve.
+    keys=('b','x','c','tail','h')
+    graph=FixedGraph(keys,(('b','h'),('h','c'),('x','tail')),
+        dict(zip(keys,(5.,5.,0.,5.,0.))),dict(zip(keys,(0,0,0,1,0))),
+        {'h':'b'},{'h':('c',)})
+    o=SimpleNamespace(m=graph,fused_cost=graph.cost.copy(),split_cost={4:2.},
+        hcost={4:2.},base_orders=((0,1,2),(3,)))
+    def configure(selected):
+        graph.cost=o.fused_cost.copy()
+        if 4 in selected: graph.cost[0],graph.cost[4]=2.,2.
+    o.configure=configure
+    return o
+
+
+def test_slower_feasible_h_position_is_kept():
+    o=placement_optional(); checked=[]
+    def feasible(state):
+        checked.append(state.makespan)
+        return state.orders[0].index(4) < state.orders[0].index(1)
+    state,info=run_cp(o,Backend(),1000,feasible)
+    assert checked == [12.,14.]
+    assert state.makespan == 14. and state.selected == {4}
+
+
+def test_complete_pair_survives_infeasible_single_intermediate():
+    o=pair_optional()
+    o.fused_cost[2]=4.5  # single h0 now improves 10->9.5 but is infeasible
+    checked=[]
+    def feasible(state):
+        checked.append(state.selected)
+        return len(state.selected)==2
+    state,info=run_cp(o,Backend(),1000,feasible)
+    assert frozenset({5}) in checked and frozenset({5,6}) in checked
+    assert state.selected=={5,6} and state.makespan==7.
+
+
+def test_deadline_during_check_keeps_last_verified_improvement(monkeypatch):
+    from megatron.core.pipeline_parallel import dspp_plan_b as module
+    clock=[0.]
+    monkeypatch.setattr(module.time,'perf_counter',lambda:clock[0])
+    checked=[]
+    def feasible(state):
+        checked.append(state.makespan)
+        clock[0]=2.
+        return True
+    state,info=run_cp(placement_optional(),Backend(),1000,feasible)
+    assert checked==[12.] and state.makespan==12.
+    assert info['stop']=='deadline'
+
+
+def test_later_infeasible_split_keeps_previous_gain_and_checks_once():
+    ref,compute,messages,split,tokens=fixture()
+    seen=set(); selected=[]
+    class Memory:
+        def check(self,plan):
+            key=plan.schedules
+            assert key not in seen, 'same complete candidate checked twice'
+            seen.add(key)
+            count=sum(n.kind=='H' for seq in key for n in seq)
+            selected.append(count)
+            if count>1: raise ValueError('counted memory capacity exceeded')
+    plan=plan_configuration_b(ref,compute,messages,split,tokens=tokens,memory=Memory(),budget_fraction=1.)
+    assert 1 in selected and max(selected)>1
+    assert plan.planning_info['selected_count']==1
+    assert plan.predicted_ms < plan.planning_info['seed_makespan_ms']
+    assert plan.planning_info['memory_search']['checks']==len(seen)-1
+    assert not plan.fallback_reason
+
+
+def test_unprofitable_diagnostic_states_do_not_pay_for_memory_checks():
+    o=pair_optional(); o.split_cost={5:6.,6:6.}
+    def forbidden(state):
+        raise AssertionError('unprofitable candidate checked')
+    state,_=run_cp(o,Backend(),1000,forbidden)
+    assert not state.selected

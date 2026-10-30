@@ -297,7 +297,9 @@ def _warmup_jit_function():
             print('> compiling swiglu ...', flush=True)
         if _compile_swiglu:
             seq_len = args.micro_seq_length or args.seq_length
-            input = torch.rand((seq_len // mpu.get_context_parallel_world_size(), args.micro_batch_size,
+            # DSPP packs sequences along the token dimension; its physical batch size is 1.
+            warmup_batch_size = 1 if getattr(args, 'dspp', False) else args.micro_batch_size
+            input = torch.rand((seq_len // mpu.get_context_parallel_world_size(), warmup_batch_size,
                                 args.ffn_hidden_size * 2 // args.tensor_model_parallel_size),
                                dtype=dtype, device='cuda')
             for input_grad in [False, True]:

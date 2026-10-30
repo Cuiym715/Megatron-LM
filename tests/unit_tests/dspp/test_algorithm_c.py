@@ -5,7 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from megatron.core.pipeline_parallel.dspp_plan import DsppSchedulePlan, node_key, validate_plan
+from megatron.core.pipeline_parallel.dspp_plan import (
+    DsppSchedulePlan, node_key, replay_plan, validate_plan,
+)
 from megatron.core.pipeline_parallel.dspp_plan_b import plan_configuration_b
 from megatron.core.pipeline_parallel.dspp_plan_c import feedback_configuration_c, plan_configuration_c
 from .test_algorithm_b import fixture
@@ -93,8 +95,10 @@ def test_runtime_dispatches_c_budgets_and_versions_both_fractions(monkeypatch):
     ref = fixture()[0]
     batch = build_dspp_batch_plan([145, 33], chunk_size=64)
     groups = [tuple((l, p) for p in range(len(batch.microbatches))) for l in range(2)]
-    prediction = SimpleNamespace(duration_ms=1., extrapolated=False, confidence='high')
+    prediction = SimpleNamespace(duration_ms=1., extrapolated=False, confidence='high',
+                                 source='exact-profile', error_ms=0.)
     class Model:
+        interpolation_policy = {}
         def predict_detailed(self, *args, **kwargs):
             return prediction
     class Memory:
@@ -162,3 +166,56 @@ def test_feedback_capacity_failure_preserves_entire_seed():
     result = feedback_configuration_c(ref, seed, compute, messages, split, tokens=tokens, memory=Memory())
     assert result.schedules == seed.schedules
     assert result.planning_info['feedback']['reason'].startswith('feedback-capacity')
+
+
+@pytest.mark.parametrize('backend', ['python', 'cpp'])
+def test_feedback_after_b_fallback_uses_its_own_acceptance_result(backend):
+    ref, compute, messages, split, tokens = fixture(4)
+    # A valid unsplit B seed with tail W leaves room for one feedback pass.
+    # It models the verified base returned after B's final split audit fails.
+    orders = tuple(tuple(replace(n, slot=i) for i, n in enumerate(
+        [n for n in seq if n.kind != 'W'] + [n for n in seq if n.kind == 'W']))
+        for seq in ref.schedules)
+    seed = replace(ref, algorithm='B', schedules=orders)
+    validate_plan(seed, ref)
+    seed = replace(seed,
+        predicted_ms=replay_plan(seed, compute, messages, tokens=tokens)['makespan_ms'],
+        reference_ms=replay_plan(ref, compute, messages, tokens=tokens)['makespan_ms'])
+
+    class Memory:
+        capacities = [1e30] * 4
+        reject_feedback = False
+
+        def check(self, plan):
+            if self.reject_feedback and plan.schedules != seed.schedules:
+                raise ValueError('injected feedback capacity')
+
+        def records(self, plan):
+            return plan, (), {}
+
+    memory = Memory()
+    def feedback(plan):
+        return feedback_configuration_c(ref, plan, compute, messages, split,
+            tokens=tokens, memory=memory, backend=backend)
+
+    clean = feedback(seed)
+    assert clean.planning_info['feedback']['accepted']
+    assert clean.predicted_ms < seed.predicted_ms
+    prior_reason = 'final-capacity: injected split capacity'
+    seed = replace(seed, fallback_reason=prior_reason,
+                   planning_info={'fallback_reason': prior_reason})
+    result = feedback(seed)
+    assert result.planning_info['feedback']['accepted']
+    assert result.fallback_reason == ''
+    assert result.schedules == clean.schedules
+    assert result.predicted_ms == clean.predicted_ms
+    assert selected(result) == selected(seed) == set()
+    validate_plan(result, ref)
+    # Keep the earlier B diagnostic, while reporting C's decision separately.
+    assert seed.fallback_reason == result.planning_info['fallback_reason'] == prior_reason
+
+    memory.reject_feedback = True
+    rejected = feedback(seed)
+    assert rejected.schedules == seed.schedules
+    assert not rejected.planning_info['feedback']['accepted']
+    assert rejected.fallback_reason == 'feedback-capacity: injected feedback capacity'

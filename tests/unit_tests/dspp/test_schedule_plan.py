@@ -271,7 +271,8 @@ def test_runtime_metadata_binding_and_cost_fallback(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match='binding'):
         validate_plan(reference, binding=newer.binding)
     monkeypatch.setattr(runtime, 'load_runtime_calibration', lambda path, version: SimpleNamespace(
-        predict_detailed=lambda *a: SimpleNamespace(duration_ms=1.0, extrapolated=False, confidence='high')))
+        predict_detailed=lambda *a: SimpleNamespace(duration_ms=1.0, extrapolated=False,
+                                                   confidence='high', source='exact-profile', error_ms=0.)))
     reference, candidate = build()
     validate_plan(candidate, reference)
     assert preserves_retention_envelope(candidate, reference)
@@ -309,3 +310,17 @@ def test_distributed_argument_checks_preserve_layout_and_model_contract(monkeypa
         args = validate_args(parse_args())
         assert args.pipeline_model_parallel_size == pp
         assert args.virtual_pipeline_model_parallel_size == 2
+
+
+def test_replay_checks_reference_with_one_graph_build(monkeypatch):
+    from megatron.core.pipeline_parallel import dspp_plan as module
+    plan,compute,messages,tokens=case(4)
+    calls=[];original=module._graph
+    def graph(*a,**kw):
+        calls.append(a[0]);return original(*a,**kw)
+    monkeypatch.setattr(module,'_graph',graph)
+    result=module.replay_plan(plan,compute,messages,tokens=tokens,reference=plan)
+    assert result['makespan_ms']>0 and len(calls)==1
+    wrong=replace(plan,binding=replace(plan.binding,input_hash='wrong-input'))
+    with pytest.raises(ValueError,match='identity'):
+        module.replay_plan(wrong,compute,messages,reference=plan)

@@ -18,6 +18,26 @@ from .test_algorithm_b import fixture
 from .test_memory_counts import case
 
 
+@pytest.mark.parametrize('feedback', [False, True])
+def test_supply_and_feedback_respect_w_chain_before_final_validation(feedback):
+    from .test_schedule_plan import case as schedule_case
+    from megatron.core.pipeline_parallel.dspp_plan import _graph
+    ref, compute, messages, tokens = schedule_case(3)
+    ref = replace(ref, schema_version=2)
+    # Zero-cost cooldown W tie on due date. Adversarial tie-break IDs would
+    # reverse them if construction relied solely on the final validator.
+    compute = {k: 0. if k[1] == 'W' else v for k,v in compute.items()}
+    _,_,succ,_ = _graph(ref, resource=False)
+    ids = {k: len(succ)-i for i,k in enumerate(succ)}
+    results = [_plan_unsplit(ref, compute, messages, tokens=tokens, supply=True,
+                            feedback=feedback, stable_ids=ids, backend=backend)
+               for backend in ('python', 'cpp')]
+    assert results[0] == results[1]
+    for plan in results:
+        assert plan.fallback_reason != 'per-chunk-W-order'
+        validate_plan(plan, ref)
+
+
 @pytest.fixture(scope='module', autouse=True)
 def compile_before_timed_planning():
     library()

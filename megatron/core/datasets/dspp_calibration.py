@@ -21,6 +21,17 @@ from .dspp_batch_plan import build_dspp_batch_plan
 SCHEMA = 'dspp-stage-calibration-v2'
 ESTIMATOR = 'extended-nonnegative-ridge-v1'
 OPERATIONS = ('F', 'B_fused', 'D', 'H', 'W')
+# Fixed policy, included in both profile and runtime plan identities. These are
+# empirical validation thresholds, not certified prediction error bounds.
+LEGACY_INTERPOLATION_POLICY = dict(version='single-item-query-local-v1', max_span=512,
+    max_gap=256, min_repeats=3, max_relative_error=.05, max_relative_noise=.05)
+NOISE_RELAXED_INTERPOLATION_POLICY = dict(LEGACY_INTERPOLATION_POLICY,
+    version='single-item-query-local-v2', max_relative_noise=None)
+INTERPOLATION_POLICY = dict(NOISE_RELAXED_INTERPOLATION_POLICY,
+    version='single-item-query-local-v3', max_relative_error=None,
+    acceptance='nominal-makespan-v1')
+SUPPORTED_INTERPOLATION_POLICIES = (
+    LEGACY_INTERPOLATION_POLICY, NOISE_RELAXED_INTERPOLATION_POLICY, INTERPOLATION_POLICY)
 
 
 def canonical(value):
@@ -71,7 +82,10 @@ def stage_context(args, stage, chunk, *, hardware=None):
     count = slots // (2 * pp)
     logical = stage if chunk == 0 else 2 * pp - stage - 1
     layers = list(range(logical * count + 1, min(args.num_layers, (logical + 1) * count) + 1))
+    # num_query_groups is ignored when GQA is disabled. Bind the switch too,
+    # so MHA and GQA/MQA cannot share a complete-stage timing identity.
     names = ('hidden_size', 'ffn_hidden_size', 'num_attention_heads', 'num_query_groups',
+             'group_query_attention',
              'kv_channels', 'padded_vocab_size', 'normalization', 'norm_epsilon',
              'swiglu', 'position_embedding_type', 'rotary_percent', 'rotary_base',
              'attention_dropout', 'hidden_dropout', 'gradient_accumulation_fusion',
@@ -97,8 +111,58 @@ class Prediction:
     out_of_range: tuple = ()
 
 
+def _query_regions(rows, policy):
+    """Validate a local line using an interior shape excluded from its fit.
+
+    Only q varies: capacity, history, packing and final/non-final path stay
+    fixed. No history interpolation, multivariate interpolation or extrapolation.
+    Build once when loading the frozen profile, never during GPU execution.
+    """
+    groups = defaultdict(lambda: defaultdict(list))
+    for row in rows:
+        if len(row['items']) != 1:
+            continue
+        item = row['items'][0]
+        key = (int(row['sequence_chunk_size']), int(item['token_offset']),
+               item['segment_id'] == item['segment_count'] - 1)
+        groups[key][int(item['token_length'])].append(float(row['duration_ms']))
+    regions = defaultdict(list)
+    for key, shapes in groups.items():
+        xs = sorted(shapes)
+        for lo, mid, hi in zip(xs, xs[1:], xs[2:]):
+            if (hi - lo > policy['max_span'] or max(mid-lo, hi-mid) > policy['max_gap']
+                    or min(len(shapes[x]) for x in (lo, mid, hi)) < policy['min_repeats']):
+                continue
+            ys = [median(shapes[x]) for x in (lo, mid, hi)]
+            noises = [max(abs(y-center) for y in shapes[x])
+                      for x, center in zip((lo, mid, hi), ys)]
+            estimated = ys[0] + (ys[2]-ys[0]) * (mid-lo)/(hi-lo)
+            residual = abs(estimated-ys[1])
+            noise_limit = policy['max_relative_noise']
+            error_limit = policy['max_relative_error']
+            if ((error_limit is not None and residual/ys[1] > error_limit)
+                    or (noise_limit is not None and any(n/y > noise_limit for n,y in zip(noises,ys)))):
+                continue
+            # Retain the held-out residual, repeated-sample spread and a 1%
+            # floor as diagnostics; v1/v2 also use these in acceptance replays.
+            error = residual + max(noises) + .01 * max(ys)
+            regions[key].append(dict(lo=lo, mid=mid, hi=hi, left_ms=ys[0],
+                right_ms=ys[2], error_ms=error, validation_relative=residual/ys[1],
+                repeats=[len(shapes[x]) for x in (lo, mid, hi)]))
+    return dict(regions)
+
+
+@lru_cache(maxsize=32)
+def _dense_w_meta(capacity):
+    return build_dspp_batch_plan([capacity], chunk_size=capacity).microbatches[0]
+
+
 class StageCalibration:
-    def __init__(self, records):
+    def __init__(self, records, *, interpolation_policy=None):
+        policy = INTERPOLATION_POLICY if interpolation_policy is None else interpolation_policy
+        if policy not in SUPPORTED_INTERPOLATION_POLICIES:
+            raise ValueError('stage interpolation policy version mismatch')
+        self.interpolation_policy = dict(policy)
         self.records = tuple(records)
         self.groups = defaultdict(list)
         for row in self.records:
@@ -117,6 +181,7 @@ class StageCalibration:
             self.groups[(canonical(context), op)].append(dict(row, kind=op))
         self.models = {}
         self.coverage = {}
+        self.query_regions = {}
         for key, rows in self.groups.items():
             histories = [i['token_offset'] for r in rows for i in r['items']]
             self.coverage[key] = (
@@ -134,6 +199,7 @@ class StageCalibration:
                     dense.pop('signature', None)
                     fitting.append(dense)
             self.models[key] = DsppExecutionCostModel.from_records(fitting, extended_features=True)
+            self.query_regions[key] = _query_regions(rows, self.interpolation_policy) if key[1] != 'W' else {}
 
     @property
     def version(self):
@@ -142,23 +208,32 @@ class StageCalibration:
     def to_dict(self):
         return dict(schema=SCHEMA, records=list(self.records),
                     estimator=ESTIMATOR,
+                    interpolation_policy=self.interpolation_policy.copy(),
                     error_semantics='empirical residuals, not hard upper bounds')
 
     @classmethod
     def from_json(cls, path):
-        value = json.loads(Path(path).read_text())
+        return cls.from_dict(json.loads(Path(path).read_text()))
+
+    @classmethod
+    def from_dict(cls, value):
         if value.get('schema') != SCHEMA:
             raise ValueError('not a stage calibration v2 profile')
         if value.get('estimator') != ESTIMATOR:
             raise ValueError('stage calibration estimator version mismatch')
-        return cls(value['records'])
+        # Frozen profiles keep their admission policy. New profiles constructed
+        # from the raw records use v3; archives need no in-place conversion.
+        policy = value.get('interpolation_policy', LEGACY_INTERPOLATION_POLICY)
+        if policy not in SUPPORTED_INTERPOLATION_POLICIES:
+            raise ValueError('stage interpolation policy version mismatch')
+        return cls(value['records'], interpolation_policy=policy)
 
     def predict_detailed(self, context, op, meta):
         key = (canonical(context), op)
         if key not in self.models:
             # None, never H=0. Consumers must keep an unsplit fallback.
             return Prediction(None, 'missing-stage-path', None, 'none', True, ('context/path',))
-        shape = (build_dspp_batch_plan([meta.chunk_size], chunk_size=meta.chunk_size).microbatches[0]
+        shape = (_dense_w_meta(meta.chunk_size)
                  if op == 'W' else meta)
         p = self.models[key].predict_detailed(context['stage'], op, shape)
         p95 = self.models[key].predict_detailed(context['stage'], op, shape, percentile=.95)
@@ -170,8 +245,18 @@ class StageCalibration:
             outside.append('history')
         if op != 'W' and len(meta.items) not in packs:
             outside.append('packing')
-        # Marginal feature bounds do not certify the kernel region. Until a
-        # region is calibrated, every non-exact prediction stays low confidence.
+        if p.source != 'exact-profile' and not outside and len(meta.items) == 1 and op != 'W':
+            item = meta.items[0]
+            region_key = (meta.chunk_size, item.token_offset, item.is_last_segment)
+            matches = [r for r in self.query_regions[key].get(region_key, ())
+                       if r['lo'] < item.token_length < r['hi']]
+            if matches:
+                region = min(matches, key=lambda r: (r['error_ms'], r['hi']-r['lo'], r['lo']))
+                fraction = (item.token_length-region['lo'])/(region['hi']-region['lo'])
+                value = region['left_ms'] + fraction*(region['right_ms']-region['left_ms'])
+                return Prediction(value, 'validated-query-interpolation', region['error_ms'],
+                                  'medium', False)
+        # Marginal feature bounds alone still do not admit other predictions.
         if p.source != 'exact-profile':
             outside.append('kernel-region-unverified')
         return Prediction(p.duration_ms, p.source, max(p.error_ms, abs(p95.duration_ms - p.duration_ms)),
@@ -238,9 +323,7 @@ def load_runtime_calibration(path, version):
     if fingerprint_bytes(contents) != version:
         raise ValueError('execution profile changed during plan construction')
     if payload.get('schema') == SCHEMA:
-        if payload.get('estimator') != ESTIMATOR:
-            raise ValueError('stage calibration estimator version mismatch')
-        return StageCalibration(payload['records'])
+        return StageCalibration.from_dict(payload)
     return DsppExecutionCostModel.from_json(path)
 
 
