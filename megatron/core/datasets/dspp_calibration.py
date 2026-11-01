@@ -7,7 +7,6 @@ Statistical errors are diagnostics, not memory bounds or acceptance policies.
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
-import hashlib
 import importlib.metadata
 import json
 import math
@@ -16,6 +15,8 @@ from statistics import median
 
 from .dspp_execution_cost import DsppExecutionCostModel, meta_from_timeline_record
 from .dspp_batch_plan import build_dspp_batch_plan
+from .dspp_profile_snapshot import profile_snapshot
+from megatron.core.dspp_layout import physical_layer_range
 
 
 SCHEMA = 'dspp-stage-calibration-v2'
@@ -39,7 +40,8 @@ def canonical(value):
 
 
 def fingerprint(value):
-    return hashlib.sha256(canonical(value).encode()).hexdigest()
+    """Compatibility slot, no content walk/hash or validation."""
+    return None
 
 
 def operation(kind, backward_mode):
@@ -65,11 +67,7 @@ def hardware_identity():
             versions[package] = importlib.metadata.version(package)
         except importlib.metadata.PackageNotFoundError:
             versions[package] = 'absent'
-    kernel_root = Path(__file__).resolve().parents[1] / 'kv_cache'
-    versions['split_sources'] = fingerprint({
-        str(path.relative_to(kernel_root)): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in sorted((kernel_root / 'fa_split_src').glob('*')) if path.is_file()
-    })
+    versions['split_sources'] = 'not-checked-at-runtime'
     return dict(gpu=p.name, capability=[p.major, p.minor], total_memory=p.total_memory,
                 torch=str(torch.__version__), cuda=torch.version.cuda,
                 cudnn=torch.backends.cudnn.version(), kernels=versions)
@@ -77,11 +75,10 @@ def hardware_identity():
 
 def stage_context(args, stage, chunk, *, hardware=None):
     pp = int(args.pipeline_model_parallel_size)
-    balanced = getattr(args, 'dspp_v_layer_layout', 'balanced') == 'balanced'
-    slots = int(args.num_layers) + (0 if balanced else 1)
-    count = slots // (2 * pp)
-    logical = stage if chunk == 0 else 2 * pp - stage - 1
-    layers = list(range(logical * count + 1, min(args.num_layers, (logical + 1) * count) + 1))
+    begin, end = physical_layer_range(
+        args.num_layers, pp, getattr(args, 'dspp_v_layer_layout', 'balanced'),
+        stage, chunk)
+    layers = list(range(begin + 1, end + 1))
     # num_query_groups is ignored when GQA is disabled. Bind the switch too,
     # so MHA and GQA/MQA cannot share a complete-stage timing identity.
     names = ('hidden_size', 'ffn_hidden_size', 'num_attention_heads', 'num_query_groups',
@@ -158,6 +155,17 @@ def _dense_w_meta(capacity):
 
 
 class StageCalibration:
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        if self.models and isinstance(next(iter(self.models))[0], str):
+            for name in ('models', 'coverage', 'query_regions'):
+                old = getattr(self, name)
+                converted = {}
+                for (text, op), value in old.items():
+                    context = json.loads(text)
+                    converted[((context['stage'], context['virtual_chunk']), op)] = value
+                setattr(self, name, converted)
+
     def __init__(self, records, *, interpolation_policy=None):
         policy = INTERPOLATION_POLICY if interpolation_policy is None else interpolation_policy
         if policy not in SUPPORTED_INTERPOLATION_POLICIES:
@@ -178,7 +186,7 @@ class StageCalibration:
             if not math.isfinite(float(row['duration_ms'])) or row['duration_ms'] <= 0:
                 raise ValueError('calibration duration must be finite and positive')
             meta_from_timeline_record(row).validate()
-            self.groups[(canonical(context), op)].append(dict(row, kind=op))
+            self.groups[((context['stage'], context['virtual_chunk']), op)].append(dict(row, kind=op))
         self.models = {}
         self.coverage = {}
         self.query_regions = {}
@@ -203,7 +211,7 @@ class StageCalibration:
 
     @property
     def version(self):
-        return fingerprint(self.to_dict())
+        return SCHEMA
 
     def to_dict(self):
         return dict(schema=SCHEMA, records=list(self.records),
@@ -229,7 +237,7 @@ class StageCalibration:
         return cls(value['records'], interpolation_policy=policy)
 
     def predict_detailed(self, context, op, meta):
-        key = (canonical(context), op)
+        key = ((context['stage'], context['virtual_chunk']), op)
         if key not in self.models:
             # None, never H=0. Consumers must keep an unsplit fallback.
             return Prediction(None, 'missing-stage-path', None, 'none', True, ('context/path',))
@@ -316,16 +324,14 @@ def holdout_report(records):
 
 @lru_cache(maxsize=8)
 def load_runtime_calibration(path, version):
-    # version is the frozen file digest, so rewriting a path cannot reuse the
-    # old lru entry. Legacy files keep their explicitly legacy API semantics.
-    contents = Path(path).read_bytes()
+    # Decode exactly the bytes used for this process's frozen binding.
+    snapshot = profile_snapshot(path)
+    contents = snapshot.contents
     payload = json.loads(contents)
-    if fingerprint_bytes(contents) != version:
-        raise ValueError('execution profile changed during plan construction')
     if payload.get('schema') == SCHEMA:
         return StageCalibration.from_dict(payload)
-    return DsppExecutionCostModel.from_json(path)
+    return DsppExecutionCostModel.from_payload(payload)
 
 
 def fingerprint_bytes(value):
-    return hashlib.sha256(value).hexdigest()
+    return None

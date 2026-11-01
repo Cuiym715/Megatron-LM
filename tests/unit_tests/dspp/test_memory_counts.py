@@ -127,7 +127,14 @@ def test_runtime_passes_real_owners_capacities_and_binds_profile(tmp_path, monke
     path.write_text(json.dumps(profile))
     newer, _ = build_runtime_plan(args, ref.schedules, ref.split_counts,
         groups, [SimpleNamespace(plan=batch)] * 2, torch.bfloat16, (64, 1, 8), 64)
-    assert newer.binding.capacity_version != reference.binding.capacity_version
+    # A running process pins the original calibration bytes at each path.
+    assert newer.binding.capacity_version == reference.binding.capacity_version
+    replacement = tmp_path/'replacement-memory.json'
+    replacement.write_text(json.dumps(profile))
+    args.dspp_memory_profile = str(replacement)
+    switched, _ = build_runtime_plan(args, ref.schedules, ref.split_counts,
+        groups, [SimpleNamespace(plan=batch)] * 2, torch.bfloat16, (64, 1, 8), 64)
+    assert switched.binding.capacity_version != reference.binding.capacity_version
 
 
 def test_packed_key_coverage_and_unimplemented_split_are_explicit():

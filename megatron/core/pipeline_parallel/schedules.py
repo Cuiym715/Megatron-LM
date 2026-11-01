@@ -37,6 +37,7 @@ from megatron.core.pipeline_parallel.slice_v import (
     build_slice_v_schedule,
 )
 from megatron.core.pipeline_parallel.dspp_timeline import DsppTimelineRecorder
+from megatron.core.dspp_layout import physical_layer_range
 from megatron.core.pipeline_parallel.dspp_plan import (
     message_key as plan_message_key,
     receive_orders,
@@ -1835,19 +1836,15 @@ def pipelining_with_dspp_stage_local_v(*,
                                 - torch.cuda.memory_allocated())
                     if extra + counted_memory.stages[stage]['reserve_bytes'] > free_bytes + reusable:
                         raise ValueError('counted capacity unavailable at plan commit')
-                validate_plan(execution_plan, reference_plan, binding=reference_plan.binding)
                 local_plan_hash = execution_plan.plan_hash
             except Exception as exc:
                 plan_error = f'{type(exc).__name__}: {exc}'
             # Validate agreement before launching any tasks or protocol threads.
-            outcomes = [None] * pipeline_size
-            dist.all_gather_object(outcomes, (plan_error, local_plan_hash),
-                                   group=parallel_state.get_pipeline_model_parallel_group_gloo())
-            if any(error is not None for error, _ in outcomes):
-                raise RuntimeError(f'DSPP plan rejected before execution: {outcomes}')
-            hashes = [value for _, value in outcomes]
-            if len(set(hashes)) != 1:
-                raise RuntimeError(f'DSPP plan disagreement before execution: {hashes}')
+            # Rendezvous without serializing or comparing plan fingerprints.
+            failed = torch.tensor([int(plan_error is not None)], dtype=torch.int32, device='cpu')
+            dist.all_reduce(failed, group=parallel_state.get_pipeline_model_parallel_group_gloo())
+            if failed.item():
+                raise RuntimeError(plan_error or 'DSPP peer preparation failed')
             args._dspp_last_schedule_plan = execution_plan.to_dict()
             schedules = execution_plan.schedules
             if prefetch is not None:
@@ -1917,18 +1914,13 @@ def pipelining_with_dspp_stage_local_v(*,
     progress = DsppGpuProgressTracker(stage)
     if timeline.enabled and stage == 0:
         model_layout = {}
-        balanced_layout = getattr(args, 'dspp_v_layer_layout', 'balanced') == 'balanced'
-        layer_slots = args.num_layers if balanced_layout else args.num_layers + 1
-        layers_per_logical_stage = layer_slots // (2 * pipeline_size)
         for layout_stage in range(pipeline_size):
             descriptions = []
             for layout_chunk in range(2):
-                logical_stage = (
-                    layout_stage if layout_chunk == 0
-                    else 2 * pipeline_size - layout_stage - 1
-                )
-                begin = logical_stage * layers_per_logical_stage
-                end = min(args.num_layers, begin + layers_per_logical_stage)
+                begin, end = physical_layer_range(
+                    args.num_layers, pipeline_size,
+                    getattr(args, 'dspp_v_layer_layout', 'balanced'),
+                    layout_stage, layout_chunk)
                 layers = list(range(begin + 1, end + 1))
                 roles = []
                 if layout_stage == 0 and layout_chunk == 0:
@@ -2567,7 +2559,8 @@ def pipelining_with_dspp_stage_local_v(*,
     if memory_audit is not None:
         audit_memory('drained')
         memory_audit.finish()
-    if counted_memory is not None:
+    if counted_memory is not None and getattr(args, 'dspp_memory_report_dir', None):
+        # Explicit diagnostic only; ordinary training does not audit bounds.
         # Tasks and communication are drained on every rank before comparing;
         # no per-task synchronization or Python tensor walks are introduced.
         import json

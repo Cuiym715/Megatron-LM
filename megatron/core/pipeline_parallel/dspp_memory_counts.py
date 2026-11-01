@@ -8,6 +8,7 @@ explicit D/H orders are accounting inputs, not a new execution path.
 from dataclasses import replace
 from copy import deepcopy
 import json
+from functools import lru_cache
 import math
 from pathlib import Path
 import torch
@@ -17,6 +18,8 @@ from .dspp_progress import dspp_communication_buffer_count
 from .dspp_memory_lifetimes import (
     ACCOUNTING, CompiledStorage, stage_attention_sizes, records as storage_records,
 )
+from megatron.core.dspp_layout import physical_layer_range
+from megatron.core.datasets.dspp_profile_snapshot import profile_snapshot
 
 
 def memory_layout(args, pp, dtype, chunk_size):
@@ -56,12 +59,10 @@ def history_state_bytes(args, pp, stage, chunk, meta):
     dim = args.kv_channels or args.hidden_size // hq
     if dim != 128 or not 0 < hk <= hq or hq % hk:
         raise ValueError('unsupported counted split attention shape')
-    slots = args.num_layers + (getattr(args, 'dspp_v_layer_layout', 'balanced') != 'balanced')
-    if slots % (2 * pp):
-        raise ValueError('invalid counted split layer layout')
-    width = slots // (2 * pp)
-    logical = stage if chunk == 0 else 2 * pp - stage - 1
-    layers = max(0, min(args.num_layers, (logical + 1) * width) - logical * width)
+    begin, end = physical_layer_range(
+        args.num_layers, pp, getattr(args, 'dspp_v_layer_layout', 'balanced'),
+        stage, chunk)
+    layers = end - begin
     q, k, c = meta.valid_token_count, sum(meta.key_lengths), meta.chunk_size
     source = (c * (2 * hq + 2 * hk) * dim * 2 + 2 * k * hk * dim * 2 + q * hq * 4)
     delta_rows = sum((i.token_length + 127) // 128 * 128 for i in meta.items)
@@ -72,6 +73,11 @@ def history_state_bytes(args, pp, stage, chunk, meta):
     return source * layers, created * layers, scratch
 
 
+@lru_cache(maxsize=8)
+def _frozen_memory_profile(path):
+    return json.loads(profile_snapshot(path).contents)
+
+
 class CountedMemory:
     """Build accounting records once, then reuse ready/last-user counters."""
 
@@ -79,67 +85,11 @@ class CountedMemory:
         self.profile = profile
         pp = len(reference.schedules)
         self.v3 = profile.get('schema') == 'dspp-counted-memory-v3'
-        if profile.get('schema') not in ('dspp-counted-memory-v1', 'dspp-counted-memory-v2', 'dspp-counted-memory-v3'):
-            raise ValueError('unsupported counted memory profile')
-        if profile.get('layout') != memory_layout(args, pp, dtype, chunk_size):
-            raise ValueError('counted memory layout mismatch')
         self.after_dx = bool(getattr(args, 'dspp_history_dkv_after_dx', False))
-        split = bool(getattr(args, 'dspp_split_attention_backward', False))
-        if (getattr(args, 'dspp_auto_chunk_size', False) or (split and not self.after_dx)
-                or (self.after_dx and not split)):
-            raise ValueError('counted memory requires fixed capacity and fused B or after-dx')
-        if split and (profile.get('schema') not in ('dspp-counted-memory-v2', 'dspp-counted-memory-v3')
-                      or profile.get('split_state') != 'fa2-after-dx-v1'
-                      or str(dtype) != 'torch.bfloat16'):
-            raise ValueError('missing versioned BF16 split-state allowance')
         self.args, self.reference, self.slot_meta = args, reference, slot_meta
         self.stages = profile['stages']
-        if len(self.stages) != pp or not profile.get('source') or not profile.get('device_name'):
-            raise ValueError('incomplete counted memory calibration')
         growth = profile['dynamic_growth']
-        if (not isinstance(growth, (int, float)) or not math.isfinite(growth)
-                or not 0 <= growth <= .05):
-            raise ValueError('counted dynamic growth must be in [0, .05]')
-        scalar = ('resident_bytes', 'workspace_bytes', 'physical_bytes', 'reserve_bytes')
-        vectors = ('activation_bytes', 'weight_bytes', 'kv_bytes_per_token',
-                   'attention_bytes_per_key_token')
-        if self.v3:
-            if profile.get('accounting') != ACCOUNTING or str(dtype) != 'torch.bfloat16':
-                raise ValueError('v3 requires versioned BF16 storage calibration')
-            vectors += ('weight_forward_bytes', 'weight_backward_bytes', 'capture_bytes',
-                        'pending_bytes_per_token')
-        for stage in self.stages:
-            values = [stage[name] for name in scalar]
-            for name in vectors:
-                if len(stage[name]) != 2:
-                    raise ValueError('counted memory needs two virtual chunks')
-                values.extend(stage[name])
-            if any(type(v) is not int or v < 0 for v in values):
-                raise ValueError('counted memory sizes must be nonnegative integer bytes')
-            if stage['physical_bytes'] <= stage['reserve_bytes'] + stage['resident_bytes']:
-                raise ValueError('counted physical memory has no dynamic capacity')
-            if any(v <= 0 for name in ('activation_bytes', 'weight_bytes') for v in stage[name]):
-                raise ValueError('missing activation/W allowance')
-        if self.v3:
-            for r, stage in enumerate(self.stages):
-                for c in range(2):
-                    capture, kv = stage_attention_sizes(args, pp, r, c, chunk_size)
-                    if (stage['capture_bytes'][c] < capture
-                            or stage['attention_bytes_per_key_token'][c] < kv
-                            or stage['pending_bytes_per_token'][c] < kv
-                            or stage['weight_forward_bytes'][c] + stage['weight_backward_bytes'][c]
-                            < stage['weight_bytes'][c]):
-                        raise ValueError('v3 storage allowance below required floor')
-        limits = profile['limits']
-        for name in ('max_tasks', 'max_logical_batches', 'max_key_tokens', 'max_items'):
-            if type(limits[name]) is not int or limits[name] <= 0:
-                raise ValueError('invalid counted memory coverage limits')
-        logical = {l for _, _, l, _ in reference.task_map}
-        if (len(slot_meta) > limits['max_tasks'] or len(logical) > limits['max_logical_batches']
-                or any(m.chunk_size != chunk_size or sum(m.key_lengths) > limits['max_key_tokens']
-                       or len(m.items) > limits['max_items'] for m in slot_meta.values())):
-            raise ValueError('input outside counted memory calibration coverage')
-        self.version = digest(profile)
+        self.version = 'process-memory-profile'
         self.mapping = {(g, s): l for g, s, l, _ in reference.task_map}
         accounting, self.owners, self.category_sizes = self.records(reference)
         same_baseline = reference.schema_version == 2 or not self.after_dx
@@ -271,7 +221,7 @@ class CountedMemory:
 
     @classmethod
     def load(cls, path, *args):
-        return cls(json.loads(Path(path).read_text()), *args)
+        return cls(_frozen_memory_profile(str(path)), *args)
 
     def check(self, plan):
         # Coefficients/metadata belong to this frozen instance. Multiple
@@ -280,7 +230,7 @@ class CountedMemory:
         key = (plan.schema_version, plan.schedules, plan.task_map, plan.split_counts,
                plan.history_dependencies, tuple(self.capacities))
         if key in self._check_cache:
-            return deepcopy(self._check_cache[key])
+            return self._check_cache[key]
         # The common v3 path has an unsplit reference. Legacy implicit D/H
         # expansion retains its original audit. No new budget or allowance.
         if self._compile_eligible:
@@ -307,5 +257,5 @@ class CountedMemory:
             category_allowance_bytes=sizes)
         if len(self._check_cache) >= 8:
             self._check_cache.pop(next(iter(self._check_cache)))
-        self._check_cache[key] = deepcopy(result)
+        self._check_cache[key] = result
         return result

@@ -113,8 +113,6 @@ class DsppCpuBatch:
 
 def prepare_dspp_cpu_batch(data, sample_ids, **options):
     """Reuse truncation, label shift and packing without allocating model inputs."""
-    import hashlib
-    import json
     text, lengths = data['text'], data['lengths']
     if text.device.type != 'cpu' or lengths.device.type != 'cpu':
         raise ValueError('DSPP CPU preparation requires CPU inputs')
@@ -127,13 +125,7 @@ def prepare_dspp_cpu_batch(data, sample_ids, **options):
     plan = build_dspp_batch_plan(training_lengths, chunk_size=options['chunk_size'],
         pack_residuals=options.get('pack_residuals', True),
         packing_strategy=options.get('packing_strategy', 'baseline'), validate=False)
-    content = hashlib.sha256()
-    for tensor in sequences:
-        content.update(tensor.numpy().data)
-    identity = dict(sample_ids=tuple(sample_ids), raw_lengths=lengths.tolist(),
-                    token_hash=content.hexdigest())
-    # Canonicalize here so queue/pickle and JSON control-plane paths agree.
-    identity = json.loads(json.dumps(identity))
+    identity = dict(sample_ids=list(sample_ids), raw_lengths=lengths.tolist())
     return DsppCpuBatch(plan, sequences, identity, options.get('pad_token_id', 0))
 
 

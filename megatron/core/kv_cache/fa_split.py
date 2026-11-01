@@ -192,7 +192,7 @@ def backward_dkv(state: SplitBackwardState | VarlenSplitBackwardState,
 
     Results have the full input KV shape, with exact zeros outside the selected
     region. Thus current+history reconstructs all, with no uninitialized rows.
-    Only intersecting 64-token tiles execute; a nonaligned boundary can incur
+    Only intersecting 64-token H tiles execute; a nonaligned boundary can incur
     surplus tile computation whose results are discarded. K/V are not expanded
     by head; GQA partial gradients are summed once, following upstream FA2.
 

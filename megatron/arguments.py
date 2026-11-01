@@ -14,6 +14,7 @@ from megatron.global_vars import set_retro_args, get_retro_args
 from tools.retro.utils import get_args_path as get_retro_args_path
 
 from megatron.core.transformer import TransformerConfig
+from megatron.core.dspp_layout import logical_layer_ranges
 
 
 def parse_args(extra_args_provider=None, ignore_unknown_args=False):
@@ -168,16 +169,12 @@ def validate_args(args, defaults={}):
             assert args.kaimm_num_layers_padding_front == 0 and \
                 args.kaimm_num_layers_padding_back == 0, \
                 'V-shaped uneven layer allocation does not support padding layers'
-            logical_stages = 2 * args.transformer_pipeline_model_parallel_size
-            balanced_dspp = args.dspp and args.dspp_v_layer_layout == 'balanced'
-            layer_slots = args.num_layers if balanced_dspp else args.num_layers + 1
-            assert layer_slots % logical_stages == 0, \
-                f'V-shaped scheduling requires {layer_slots} layer slots to be ' \
-                f'divisible by 2 * pipeline size ({logical_stages}); layout=' \
-                f'{args.dspp_v_layer_layout if args.dspp else "legacy-output-slot"}'
-            expected_layers = layer_slots // logical_stages
-            assert args.num_layers_per_virtual_pipeline_stage == expected_layers, \
-                f'V-shaped scheduling requires num_layers_per_virtual_pipeline_stage={expected_layers}'
+            layout = args.dspp_v_layer_layout if args.dspp else 'legacy-output-slot'
+            ranges = logical_layer_ranges(
+                args.num_layers, args.transformer_pipeline_model_parallel_size, layout)
+            regular_layers = max(end - begin for begin, end in ranges)
+            assert args.num_layers_per_virtual_pipeline_stage == regular_layers, \
+                f'V-shaped scheduling requires num_layers_per_virtual_pipeline_stage={regular_layers}'
             args.virtual_pipeline_model_parallel_size = 2
         else:
             assert num_layers_including_padding_layers % (args.transformer_pipeline_model_parallel_size * args.num_layers_per_virtual_pipeline_stage) == 0, \
@@ -1506,10 +1503,11 @@ def _add_distributed_args(parser):
                        'greedy packer; attention-critical applies bounded continuation-safe '
                        'LPT/local-improvement packing.')
     group.add_argument('--dspp-v-layer-layout', type=str, default='balanced',
-                       choices=['balanced', 'legacy-output-slot'],
+                       choices=['balanced', 'legacy-output-slot', 'endpoint-3-2'],
                        help='DSPP V-pipeline Transformer-layer layout. balanced assigns '
                        'the same number of Transformer layers to every logical stage; '
-                       'legacy-output-slot preserves the earlier (num_layers + 1) rule.')
+                       'legacy-output-slot preserves the earlier (num_layers + 1) rule; '
+                       'endpoint-3-2 is the PP8/61-layer measured endpoint rebalance.')
     group.add_argument('--dspp-order-profile', type=str, default=None,
                        help='Optional C2 CUDA-event cost JSON used by C1 ordering. '
                        'Unmatched shapes use the metadata cost proxy.')

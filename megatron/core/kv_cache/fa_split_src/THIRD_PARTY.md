@@ -31,8 +31,12 @@ The combined-current entry additionally instantiates the unchanged full-gradient
 column-block routine for tiles intersecting current KV, and dQ-only for tiles
 wholly within history. It reads only current rows from the per-Q-head dKV
 workspace; a nonaligned boundary tile's surplus history output is discarded.
-The original upstream-header patch, tile configuration, GQA reduction and dQ
-conversion remain unchanged. Independent historical dKV is still computed later.
+The original upstream-header patch, GQA reduction and dQ conversion remain
+unchanged. The launcher now follows pinned FA2's head-dim-128 BF16 split:
+SM80 D uses its >=144 KiB 64x128 tile, while lower-shared-memory targets retain
+the validated 64x64 tile. H is specialized independently and retains 64x64 on
+SM80 because it is faster for dKV-only work. Independent historical dKV is
+still computed later.
 
 The optional diagnostic `deterministic=True` dQ entry follows pinned FA2's
 seq-K parallel deterministic launcher: ceil(SM_count / Q_heads) independent

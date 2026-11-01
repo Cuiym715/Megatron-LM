@@ -176,6 +176,10 @@ def load_p2p_cost_model(path: Optional[str]) -> DsppP2PCostModel:
     if not path:
         return DsppP2PCostModel.empty()
     try:
-        return DsppP2PCostModel.from_json(path)
+        from .dspp_profile_snapshot import profile_snapshot
+        payload = json.loads(profile_snapshot(path).contents)
+        if isinstance(payload, dict):
+            payload = payload.get('records', payload.get('points', []))
+        return DsppP2PCostModel.from_records(payload if isinstance(payload, list) else [])
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
         return DsppP2PCostModel.empty()

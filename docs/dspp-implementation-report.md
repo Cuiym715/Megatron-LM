@@ -1,7 +1,16 @@
 # DSPP 当前实现与实验报告
 
-更新日期：2026-09-13  
-状态：Milestone A、B1、B2+B3、C1+C2 已实现；launch starvation、大消息 matched receive lookahead 和有界 multi-inflight 已完成针对性优化；no-history packed KV 冗余、input-mode 观测不一致、运行时自适应 chunk size 和大消息 P2P 卡死已修复/实现
+更新日期：2026-11-01（B/PP8增补；基础章节保留2026-09-13快照）
+
+2026-09-13基础实现状态：Milestone A、B1、B2+B3、C1+C2 已实现；launch starvation、大消息 matched receive lookahead 和有界 multi-inflight 已完成针对性优化；no-history packed KV 冗余、input-mode 观测不一致、运行时自适应 chunk size 和大消息 P2P 卡死已修复/实现
+
+## 最新增补：算法B与A800/PP8
+
+当前选择性D/H、跨轮异步规划及运行时精简见[算法B当前实现与改进记录](dspp-algorithm-b-implementation.md)。2026-11-01已删除DSPP内容指纹/重复审计，固定profile每进程加载，复用同轮元数据；B搜索、目标、依赖及候选容量计算保留，当前正收益使用P实测模型。
+
+61层受控输入下，精简后baseline/B三次配对汇总吞吐+2.82%；同首尾减层规则的独立三方法复测为baseline1942.98ms、B在线1880.17ms（+3.34%）、InfiniPipe端点适配版5741.03ms。两批B是相同精简源码，不是新增两种算法；每项5预热＋20计时，默认高性能FA。完整配置、变体失败/负收益、适配口径及范围以新文档为准。
+
+下列第1–13节保留早期基础实现/实验快照，其中“固定PP3”“attention bubble filling尚未实现”等不能作为当前B/PP8状态；历史数字与记录不覆盖或改写。
 
 ## 1. 当前结论
 

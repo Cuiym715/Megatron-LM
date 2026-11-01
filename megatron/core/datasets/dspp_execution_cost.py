@@ -220,7 +220,6 @@ class DsppExecutionCostModel:
                 x_scaled[:, 1:] = features / scale
                 gram = x_scaled.T @ x_scaled
                 gram = gram + ridge * torch.eye(gram.shape[0], dtype=gram.dtype)
-                beta_scaled = torch.linalg.solve(gram, x_scaled.T @ y)
                 if extended_features:
                     # Clipping an unconstrained solution is not nonnegative
                     # least squares: correlated capacity/padding/history terms
@@ -235,6 +234,8 @@ class DsppExecutionCostModel:
                         if torch.max(torch.abs(updated - beta_scaled)) < 1e-9:
                             break
                         beta_scaled = updated
+                else:
+                    beta_scaled = torch.linalg.solve(gram, x_scaled.T @ y)
                 beta = beta_scaled.clone()
                 beta[1:] = beta_scaled[1:] / scale
                 beta = torch.clamp(beta, min=0.0)
@@ -275,6 +276,10 @@ class DsppExecutionCostModel:
     @classmethod
     def from_json(cls, path: str | Path) -> "DsppExecutionCostModel":
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        return cls.from_payload(payload)
+
+    @classmethod
+    def from_payload(cls, payload) -> "DsppExecutionCostModel":
         if isinstance(payload, Mapping) and payload.get('schema') == 'dspp-stage-calibration-v2':
             raise ValueError('stage calibration v2 requires the context-aware StageCalibration API')
         records = payload.get("records") if isinstance(payload, Mapping) else None

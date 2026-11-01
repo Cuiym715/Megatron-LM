@@ -182,17 +182,16 @@ class CompiledStorage:
 
 
 def stage_attention_sizes(args, pp, stage, chunk, capacity):
+    from megatron.core.dspp_layout import physical_layer_range
     hq = args.num_attention_heads
     hk = args.num_query_groups if getattr(args, 'group_query_attention', False) else hq
     dim = args.kv_channels or args.hidden_size // hq
     if dim != 128 or not 0 < hk <= hq or hq % hk:
         raise ValueError('unsupported v3 attention shape')
-    slots = args.num_layers + (getattr(args, 'dspp_v_layer_layout', 'balanced') != 'balanced')
-    if slots % (2 * pp):
-        raise ValueError('invalid v3 layer layout')
-    width = slots // (2 * pp)
-    logical = stage if chunk == 0 else 2 * pp - stage - 1
-    layers = max(0, min(args.num_layers, (logical + 1) * width) - logical * width)
+    begin, end = physical_layer_range(
+        args.num_layers, pp, getattr(args, 'dspp_v_layer_layout', 'balanced'),
+        stage, chunk)
+    layers = end - begin
     # Current Q/K/V, O and outer LSE; also covers a shared unsplit QKV backing
     # plus O. Calibration takes the maximum with observed backing sizes.
     # Assembled K/V is charged separately from the original cached K/V.

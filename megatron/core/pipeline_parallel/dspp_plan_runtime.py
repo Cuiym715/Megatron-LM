@@ -12,6 +12,7 @@ from megatron.core.datasets.dspp_calibration import (
     INTERPOLATION_POLICY, StageCalibration, load_runtime_calibration, stage_context,
 )
 from megatron.core.datasets.dspp_p2p import load_p2p_cost_model
+from megatron.core.datasets.dspp_profile_snapshot import profile_snapshot
 from .dspp_plan import (
     PlanBinding, digest, node_key, receive_orders, template_plan,
     plan_configuration_a, preserves_retention_envelope, history_dependencies, replay_plan,
@@ -24,10 +25,8 @@ from .dspp_plan_c import plan_configuration_c
 def _file_version(path):
     if not path:
         return 'none'
-    # Read content even when stat is unchanged: some mounted filesystems
-    # have coarse timestamps, including same-size profile rewrites.
-    import hashlib
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    # Profiles are fixed for the training process; this is an in-memory lookup.
+    return profile_snapshot(path).version
 
 
 def runtime_inputs(args, pp, schedule_groups, batches, dtype, tensor_shape, chunk_size,
@@ -39,37 +38,11 @@ def runtime_inputs(args, pp, schedule_groups, batches, dtype, tensor_shape, chun
     metadata = {(l, p): meta for l, batch in enumerate(batches)
                 for p, meta in enumerate(batch.plan.microbatches)}
     slot_meta = {(g, s): metadata[(l, p)] for g, s, l, p in task_map}
-    layout = dict(pp=pp, vpp=2, dtype=str(dtype), shape=list(tensor_shape),
-                  chunk_size=chunk_size, model={name: getattr(args, name, None) for name in (
-                      'num_layers', 'hidden_size', 'ffn_hidden_size', 'num_attention_heads',
-                      'num_query_groups', 'group_query_attention', 'dspp_v_layer_layout', 'kv_channels')})
     execution_version = _file_version(getattr(args, 'dspp_execution_profile', None))
-    input_metadata = dict(tasks=task_map, metadata=[(l, p, asdict(m))
-                                                  for (l, p), m in sorted(metadata.items())])
-    identities = [getattr(batch, 'input_identity', None) for batch in batches]
-    if any(identity is not None for identity in identities):
-        input_metadata['sources'] = identities
-    binding = PlanBinding(
-        iteration_id=int(getattr(args, 'curr_iteration', -1)) + 1,
-        input_hash=digest(input_metadata),
-        layout_version=digest(layout),
-        cost_version=digest([execution_version, INTERPOLATION_POLICY,
-                             'construct-per-chunk-W-order-v1',
-                             _file_version(getattr(args, 'dspp_p2p_profile', None))]),
-        capacity_version='p1-template-W-retention-envelope-v1',
-        protocol_version=digest(dict(protocol='stage-local-v1',
-                                     lookahead=getattr(args, 'dspp_recv_lookahead', 2),
-                                     depth=getattr(args, 'dspp_send_inflight_depth', 2),
-                                     forward_only=forward_only,
-                                     split=getattr(args, 'dspp_split_attention_backward', False),
-                                     after_dx=getattr(args, 'dspp_history_dkv_after_dx', False))))
-    if mode in ('b', 'c'):
-        budgets = ([getattr(args, 'dspp_b_budget_fraction', .60)] if mode == 'b' else
-                   [getattr(args, 'dspp_c_budget_fraction', .50),
-                    getattr(args, 'dspp_c_b_budget_fraction', .30)])
-        binding = replace(binding, cost_version=digest([binding.cost_version,
-            'supply-cp-memory-v2' if mode == 'b' else 'supply-cp-memory-fixed-H-feedback-v2',
-            *budgets]))
+    # Iteration routing uses its ordinal. No input/layout/cost/protocol hashes.
+    binding = PlanBinding(iteration_id=int(getattr(args, 'curr_iteration', -1)) + 1,
+                          input_hash='', layout_version='', cost_version='',
+                          capacity_version='', protocol_version='stage-local-v1')
     return binding, task_map, metadata, slot_meta, execution_version
 
 
@@ -252,7 +225,6 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
         candidate.planning_info['unavailable_split_costs'] = unavailable
         # Export cost belongs to planning; collective publication is recorded
         # separately by the executor and never treated as hidden work.
-        candidate.to_dict()
         elapsed = (time.perf_counter()-planning_begin)*1000
         budget = candidate.planning_info['full_budget_ms']
         candidate.planning_info.update(total_ms=elapsed, budget_met=elapsed<=budget,

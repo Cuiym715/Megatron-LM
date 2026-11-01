@@ -15,21 +15,36 @@
 
 namespace dspp_split_detail {
 using dspp_flash_split::Flash_bwd_params;
-// This is upstream FA2's BF16/head-dim-128 configuration for SMs with <144 KiB
-// opt-in shared memory (including L40). No tile/precision retuning in stage A.
-using Traits = Flash_bwd_kernel_traits<
+using Tile64Traits = Flash_bwd_kernel_traits<
     128, 64, 64, 8, 4, 2, 2, true, false, cutlass::bfloat16_t>;
 
+// Follow pinned FA2's BF16/head-dim-128 launcher split for the latency-critical
+// dQ/current-dKV path.  SM80 has enough opt-in shared memory for the 64x128
+// tile; lower-smem targets (including L40) retain the validated 64x64 tile.
+#if DSPP_FA_SPLIT_ARCH == 80
+using DTraits = Flash_bwd_kernel_traits<
+    128, 64, 128, 8, 2, 4, 2, false, false, cutlass::bfloat16_t>;
+#else
+using DTraits = Tile64Traits;
+#endif
+
+// Historical dKV does not accumulate dQ.  On SM80 the smaller 64x64 tile is
+// faster for this H-only specialization, so tune it independently from D.
+using HTraits = Tile64Traits;
+
+constexpr int kDBlockM = DTraits::kBlockM;
+constexpr int kDBlockN = DTraits::kBlockN;
+
 __global__ void prepare_kernel(const Flash_bwd_params p) {
-    dspp_flash_split::compute_dot_do_o<false, Traits>(p);
+    dspp_flash_split::compute_dot_do_o<false, DTraits>(p);
 }
 
-template<bool ComputeDq>
+template<typename KernelTraits, bool ComputeDq>
 __global__ void split_kernel(const Flash_bwd_params p, int first_k_block) {
     // Is_first/Is_last=false, Seq_parallel=true: delta is already prepared;
     // dQ-only atomically accumulates FP32 partials; dKV-only owns each KV tile.
     dspp_flash_split::compute_dq_dk_dv_1colblock<
-        Traits, false, true, false, false, false, true, false,
+        KernelTraits, false, true, false, false, false, true, false,
         false, false, true, ComputeDq, !ComputeDq>(
             p, blockIdx.y, blockIdx.z, blockIdx.x + first_k_block);
 }
@@ -39,13 +54,13 @@ __device__ __forceinline__ void dq_current_column(
     // Tiles wholly within history need only dQ. A boundary tile also computes
     // dKV, but its surplus history rows are discarded by the current-only
     // output slice. H later computes/routes those rows exactly once.
-    if ((n_block + 1) * 64 <= history) {
+    if ((n_block + 1) * kDBlockN <= history) {
         dspp_flash_split::compute_dq_dk_dv_1colblock<
-            Traits, false, true, false, false, false, true, false,
+            DTraits, false, true, false, false, false, true, false,
             false, false, true, true, false>(p, blockIdx.y, blockIdx.z, n_block);
     } else {
         dspp_flash_split::compute_dq_dk_dv_1colblock<
-            Traits, false, true, false, false, false, true, false,
+            DTraits, false, true, false, false, false, true, false,
             false, false, true, true, true>(p, blockIdx.y, blockIdx.z, n_block);
     }
 }
@@ -59,24 +74,24 @@ __global__ void dq_current_kernel(const Flash_bwd_params p, int history) {
 // Default kernels above keep the original one-CTA-per-KV-column launch.
 template<bool CurrentDkv>
 __global__ void deterministic_dq_kernel(const Flash_bwd_params p, int history) {
-    for (int n_block = blockIdx.x; n_block < (p.seqlen_k + 63) / 64;
+    for (int n_block = blockIdx.x; n_block < (p.seqlen_k + kDBlockN - 1) / kDBlockN;
          n_block += gridDim.x) {
         if constexpr (CurrentDkv) {
             dq_current_column(p, history, n_block);
         } else {
             dspp_flash_split::compute_dq_dk_dv_1colblock<
-                Traits, false, true, false, false, false, true, false,
+                DTraits, false, true, false, false, false, true, false,
                 false, false, true, true, false>(p, blockIdx.y, blockIdx.z, n_block);
         }
     }
 }
 
 __global__ void convert_dq_kernel(const Flash_bwd_params p) {
-    dspp_flash_split::convert_dQ<Traits>(p, 1);
+    dspp_flash_split::convert_dQ<DTraits>(p, 1);
 }
 
 __global__ void convert_dq_deterministic_kernel(const Flash_bwd_params p, int nsplits) {
-    dspp_flash_split::convert_dQ<Traits>(p, nsplits);
+    dspp_flash_split::convert_dQ<DTraits>(p, nsplits);
 }
 
 at::Tensor dq_accumulator(Flash_bwd_params& p, const at::Tensor& q,
@@ -98,19 +113,19 @@ void launch_deterministic_dq(const Flash_bwd_params& p, cudaStream_t stream,
                               int nsplits, int history) {
     auto kernel = deterministic_dq_kernel<CurrentDkv>;
     C10_CUDA_CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize,
-                                        Traits::kSmemSize1colblock));
-    kernel<<<dim3(nsplits, 1, p.h), Traits::kNThreads,
-              Traits::kSmemSize1colblock, stream>>>(p, history);
+                                        DTraits::kSmemSize1colblock));
+    kernel<<<dim3(nsplits, 1, p.h), DTraits::kNThreads,
+              DTraits::kSmemSize1colblock, stream>>>(p, history);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 
 void finish_dq(const Flash_bwd_params& p, cudaStream_t stream, int nsplits) {
-    const dim3 grid((p.seqlen_q + 63) / 64, 1, p.h);
+    const dim3 grid((p.seqlen_q + kDBlockM - 1) / kDBlockM, 1, p.h);
     if (p.deterministic) {
-        convert_dq_deterministic_kernel<<<grid, Traits::kNThreads,
-            Traits::kSmemdQSize, stream>>>(p, nsplits);
+        convert_dq_deterministic_kernel<<<grid, DTraits::kNThreads,
+            DTraits::kSmemdQSize, stream>>>(p, nsplits);
     } else {
-        convert_dq_kernel<<<grid, Traits::kNThreads, Traits::kSmemdQSize, stream>>>(p);
+        convert_dq_kernel<<<grid, DTraits::kNThreads, DTraits::kSmemdQSize, stream>>>(p);
     }
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
@@ -196,7 +211,8 @@ void check_inputs(const at::Tensor& q, const at::Tensor& k, const at::Tensor& v,
                 "split backward is built for SM80-SM90 only");
     TORCH_CHECK(props->major * 10 + props->minor == DSPP_FA_SPLIT_ARCH,
                 "device architecture differs from this split backward build target");
-    TORCH_CHECK(props->sharedMemPerBlockOptin >= Traits::kSmemSize1colblock,
+    TORCH_CHECK(props->sharedMemPerBlockOptin >= DTraits::kSmemSize1colblock &&
+                props->sharedMemPerBlockOptin >= HTraits::kSmemSize1colblock,
                 "insufficient shared memory for split backward kernel");
 }
 
@@ -237,16 +253,16 @@ void check_delta(const at::Tensor& q, const at::Tensor& delta) {
                 "delta must be contiguous FP32 [heads, rounded_sequence] on Q's device");
 }
 
-template<bool ComputeDq>
+template<typename KernelTraits, bool ComputeDq>
 void launch(const Flash_bwd_params& p, cudaStream_t stream, int begin, int end) {
     if (begin == end) { return; }
-    auto kernel = split_kernel<ComputeDq>;
+    auto kernel = split_kernel<KernelTraits, ComputeDq>;
     C10_CUDA_CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize,
-                                        Traits::kSmemSize1colblock));
-    const int first_block = begin / 64;
-    const int blocks = (end + 63) / 64 - first_block;
-    kernel<<<dim3(blocks, 1, p.h), Traits::kNThreads,
-              Traits::kSmemSize1colblock, stream>>>(p, first_block);
+                                        KernelTraits::kSmemSize1colblock));
+    const int first_block = begin / KernelTraits::kBlockN;
+    const int blocks = (end + KernelTraits::kBlockN - 1) / KernelTraits::kBlockN - first_block;
+    kernel<<<dim3(blocks, 1, p.h), KernelTraits::kNThreads,
+              KernelTraits::kSmemSize1colblock, stream>>>(p, first_block);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 }  // namespace dspp_split_detail
@@ -261,7 +277,7 @@ at::Tensor split_prepare(const at::Tensor& q, const at::Tensor& k, const at::Ten
     // Zero padded rows too; kernels only use valid rows but state is reproducible.
     auto delta = at::zeros({q.size(1), (q.size(0) + 127) / 128 * 128}, q.options().dtype(at::kFloat));
     auto p = params(q, k, v, o, dout, lse, delta, scale);
-    prepare_kernel<<<dim3((p.seqlen_q + 63) / 64, 1, p.h), Traits::kNThreads, 0,
+    prepare_kernel<<<dim3((p.seqlen_q + kDBlockM - 1) / kDBlockM, 1, p.h), DTraits::kNThreads, 0,
                      at::cuda::getCurrentCUDAStream()>>>(p);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
     return delta;
@@ -283,7 +299,7 @@ at::Tensor split_dq(const at::Tensor& q, const at::Tensor& k, const at::Tensor& 
     if (deterministic) {
         launch_deterministic_dq<false>(p, stream, nsplits, 0);
     } else {
-        launch<true>(p, stream, 0, p.seqlen_k);
+        launch<DTraits, true>(p, stream, 0, p.seqlen_k);
     }
     finish_dq(p, stream, nsplits);
     return dq;
@@ -312,7 +328,7 @@ std::vector<at::Tensor> split_dkv(const at::Tensor& q, const at::Tensor& k, cons
     p.dk_row_stride = partial_k.stride(0); p.dv_row_stride = partial_v.stride(0);
     p.dk_head_stride = p.dv_head_stride = 128;
     p.dk_batch_stride = partial_k.numel(); p.dv_batch_stride = partial_v.numel();
-    launch<false>(p, at::cuda::getCurrentCUDAStream(), begin, end);
+    launch<HTraits, false>(p, at::cuda::getCurrentCUDAStream(), begin, end);
     // Read only the requested rows, which the selected tiles fully wrote.
     // Boundary-tile surplus is never returned or included in the reduction.
     auto dk_region = compact ? dk : dk.slice(0, begin, end);
@@ -350,9 +366,9 @@ std::vector<at::Tensor> split_dq_current(
         launch_deterministic_dq<true>(p, stream, nsplits, history);
     } else {
         C10_CUDA_CHECK(cudaFuncSetAttribute(dq_current_kernel,
-            cudaFuncAttributeMaxDynamicSharedMemorySize, Traits::kSmemSize1colblock));
-        dq_current_kernel<<<dim3((p.seqlen_k + 63) / 64, 1, p.h), Traits::kNThreads,
-            Traits::kSmemSize1colblock, stream>>>(p, history);
+            cudaFuncAttributeMaxDynamicSharedMemorySize, DTraits::kSmemSize1colblock));
+        dq_current_kernel<<<dim3((p.seqlen_k + kDBlockN - 1) / kDBlockN, 1, p.h), DTraits::kNThreads,
+            DTraits::kSmemSize1colblock, stream>>>(p, history);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     finish_dq(p, stream, nsplits);

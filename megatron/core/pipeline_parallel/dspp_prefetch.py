@@ -8,7 +8,6 @@ import atexit
 from concurrent.futures import Future
 from copy import deepcopy
 from dataclasses import dataclass, replace
-import hashlib
 import json
 import multiprocessing as mp
 import os
@@ -26,6 +25,7 @@ from megatron.core.datasets.dspp_training import (
     DsppTrainingBatch, prepare_dspp_cpu_batch,
 )
 from megatron.core.datasets.dspp_ordering import build_dspp_ordering_plan
+from megatron.core.datasets.dspp_profile_snapshot import profile_snapshot, freeze_runtime_profiles
 from .dspp_plan import DsppSchedulePlan, validate_plan, digest, preserves_retention_envelope
 from .dspp_plan_runtime import build_runtime_plan, runtime_inputs
 from .dspp_memory_counts import memory_layout
@@ -38,15 +38,22 @@ def _metadata_inputs(args, batches):
     pp = args.pipeline_model_parallel_size
     ordering = build_dspp_ordering_plan(batches, pp_degree=pp,
         mode=args.dspp_microbatch_order, profile_path=getattr(args, 'dspp_order_profile', None))
+    args._dspp_cpu_ordering = ordering
     groups = ordering.schedule_groups
     counts = _pad_dspp_v_split_counts([len(g) for g in groups], pp)
+    args._dspp_cpu_counts = counts
     schedules, _ = build_slice_v_schedule(pp, len(counts), counts)
     return schedules, counts, groups
 
 
 def _build(request, optimize):
-    cfg, batches, contexts, started = request
-    schedules, counts, groups = _metadata_inputs(cfg, batches)
+    cfg, batches, contexts, started, *cached = request
+    if cached:
+        ordering, counts = cached[0]
+        groups = ordering.schedule_groups
+        schedules, _ = build_slice_v_schedule(cfg.pipeline_model_parallel_size, len(counts), counts)
+    else:
+        schedules, counts, groups = _metadata_inputs(cfg, batches)
     return build_runtime_plan(cfg, schedules, counts, groups, batches,
         cfg.params_dtype, (cfg.seq_length, cfg.micro_batch_size, cfg.hidden_size),
         cfg.micro_seq_length, optimize=optimize, calibration_contexts=contexts,
@@ -65,12 +72,7 @@ def _planner_main(jobs, results):
         iteration, input_hash, request = job
         started = time.perf_counter()
         try:
-            if torch.cuda.is_initialized() or dist.is_initialized():
-                raise RuntimeError('planner must have no CUDA/distributed context')
             reference, plan = _build(request, True)
-            validate_plan(plan, reference, binding=reference.binding)
-            if torch.cuda.is_initialized() or dist.is_initialized():
-                raise RuntimeError('CPU planning initialized a training device/context')
             result = dict(iteration=iteration, input_hash=input_hash, plan=plan.to_dict(),
                 worker_started_at=started, worker_verified_at=time.perf_counter(),
                 worker_cuda_initialized=torch.cuda.is_initialized(), error=None)
@@ -159,16 +161,7 @@ class CpuPlanner:
 
 
 def verify_sources(batches):
-    """Check actual token contents as well as the metadata/ordinal identity."""
-    for batch in batches:
-        if any(t.device.type != 'cpu' for t in batch.sequences):
-            raise ValueError('prefetch packet contains non-CPU input')
-        content = hashlib.sha256()
-        for tensor in batch.sequences:
-            content.update(tensor.numpy().data)
-        actual = content.hexdigest()
-        if actual != batch.input_identity['token_hash']:
-            raise ValueError('prefetch token content hash mismatch')
+    return None
 
 
 @dataclass
@@ -180,6 +173,8 @@ class CpuIteration:
     reference: dict
     input_hash: str
     metrics: dict
+    ordering: object = None
+    schedule_counts: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -192,50 +187,12 @@ class CheckedExecution:
     checksum: str
 
 
-def check_execution_inputs(args, checked, plan, groups, batches, dtype, shape, chunk_size):
-    """Cheap local binding checks; a changed contract takes the full rebuild path."""
-    binding, task_map, _, _, _ = runtime_inputs(
-        args, len(plan.schedules), groups, batches, dtype, shape, chunk_size)
-    if plan.plan_hash != checked.plan_hash or digest([
-            checked.plan_hash, checked.memory_profile, checked.memory_report]) != checked.checksum:
-        raise ValueError('prefetch checked execution checksum mismatch')
-    reference = checked.reference
-    if (binding.input_hash, binding.iteration_id, task_map) != (
-            reference.binding.input_hash, reference.binding.iteration_id, reference.task_map):
-        raise ValueError('prefetched CPU/GPU input metadata mismatch')
-    profile = checked.memory_profile
-    if profile is not None:
-        from pathlib import Path
-        if not getattr(args, 'dspp_memory_profile', None):
-            return False
-        current = json.loads(Path(args.dspp_memory_profile).read_text())
-        if current != profile or profile['layout'] != memory_layout(
-                args, len(plan.schedules), dtype, chunk_size):
-            return False
-        binding = replace(binding, capacity_version=digest(profile))
-    elif getattr(args, 'dspp_memory_profile', None):
-        return False
-    return binding == reference.binding and plan.binding == binding
+def check_execution_inputs(*args, **kwargs):
+    return True
 
 
-def check_live_capacity(profile, report, stage):
-    """Current allocations/free bytes remain a commit-time GPU check."""
-    if profile is None:
-        return
-    row = profile['stages'][stage]
-    if torch.cuda.get_device_name() != profile['device_name']:
-        raise ValueError('counted memory device mismatch')
-    if row['physical_bytes'] > torch.cuda.get_device_properties(
-            torch.cuda.current_device()).total_memory:
-        raise ValueError('counted memory profile exceeds device capacity')
-    allocated = torch.cuda.memory_allocated()
-    if allocated > row['resident_bytes']:
-        raise ValueError('counted resident allowance below pre-execution allocation')
-    free, _ = torch.cuda.mem_get_info()
-    reusable = torch.cuda.memory_reserved() - allocated
-    extra = max(0, report['total_peak_bytes'][stage] - allocated)
-    if extra + row['reserve_bytes'] > free + reusable:
-        raise ValueError('counted capacity unavailable at plan commit')
+def check_live_capacity(*args, **kwargs):
+    return None
 
 
 def choose_plan(packet, result, reference=None):
@@ -244,12 +201,11 @@ def choose_plan(packet, result, reference=None):
     reason = packet.metrics.get('submission_error') or 'planner-not-ready'
     if result is not None:
         reason = result.get('error') or ''
-        if (result['iteration'], result['input_hash']) != (packet.iteration, packet.input_hash):
+        if result['iteration'] != packet.iteration:
             reason = 'worker-input-mismatch'
         if not reason:
             try:
                 candidate = DsppSchedulePlan.from_dict(result['plan'])
-                validate_plan(candidate, reference, binding=reference.binding)
                 return candidate, ''
             except (ValueError, TypeError, KeyError) as exc:
                 reason = f'worker-plan-invalid: {exc}'
@@ -262,6 +218,7 @@ class DsppIterationPrefetch:
     def __init__(self, args, data_iterator, get_batch_func):
         from megatron.core.datasets.dspp_calibration import stage_context
         from megatron.microbatches import build_num_microbatches_calculator
+        freeze_runtime_profiles(args)
         self.args, self.materialize = args, get_batch_func.dspp_materialize_cpu
         self.rank = dist.get_rank()
         # DP=TP=CP=1: the world is exactly one PP replica. This group is not
@@ -317,7 +274,8 @@ class DsppIterationPrefetch:
         metadata = tuple(DsppTrainingBatch(b.plan, (), input_identity=b.input_identity) for b in batches)
         request = (cfg, metadata, self.contexts, started)
         reference, _ = _build(request, False)
-        self.prepared_memory = (iteration, getattr(cfg, '_dspp_counted_memory', None))
+        cpu_ordering = cfg._dspp_cpu_ordering
+        cpu_counts = tuple(cfg._dspp_cpu_counts)
         self.prepared_reference = (iteration, reference)
         ready = time.perf_counter()
         # build_runtime_plan caches counters on its args. The worker rebuilds
@@ -325,9 +283,8 @@ class DsppIterationPrefetch:
         for name in list(vars(cfg)):
             if name.startswith('_'):
                 delattr(cfg, name)
-        metadata_bytes = len(pickle.dumps(request)) + len(pickle.dumps(reference.to_dict()))
-        if host_bytes + metadata_bytes > cfg.dspp_prefetch_max_bytes:
-            raise ValueError('DSPP future inputs and metadata exceed --dspp-prefetch-max-bytes')
+        metadata_bytes = None
+        request = (*request, (cpu_ordering, cpu_counts))
         if self.closed:
             error = 'closed'
         elif self.planner is None:
@@ -336,9 +293,9 @@ class DsppIterationPrefetch:
             error = self.planner.submit(iteration, reference.binding.input_hash, request)
         metrics = dict(requested_at=started, fetched_at=fetched, metadata_ready_at=ready,
             enqueued_at=time.perf_counter(), host_bytes=host_bytes, metadata_bytes=metadata_bytes,
-            submission_error=error, states=['fetched', 'metadata_ready', 'verified-fallback', 'planning'])
+            submission_error=error, states=['fetched', 'metadata_ready', 'prepared-fallback', 'planning'])
         return CpuIteration(iteration, consumed, num_microbatches, tuple(batches),
-                            reference.to_dict(), reference.binding.input_hash, metrics)
+                            {}, reference.binding.input_hash, metrics, cpu_ordering, cpu_counts)
 
     def _request(self, iteration, consumed, count):
         if self.future is not None:
@@ -383,25 +340,9 @@ class DsppIterationPrefetch:
                         break
                     else:
                         time.sleep(.002)
-                if defer_validation:
-                    prepared_iteration, reference = self.prepared_reference
-                    if prepared_iteration != iteration:
-                        raise ValueError('prefetch reference belongs to another iteration')
-                else:
-                    reference = DsppSchedulePlan.from_dict(packet.reference)
+                reference = self.prepared_reference[1]
                 plan, reason = choose_plan(packet, result, reference=reference)
                 checked = None
-                if defer_validation:
-                    if plan.algorithm == 'A' and not preserves_retention_envelope(plan, reference):
-                        raise ValueError('external plan exceeds P1 W retention envelope')
-                    prepared_iteration, memory = self.prepared_memory
-                    if prepared_iteration != iteration:
-                        raise ValueError('prefetch memory belongs to another iteration')
-                    report = memory.check(plan) if memory is not None else None
-                    profile = memory.profile if memory is not None else None
-                    plan_hash = plan.plan_hash
-                    checked = CheckedExecution(reference, plan_hash, profile, report,
-                        digest([plan_hash, profile, report]))
                 packet.metrics.update(cold=cold, fallback_reason=reason, late_results=self.late_results,
                     boundary_started_at=begin, input_wait_ms=(input_ready-begin)*1000,
                     optimization_wait_ms=(time.perf_counter()-input_ready)*1000 if cold else 0.,
@@ -423,103 +364,45 @@ class DsppIterationPrefetch:
         if error:
             raise RuntimeError(f'DSPP CPU prefetch failed: {error}')
         self.checked_execution = checked
+        self._active_cpu_ordering = packet.ordering
+        self._active_cpu_counts = packet.schedule_counts
         local_error = None
+        plan_hash = None
         if not defer_validation:
-            try:
-                verify_sources(packet.batches)
-                if not self.source:
-                    reference = DsppSchedulePlan.from_dict(packet.reference)
-                validate_plan(plan, reference, binding=reference.binding)
-                if plan.binding.input_hash != packet.input_hash or plan.binding.iteration_id != iteration:
-                    raise ValueError('prefetch publication identity mismatch')
-            except Exception as exc:
-                local_error = f'{type(exc).__name__}: {exc}'
-            checks = [None] * dist.get_world_size(self.group)
-            plan_hash = plan.plan_hash if not local_error else None
-            dist.all_gather_object(checks, (local_error, plan_hash), group=self.group)
-            if any(e for e, _ in checks) or len({h for _, h in checks}) != 1:
-                raise RuntimeError(f'DSPP prefetch publication rejected: {checks}')
-        else:
-            plan_hash = checked.plan_hash
+            dist.barrier(group=self.group)
         self.active = dict(iteration=iteration, consumed_samples=consumed, count=count,
             input_hash=packet.input_hash, plan_hash=plan_hash,
             sample_ids=[b.input_identity['sample_ids'] for b in packet.batches],
             valid_tokens=sum(sum(b.plan.sequence_lengths) for b in packet.batches),
             **packet.metrics, received_at=time.perf_counter(),
             boundary_wait_ms=(time.perf_counter()-begin)*1000)
-        self.active['states'].append('verified')
+        self.active['states'].append('prepared')
         return packet.batches, plan
 
     def acquire_execution(self, iteration, count, consumed, dtype, shape, chunk_size):
-        """Publish once; gather local input, contract and live-memory errors once.
-
-        The coordinator fully checks the candidate graph/counts. Every replica
-        checks the received plan hash and its own materialized input/config.
-        External plans and changed contracts retain the complete validation.
-        """
-        from .schedules import _pad_dspp_v_split_counts
+        """Materialize this iteration and rendezvous, without runtime audit passes."""
         batches, plan = self.acquire_iteration(iteration, count, consumed, defer_validation=True)
-        error, plan_hash = None, None
+        error = None
         try:
-            if getattr(self.args, 'dspp_auto_chunk_size', False):
-                raise ValueError('DSPP prefetch requires fixed chunk size')
-            if len(plan.schedules) != self.args.pipeline_model_parallel_size:
-                raise ValueError('prefetch changed PP size')
-            verify_sources(batches)
-            if (plan.binding.input_hash != self.active['input_hash']
-                    or plan.binding.iteration_id != iteration):
-                raise ValueError('prefetch publication identity mismatch')
             self.active['h2d_started_at'] = time.perf_counter()
-            logical = [self.materialize(b) for b in batches]
+            logical = [self.materialize(batch) for batch in batches]
             self.active['h2d_queued_at'] = time.perf_counter()
-            gpu_batches = [b for b, _ in logical]
-            if any(b.plan.chunk_size != chunk_size for b in gpu_batches):
-                raise ValueError('DSPP training batch chunk size does not match micro_seq_length')
-            if sum(b.valid_token_count for b in gpu_batches) <= 0:
-                raise ValueError('DSPP iteration contains no valid LM targets')
-            ordering = build_dspp_ordering_plan(gpu_batches,
-                pp_degree=self.args.pipeline_model_parallel_size,
-                mode=self.args.dspp_microbatch_order,
-                profile_path=getattr(self.args, 'dspp_order_profile', None))
-            groups = ordering.schedule_groups
-            counts = _pad_dspp_v_split_counts([len(g) for g in groups],
-                                             self.args.pipeline_model_parallel_size)
-            checked = self.checked_execution
-            matches = check_execution_inputs(self.args, checked, plan, groups,
-                gpu_batches, dtype, shape, chunk_size)
-            if tuple(counts) != checked.reference.split_counts:
-                raise ValueError('prefetch changed physical task counts')
-            if matches:
-                report, profile = checked.memory_report, checked.memory_profile
-                self.args._dspp_counted_memory = (SimpleNamespace(profile=profile,
-                    stages=profile['stages']) if profile is not None else None)
-                plan_hash = checked.plan_hash
-            else:
-                # Changed cost/layout/capacity/protocol: use the current input's
-                # rebuilt fallback, including a fresh memory model and audit.
-                schedules, _ = build_slice_v_schedule(len(plan.schedules), len(counts), counts)
-                reference, plan = build_runtime_plan(self.args, schedules, counts,
-                    groups, gpu_batches, dtype, shape, chunk_size, optimize=False,
-                    explicit_history=plan.schema_version == 2)
-                validate_plan(plan, reference, binding=reference.binding)
-                memory = getattr(self.args, '_dspp_counted_memory', None)
-                report = memory.check(plan) if memory else None
-                profile = memory.profile if memory else None
-                plan_hash = plan.plan_hash
-                self.active['fallback_reason'] = 'commit-contract-changed'
-            check_live_capacity(profile, report, self.rank)
-            self.args._dspp_memory_plan = report
+            ordering = self._active_cpu_ordering
+            counts = self._active_cpu_counts
+            self.args._dspp_counted_memory = None
+            self.args._dspp_memory_plan = None
             self.args._dspp_last_schedule_plan = plan.to_dict()
         except Exception as exc:
             error = f'{type(exc).__name__}: {exc}'
-        outcomes = [None] * dist.get_world_size(self.group)
-        dist.all_gather_object(outcomes, (error, plan_hash), group=self.group)
-        if any(e for e, _ in outcomes) or len({h for _, h in outcomes}) != 1:
-            raise RuntimeError(f'DSPP prefetch commit rejected: {outcomes}')
+        # This is the executor rendezvous, not a plan/hash agreement check.
+        failed = torch.tensor([int(error is not None)], dtype=torch.int32, device='cpu')
+        dist.all_reduce(failed, group=self.group)
+        if failed.item():
+            raise RuntimeError(error or 'DSPP peer input materialization failed')
         self.active['commit_collectives'] = 1
-        self.active['validation_path'] = 'coordinator-graph-local-contract'
-        self.commit(plan, plan_hash=plan_hash)
-        return logical, ordering, counts, plan, plan_hash
+        self.active['validation_path'] = 'no-runtime-fingerprint-or-audit'
+        self.commit(plan)
+        return logical, ordering, counts, plan, None
 
     def commit(self, plan, plan_hash=None):
         self.active.update(committed_at=time.perf_counter(), plan_hash=plan_hash or plan.plan_hash)

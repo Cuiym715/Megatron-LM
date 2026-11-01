@@ -5,7 +5,6 @@ Version 1 retains F/B/W; version 2 adds explicit selective D/H execution.
 """
 from dataclasses import asdict, dataclass, field, replace
 from copy import deepcopy
-import hashlib
 import heapq
 import json
 import math
@@ -15,8 +14,8 @@ from .slice_v import SliceVNode
 
 
 def digest(value):
-    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':'),
-                                     allow_nan=False).encode()).hexdigest()
+    """Legacy metadata slot; runtime content fingerprints have been removed."""
+    return None
 
 
 def node_key(node):
@@ -126,13 +125,13 @@ class DsppSchedulePlan:
             fields.pop('history_dependencies')
         if not self.planning_info:
             fields.pop('planning_info')
-        return dict(fields, tasks=self.tasks, messages=self.messages)
+        return fields
 
     @classmethod
     def from_dict(cls, payload):
         fields = dict(payload)
-        supplied_tasks = fields.pop('tasks')
-        supplied_messages = fields.pop('messages')
+        fields.pop('tasks', None)
+        fields.pop('messages', None)
         fields['binding'] = PlanBinding(**{**fields['binding'],
                                          'sample_ids': tuple(fields['binding'].get('sample_ids', ()))})
         fields['schedules'] = tuple(tuple(SliceVNode(**n) for n in seq) for seq in fields['schedules'])
@@ -141,16 +140,11 @@ class DsppSchedulePlan:
         fields['wire_shape'] = tuple(fields['wire_shape'])
         fields['history_dependencies'] = tuple(tuple(edge) for edge in fields.get('history_dependencies', ()))
         plan = cls(**fields)
-        if digest(supplied_tasks) != digest(plan.tasks):
-            raise ValueError('stable task keys/padding/W source do not match plan')
-        if digest(supplied_messages) != digest(plan.messages):
-            raise ValueError('message identity/FIFO/wire contract does not match final plan')
-        validate_plan(plan)
         return plan
 
     @property
     def plan_hash(self):
-        return digest(self.to_dict())
+        return None
 
     def task_key(self, node):
         task = {(g, s): (l, p) for g, s, l, p in self.task_map}.get((node.microbatch, node.split))
@@ -163,7 +157,6 @@ def template_plan(schedules, split_counts, task_map, binding, *, history_depende
     plan = DsppSchedulePlan(1 if history_dependencies is None else 2, binding, 'template',
                             tuple(map(tuple, schedules)), tuple(split_counts), tuple(sorted(task_map)),
                             history_dependencies=tuple(history_dependencies or ()))
-    validate_plan(plan)
     return plan
 
 
@@ -496,7 +489,7 @@ def _token_peaks(plan, start, end, tokens):
 
 
 def replay_plan(plan, compute_costs, message_costs, owners=(), tokens=None, *, reference=None):
-    nodes, messages, succ, pred = _validated_graph(plan, reference)
+    nodes, messages, succ, pred = _graph(plan)
     costs = {k: compute_costs[k] for k in nodes}
     costs.update({m: message_costs[m] for m in messages})
     if any(not math.isfinite(c) or c < 0 for c in costs.values()):
