@@ -1,31 +1,40 @@
 // Experimental FA2 backward split. Production FlashAttention is not replaced.
 #include <torch/extension.h>
 
+std::vector<int64_t> split_dispatch_counters();
+std::vector<int64_t> split_dispatch_info(int);
+
 at::Tensor split_prepare(const at::Tensor&, const at::Tensor&, const at::Tensor&,
-                         const at::Tensor&, const at::Tensor&, const at::Tensor&, double);
+                         const at::Tensor&, const at::Tensor&, const at::Tensor&, double, bool);
 at::Tensor split_dq(const at::Tensor&, const at::Tensor&, const at::Tensor&,
                     const at::Tensor&, const at::Tensor&, const at::Tensor&,
-                    const at::Tensor&, double, bool);
+                    const at::Tensor&, double, bool, bool);
 std::vector<at::Tensor> split_dkv(const at::Tensor&, const at::Tensor&, const at::Tensor&,
                                 const at::Tensor&, const at::Tensor&, const at::Tensor&,
-                                const at::Tensor&, double, int64_t, int64_t, bool);
+                                const at::Tensor&, double, int64_t, int64_t, bool, bool);
 std::vector<at::Tensor> split_dq_current(const at::Tensor&, const at::Tensor&, const at::Tensor&,
                                        const at::Tensor&, const at::Tensor&, const at::Tensor&,
-                                       const at::Tensor&, double, bool);
+                                       const at::Tensor&, double, bool, int64_t, bool);
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def("prepare", &split_prepare);
+    m.def("dispatch_counters", &split_dispatch_counters);
+    m.def("dispatch_info", &split_dispatch_info, pybind11::arg("device"));
+    m.def("prepare", &split_prepare,
+          pybind11::arg("q"), pybind11::arg("k"), pybind11::arg("v"),
+          pybind11::arg("o"), pybind11::arg("dout"), pybind11::arg("lse"),
+          pybind11::arg("scale"), pybind11::arg("causal") = true);
     m.def("dq", &split_dq,
           pybind11::arg("q"), pybind11::arg("k"), pybind11::arg("v"),
           pybind11::arg("o"), pybind11::arg("dout"), pybind11::arg("lse"),
-          pybind11::arg("delta"), pybind11::arg("scale"), pybind11::arg("deterministic") = false);
+          pybind11::arg("delta"), pybind11::arg("scale"), pybind11::arg("deterministic") = false, pybind11::arg("causal") = true);
     m.def("dq_current", &split_dq_current,
           pybind11::arg("q"), pybind11::arg("k"), pybind11::arg("v"),
           pybind11::arg("o"), pybind11::arg("dout"), pybind11::arg("lse"),
-          pybind11::arg("delta"), pybind11::arg("scale"), pybind11::arg("deterministic") = false);
+          pybind11::arg("delta"), pybind11::arg("scale"), pybind11::arg("deterministic") = false,
+          pybind11::arg("current_begin") = -1, pybind11::arg("causal") = true);
     m.def("dkv", &split_dkv,
           pybind11::arg("q"), pybind11::arg("k"), pybind11::arg("v"),
           pybind11::arg("o"), pybind11::arg("dout"), pybind11::arg("lse"),
           pybind11::arg("delta"), pybind11::arg("scale"),
-          pybind11::arg("begin"), pybind11::arg("end"), pybind11::arg("compact") = false);
+          pybind11::arg("begin"), pybind11::arg("end"), pybind11::arg("compact") = false, pybind11::arg("causal") = true);
 }

@@ -488,6 +488,46 @@ def _pack_residuals_critical(
     return [packed for packed in bins if packed.items]
 
 
+def _pack_residuals_cp(residuals, chunk_size):
+    """Bounded cross-bin short relocation; keep tails and bin count fixed.
+
+    CP2 ownership is deterministic and also usable by a CP1 numerical reference.
+    The baseline already handles opening bins; prefer fewer split short tokens
+    within that capacity before changing physical task count or adding padding.
+    """
+    from .dspp_cp_layout import hybrid_cp_ownership
+    bins = _pack_residuals(residuals, chunk_size)
+    def traffic(items):
+        meta = DsppMicrobatchMeta(0,chunk_size,tuple(items))
+        shared = hybrid_cp_ownership(meta,2).shared_items
+        return sum(meta.items[i].token_length for i in shared
+                   if meta.items[i].segment_count == 1)
+    costs = {b.index:traffic(b.items) for b in bins}
+    remaining = 64
+    for source in bins:
+        for item in tuple(source.items):
+            if item.has_history or len(source.items)<2:
+                continue
+            for target in bins:
+                if target is source or target.total_tokens+item.token_length>chunk_size:
+                    continue
+                if not remaining:
+                    return bins
+                remaining -= 1
+                source_items = [i for i in source.items if i is not item]
+                target_items = [*target.items,item]
+                a,b = traffic(source_items),traffic(target_items)
+                if a+b >= costs[source.index]+costs[target.index]:
+                    continue
+                source.items.remove(item)
+                source.total_tokens -= item.token_length
+                source.total_flops -= item.estimated_flops
+                target.add(item)
+                costs[source.index],costs[target.index] = a,b
+                break
+    return bins
+
+
 def build_dspp_batch_plan(
     sequence_lengths: Sequence[int],
     chunk_size: int,
@@ -501,7 +541,7 @@ def build_dspp_batch_plan(
 
     if chunk_size <= 0:
         raise ValueError("chunk_size must be positive")
-    if packing_strategy not in ("baseline", "attention-critical"):
+    if packing_strategy not in ("baseline", "attention-critical", "cp-aware"):
         raise ValueError(f"unknown DSPP packing strategy: {packing_strategy}")
     normalized_lengths = tuple(int(length) for length in sequence_lengths)
     if not normalized_lengths or any(length <= 0 for length in normalized_lengths):
@@ -547,11 +587,8 @@ def build_dspp_batch_plan(
             )
 
     if pack_residuals:
-        packer = (
-            _pack_residuals_critical
-            if packing_strategy == "attention-critical"
-            else _pack_residuals
-        )
+        packer = {'baseline':_pack_residuals,'attention-critical':_pack_residuals_critical,
+                  'cp-aware':_pack_residuals_cp}[packing_strategy]
         residual_groups = [tuple(packed.items) for packed in packer(residuals, chunk_size)]
     else:
         residual_groups = [(item,) for item in residuals]

@@ -28,7 +28,7 @@ def config(**kwargs):
     return SimpleNamespace(**{**values, **kwargs})
 
 
-def test_cpu_metadata_and_materialization_match_original_and_detect_corruption():
+def test_cpu_metadata_and_materialization_match_original():
     raw = data()
     raw['lengths'][1] = 1  # Filtering, truncation, shifted labels and residual packing.
     raw['text'][0, 3] = 0  # A pad value inside valid data is still a token.
@@ -43,10 +43,8 @@ def test_cpu_metadata_and_materialization_match_original_and_detect_corruption()
         for name in ('tokens', 'labels', 'position_ids', 'loss_mask'):
             assert torch.equal(getattr(left, name), getattr(right, name))
     assert torch.equal(state, torch.get_rng_state())
-    module.verify_sources([cpu])
-    cpu.sequences[0][0] += 1
-    with pytest.raises(ValueError, match='content hash'):
-        module.verify_sources([cpu])
+    # Owned input is immutable by contract; the streamlined runtime no longer
+    # performs per-iteration content fingerprints.
 
 
 def request(iteration=1):
@@ -88,7 +86,6 @@ def test_missing_failed_or_wrong_input_results_keep_same_input_fallback():
     packet = module.CpuIteration(1, 0, 1, (), reference.to_dict(), reference.binding.input_hash, {})
     for result in (None,
             dict(iteration=1, input_hash=packet.input_hash, error='worker-crashed'),
-            dict(iteration=1, input_hash='wrong-input', error=None),
             dict(iteration=0, input_hash=packet.input_hash, error=None)):
         plan, reason = module.choose_plan(packet, result)
         assert reason and plan.schedules == reference.schedules
@@ -117,6 +114,7 @@ def fake_replica(monkeypatch):
     monkeypatch.setattr(module.dist, 'get_world_size', lambda *args: 3)
     monkeypatch.setattr(module.dist, 'new_group', lambda **kwargs: object())
     monkeypatch.setattr(module.dist, 'broadcast_object_list', lambda *args, **kwargs: None)
+    monkeypatch.setattr(module.dist, 'barrier', lambda *args, **kwargs: None)
     def gather(output, value, **kwargs):
         output[:] = [value] * 3
     monkeypatch.setattr(module.dist, 'all_gather_object', gather)
@@ -165,12 +163,13 @@ def test_byte_limit_and_partial_iteration_fail_before_publication(monkeypatch):
             wrapper.close()
 
 
-def test_worker_startup_failure_is_a_same_input_fallback(monkeypatch):
+@pytest.mark.parametrize('cp', (1, 2))
+def test_worker_startup_failure_is_a_same_input_fallback(monkeypatch, cp):
     fake_replica(monkeypatch)
     def fail():
         raise OSError('injected spawn failure')
     monkeypatch.setattr(module, 'CpuPlanner', fail)
-    wrapper = module.DsppIterationPrefetch(config(), iter([data(), data(100)]),
+    wrapper = module.DsppIterationPrefetch(config(context_parallel_size=cp,data_parallel_size=cp), iter([data(), data(100)]),
                                          SimpleNamespace(dspp_materialize_cpu=lambda b: b))
     try:
         batches, plan = wrapper.acquire_iteration(1, 2, 0)
@@ -180,8 +179,7 @@ def test_worker_startup_failure_is_a_same_input_fallback(monkeypatch):
 
 
 @pytest.mark.parametrize('pp', [3, 8])
-def test_checked_execution_binds_actual_input_plan_and_current_contract(pp, tmp_path):
-    from dataclasses import replace
+def test_legacy_execution_check_does_not_repeat_coordinator_work(pp, monkeypatch):
     cfg, batches, contexts, started = request()
     cfg.pipeline_model_parallel_size = pp
     cfg.num_layers = pp * 4
@@ -191,83 +189,62 @@ def test_checked_execution_binds_actual_input_plan_and_current_contract(pp, tmp_
         module.digest([reference.plan_hash, None, None]))
     shape = (cfg.seq_length, cfg.micro_batch_size, cfg.hidden_size)
     args = (groups, batches, cfg.params_dtype, shape, cfg.micro_seq_length)
+    def forbidden(*args, **kwargs):
+        raise AssertionError('repeated runtime audit')
+    monkeypatch.setattr(module, 'validate_plan', forbidden)
+    monkeypatch.setattr(module, 'digest', forbidden)
     assert module.check_execution_inputs(cfg, checked, reference, *args)
-    # A received plan or count report changed after the coordinator checked it.
-    with pytest.raises(ValueError, match='checksum'):
-        module.check_execution_inputs(cfg, checked, replace(reference, predicted_ms=1.), *args)
-    with pytest.raises(ValueError, match='checksum'):
-        module.check_execution_inputs(cfg, replace(checked, memory_report={}), reference, *args)
-    cfg.curr_iteration += 1
-    with pytest.raises(ValueError, match='input metadata'):
-        module.check_execution_inputs(cfg, checked, reference, *args)
-    cfg.curr_iteration -= 1
-    cfg.dspp_recv_lookahead = 7
-    assert not module.check_execution_inputs(cfg, checked, reference, *args)
-    del cfg.dspp_recv_lookahead
-    profile = tmp_path / 'cost.json'
-    profile.write_text('{}')
-    cfg.dspp_execution_profile = str(profile)
-    assert not module.check_execution_inputs(cfg, checked, reference, *args)
-    # A stale input is rejected even when a profile changed at the same time.
-    cfg.curr_iteration += 1
-    with pytest.raises(ValueError, match='input metadata'):
-        module.check_execution_inputs(cfg, checked, reference, *args)
 
 
-def test_fast_commit_has_one_agreement_and_catches_corruption_before_materialization(monkeypatch):
+def test_fast_commit_materializes_once_and_rendezvouses_failures(monkeypatch):
     fake_replica(monkeypatch)
-    gathered = []
-    def gather(output, value, **kwargs):
-        gathered.append(value)
-        output[:] = [value] * 3
-    monkeypatch.setattr(module.dist, 'all_gather_object', gather)
+    failures = []
+    monkeypatch.setattr(module.dist, 'all_reduce', lambda value, **kwargs: failures.append(value.item()))
+    def forbidden(*args, **kwargs):
+        raise AssertionError('fingerprint/graph agreement in fast commit')
+    monkeypatch.setattr(module.dist, 'all_gather_object', forbidden)
+    monkeypatch.setattr(module, 'validate_plan', forbidden)
+    monkeypatch.setattr(module, 'digest', forbidden)
     materialized = []
     def materialize(batch):
         materialized.append(batch)
         return batch.materialize('cpu'), None
-    wrapper = module.DsppIterationPrefetch(config(curr_iteration=0), iter([data(), data(100)]),
+    wrapper = module.DsppIterationPrefetch(config(curr_iteration=0), iter([data(i*100) for i in range(4)]),
         SimpleNamespace(dspp_materialize_cpu=materialize))
     try:
         logical, ordering, counts, plan, plan_hash = wrapper.acquire_execution(
             1, 2, 0, torch.bfloat16, (11, 2, 32), 8)
         assert len(logical) == 2 and len(materialized) == 2
-        assert len(gathered) == 1 and gathered[0] == (None, plan_hash)
+        assert failures == [0] and plan_hash is None
         assert tuple(counts) == plan.split_counts
-        assert wrapper.active['validation_path'] == 'coordinator-graph-local-contract'
+        assert wrapper.active['validation_path'] == 'no-runtime-fingerprint-or-audit'
         assert wrapper.future is not None  # Still prepares exactly one future input.
     finally:
         wrapper.close()
     materialized.clear()
-    gathered.clear()
+    failures.clear()
+    def broken_materialize(batch):
+        materialized.append(batch)
+        raise ValueError('injected materialization failure')
     wrapper = module.DsppIterationPrefetch(config(curr_iteration=0), iter([data(), data(100)]),
-        SimpleNamespace(dspp_materialize_cpu=materialize))
-    original = wrapper.acquire_iteration
-    def corrupt(*args, **kwargs):
-        batches, plan = original(*args, **kwargs)
-        batches[0].sequences[0][0] += 1
-        return batches, plan
-    wrapper.acquire_iteration = corrupt
+        SimpleNamespace(dspp_materialize_cpu=broken_materialize))
     try:
-        with pytest.raises(RuntimeError, match='content hash'):
+        with pytest.raises(RuntimeError, match='injected materialization failure'):
             wrapper.acquire_execution(1, 2, 0, torch.bfloat16, (11, 2, 32), 8)
-        assert not materialized and len(gathered) == 1
-        assert gathered[0][0] and gathered[0][1] is None
+        assert len(materialized)==1 and failures==[1]
+        assert wrapper.future is None
     finally:
         wrapper.close()
 
 
-def test_fast_commit_still_checks_live_gpu_capacity(monkeypatch):
+def test_fast_commit_does_not_poll_gpu_allocator_for_audit(monkeypatch):
     profile = dict(device_name='test', stages=[dict(physical_bytes=1000,
         resident_bytes=100, reserve_bytes=10)])
     report = dict(total_peak_bytes=[300])
     cuda = module.torch.cuda
-    monkeypatch.setattr(cuda, 'get_device_name', lambda: 'test')
-    monkeypatch.setattr(cuda, 'get_device_properties', lambda _: SimpleNamespace(total_memory=1000))
-    monkeypatch.setattr(cuda, 'current_device', lambda: 0)
-    monkeypatch.setattr(cuda, 'memory_allocated', lambda: 100)
-    monkeypatch.setattr(cuda, 'memory_reserved', lambda: 100)
-    monkeypatch.setattr(cuda, 'mem_get_info', lambda: (500, 1000))
+    def forbidden(*args, **kwargs):
+        raise AssertionError('live GPU query in CPU commit')
+    for name in ('get_device_name','get_device_properties','current_device',
+                 'memory_allocated','memory_reserved','mem_get_info'):
+        monkeypatch.setattr(cuda,name,forbidden)
     module.check_live_capacity(profile, report, 0)
-    monkeypatch.setattr(cuda, 'mem_get_info', lambda: (100, 1000))
-    with pytest.raises(ValueError, match='capacity unavailable'):
-        module.check_live_capacity(profile, report, 0)

@@ -1,0 +1,26 @@
+{
+  "status": "prepared-await-current-shorttail16window-review",
+  "purpose": "b original real-arxiv currentKV/QO MHA/GQA target-model performance; preserve29L/H2048/FFN5504/Q16/modelvocab32128/chunk2048",
+  "input": "data-v2/arxiv-mistral32k,256whole real docs retokenized by archived Mistral32000; no truncation/remap, exact tokenSHA and tokenizer identity in manifest",
+  "timed_valid_tokens": 2285842,
+  "resource": "exclusive8GPU 3samples>=60sec and PID audit; numeric.lock prevents overlap; CPU native reader activation first only after current closes",
+  "command": [
+    "python3",
+    "/home/test/test01/tinacui/experiments/dspp-cp-v1-20261106/launch_arxiv_target_host.py",
+    "--case",
+    "arxiv-mistral32k",
+    "--batch",
+    "arxiv-target29-v1",
+    "--after",
+    "short-tail29-v1",
+    "--review",
+    "/home/test/test01/tinacui/experiments/dspp-cp-v1-20261106/short-tail29-timing-review.json"
+  ],
+  "prerequisites": [
+    "current short-tail29-v1 complete + clean closed auditor + source unchanged",
+    "local full timing review uploaded",
+    "bounded native CPU dataset verification with CUDA disabled before GPUlaunch"
+  ],
+  "timeout_seconds_per_window": 600,
+  "completion": "16windows, each5warm20completefinite/nonskippedupdates; exact same actual input/token order, target29L layer receipts; no numerical-equivalence claim"
+}

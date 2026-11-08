@@ -1,0 +1,101 @@
+{
+  "status": "accepted-target-smoke",
+  "pid": 1029107,
+  "started": 1793927650.1413765,
+  "ended": 1793927650.4461455,
+  "jobs": [
+    {
+      "name": "mha-kv-repeat",
+      "deterministic_fa": false,
+      "exit_code": 1,
+      "reference_only": false,
+      "actual_update_max_per_rank": 0.03089495937662358,
+      "actual_update_pass": false,
+      "nonempty_H_parts_by_rank": {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0
+      }
+    },
+    {
+      "name": "mha-qo-immediate",
+      "deterministic_fa": true,
+      "exit_code": 0,
+      "reference_only": false,
+      "actual_update_max_per_rank": 0.002765895009027575,
+      "actual_update_pass": true,
+      "nonempty_H_parts_by_rank": {
+        "0": 12,
+        "1": 12,
+        "2": 12,
+        "3": 12,
+        "4": 12,
+        "5": 12,
+        "6": 12,
+        "7": 12
+      }
+    },
+    {
+      "name": "gqa1-kv-reference",
+      "deterministic_fa": true,
+      "exit_code": 0,
+      "reference_only": true,
+      "actual_update_max_per_rank": null,
+      "actual_update_pass": null,
+      "nonempty_H_parts_by_rank": {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0
+      }
+    },
+    {
+      "name": "gqa1-qo-fused",
+      "deterministic_fa": true,
+      "exit_code": 0,
+      "reference_only": false,
+      "actual_update_max_per_rank": 0.004807927293120273,
+      "actual_update_pass": true,
+      "nonempty_H_parts_by_rank": {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0
+      }
+    },
+    {
+      "name": "gqa1-qo-immediate",
+      "deterministic_fa": true,
+      "exit_code": 0,
+      "reference_only": false,
+      "actual_update_max_per_rank": 0.0014770997089855254,
+      "actual_update_pass": true,
+      "nonempty_H_parts_by_rank": {
+        "0": 12,
+        "1": 12,
+        "2": 12,
+        "3": 12,
+        "4": 12,
+        "5": 12,
+        "6": 12,
+        "7": 12
+      }
+    }
+  ],
+  "source_archive": "abae3c76e26dd6e27fb51ee0d2ccddc3f8eee1feed8ce399f4a4c1c5503c807c",
+  "arithmetic": "Shared full GEMM reduction, exact p0 residual, deterministic FA2 backward; default-FA selfrepeat retained separately, not certified",
+  "next": "Actual32K longmix-v512 full-update gap before performance; this review is not throughput or a continuous-trajectory proof"
+}

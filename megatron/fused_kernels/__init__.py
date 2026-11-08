@@ -3,6 +3,7 @@
 import os
 import pathlib
 import subprocess
+import sys
 
 import torch
 from torch.utils import cpp_extension
@@ -17,7 +18,7 @@ def load(args):
 
     # Helper function to build the kernels.
     def _cpp_extention_load_helper(name, sources, extra_cuda_flags):
-        return cpp_extension.load(
+        module = cpp_extension.load(
             name=name,
             sources=sources,
             build_directory=buildpath,
@@ -26,6 +27,10 @@ def load(args):
                                '--use_fast_math'] + extra_cuda_flags,
             verbose=(args.rank == 0)
         )
+        # Recent torch loaders can return a JIT module without installing its
+        # import name. CP's flip/cat/GEMM wrappers import these names lazily.
+        sys.modules[name] = module
+        return module
 
     # ==============
     # Fused softmax.

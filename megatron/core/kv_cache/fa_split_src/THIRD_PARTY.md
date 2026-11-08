@@ -32,11 +32,18 @@ column-block routine for tiles intersecting current KV, and dQ-only for tiles
 wholly within history. It reads only current rows from the per-Q-head dKV
 workspace; a nonaligned boundary tile's surplus history output is discarded.
 The original upstream-header patch, GQA reduction and dQ conversion remain
-unchanged. The launcher now follows pinned FA2's head-dim-128 BF16 split:
-SM80 D uses its >=144 KiB 64x128 tile, while lower-shared-memory targets retain
-the validated 64x64 tile. H is specialized independently and retains 64x64 on
-SM80 because it is faster for dKV-only work. Independent historical dKV is
-still computed later.
+unchanged. The D launcher follows pinned FA2's head-dim-128 BF16 resource dispatch:
+a per-block opt-in shared-memory limit >=144 KiB selects the 64x128
+configuration (including its warp/register parameters); otherwise it selects
+64x64. H-only historical dKV independently retains 64x64, as supported by
+SM80 microbenchmarks and the validated SM89 path. Full backward's resource
+heuristic is not assumed optimal for H. This preserves the previously measured
+operator-specific H configuration while making D selection resource-based.
+Device properties and kernel shared-memory attributes are initialized once per
+CUDA device per process. A thread-local pointer provides the common hot path;
+the process-wide cache also serves other host threads. Diagnostic bindings
+expose initialization counters without adding increments to kernel hot paths.
+Independent historical dKV is still computed later.
 
 The optional diagnostic `deterministic=True` dQ entry follows pinned FA2's
 seq-K parallel deterministic launcher: ceil(SM_count / Q_heads) independent
@@ -46,3 +53,8 @@ combined-current entry keeps the same dQ-only/current-dKV tile selection.
 No upstream header patch is added for this option. It costs extra temporary
 FP32 storage; the Python/native defaults remain false, and production
 attention does not enable it. It is for explicit numerical diagnosis only.
+
+CP-QO partial-history support adds three lazily configured noncausal FA2
+column kernels; existing causal GPU kernel specializations stay unchanged. The explicit partial-backward API accepts
+owner-local KV blocks with global attention O/LSE, including Sk < Sq for
+noncausal blocks; the original causal API and D/H tile policy remain intact.

@@ -8,6 +8,8 @@ from pathlib import Path
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fetch", action="store_true", help="fetch pinned FA2 and CUTLASS sources")
+    parser.add_argument("--arch", choices=("sm80","sm86","sm89","sm90"),
+                        help="offline compilation target; does not query or allocate a GPU")
     args = parser.parse_args()
     path = Path(__file__).resolve().parents[1] / "megatron/core/kv_cache/fa_split_build.py"
     spec = importlib.util.spec_from_file_location("fa_split_build", path)
@@ -15,7 +17,11 @@ def main():
     spec.loader.exec_module(module)
     if args.fetch:
         module.fetch_sources()
-    extension = module.load_extension()
+    arch = (int(args.arch[2]),int(args.arch[3])) if args.arch else None
+    extension = module.load_extension(arch=arch)
+    if args.arch:
+        import torch
+        print(f"CUDA context initialized: {torch.cuda.is_initialized()}")
     print(f"Built isolated extension: {extension.__file__}")
 
 

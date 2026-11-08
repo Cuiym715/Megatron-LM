@@ -23,6 +23,8 @@ def main():
     parser.add_argument('--output', required=True)
     parser.add_argument('--bytes', nargs='+', type=int, default=[65536, 131072])
     parser.add_argument('--warmup', type=int, default=2)
+    parser.add_argument('--cp-size', type=int, default=1,
+                        help='Probe all CP lanes simultaneously; directions are logical PP stages.')
     parser.add_argument('--repeats', type=int, default=5)
     parser.add_argument('--overlap', nargs='+', choices=['isolated', 'compute'], default=['isolated', 'compute'])
     args = parser.parse_args()
@@ -31,6 +33,11 @@ def main():
     torch.cuda.set_device(int(os.environ['LOCAL_RANK']))
     dist.init_process_group('nccl')
     rank, world = dist.get_rank(), dist.get_world_size()
+    if args.cp_size < 1 or world % args.cp_size:
+        raise ValueError('world must be divisible by cp-size')
+    stages = world // args.cp_size
+    lane = rank % args.cp_size
+    stage = rank // args.cp_size
     output = Path(args.output)
     if output.exists():
         raise FileExistsError(output)
@@ -42,8 +49,8 @@ def main():
     torch.mm(x, x, out=y)
     begin.record(); end.record(); torch.cuda.synchronize()
     rows = []
-    for sender in range(world):
-        for receiver in range(world):
+    for sender in range(stages):
+        for receiver in range(stages):
             if sender == receiver:
                 continue
             for size in args.bytes:
@@ -53,15 +60,15 @@ def main():
                         dist.barrier()
                         torch.cuda.synchronize()
                         duration = torch.zeros(1, dtype=torch.float64, device='cuda')
-                        if rank in (sender, receiver):
+                        if stage in (sender, receiver):
                             begin.record()
                             if overlap == 'compute':
                                 compute_stream.wait_event(begin)
                                 with torch.cuda.stream(compute_stream):
                                     for _ in range(8):
                                         torch.mm(x, x, out=y)
-                            op = (dist.P2POp(dist.isend, tensor, receiver) if rank == sender
-                                  else dist.P2POp(dist.irecv, tensor, sender))
+                            op = (dist.P2POp(dist.isend, tensor, receiver*args.cp_size+lane) if stage == sender
+                                  else dist.P2POp(dist.irecv, tensor, sender*args.cp_size+lane))
                             work = dist.batch_isend_irecv([op])[0]
                             work.wait()
                             end.record()
@@ -73,7 +80,8 @@ def main():
                                              overlap=overlap, duration_ms=duration.item()))
     if rank == 0:
         model = DsppP2PCostModel.from_records(rows).to_dict()
-        model.update(records=rows, hardware=hardware_identity(), nccl=list(torch.cuda.nccl.version()),
+        model.update(records=rows, hardware=hardware_identity(), cp_size=args.cp_size,
+                     nccl=list(torch.cuda.nccl.version()),
                      measurement='max endpoint CUDA dispatch-to-completion envelope',
                      compute_probe='8 BF16 1024x1024 GEMMs on independent CUDA stream')
         output.parent.mkdir(parents=True, exist_ok=True)

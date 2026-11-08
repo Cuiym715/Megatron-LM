@@ -990,7 +990,14 @@ class ParallelAttention(MegatronModule):
                 tp_world_size = mpu.get_tensor_model_parallel_world_size()
                 tp_rank = mpu.get_tensor_model_parallel_rank()
                 with rng_ctx:
-                    if self.cp_impl == 'query-out':    # cp-qo
+                    if isinstance(kv_cache, DsppSequenceKVState):
+                        from megatron.core.kv_cache.dspp_cp_attention import dspp_cp_flash_attention
+                        context_layer = dspp_cp_flash_attention(
+                            query_layer, key_layer, value_layer, state=kv_cache,
+                            meta=kv_cache.current_meta, layer_idx=self.layer_number,
+                            cp_group=cp_group,
+                            softmax_scale=self.hidden_size_per_attention_head ** -0.5)
+                    elif self.cp_impl == 'query-out':    # cp-qo
                         assert self.alibi_bias_max == 0, "alibi is not implemented."
                         context_layer, cp_data_to_save = cp_qo_attn_func(
                             query_layer, key_layer, value_layer, cp_group,

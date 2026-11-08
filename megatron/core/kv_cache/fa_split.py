@@ -34,6 +34,7 @@ class SplitBackwardState(_StateContract):
     softmax_scale: float
     _stream: int = field(repr=False)
     _versions: tuple[int, ...] = field(repr=False)
+    causal: bool = True
 
     def tensors(self):
         return self.q, self.k, self.v, self.out, self.dout, self.lse, self.delta
@@ -146,6 +147,25 @@ def prepare_backward(q, k, v, out, dout, lse, *, softmax_scale=None,
 
 
 @torch.no_grad()
+def prepare_partial_backward(q, k, v, out, dout, lse, *, softmax_scale=None, causal=False):
+    """CP-QO KV block with O/LSE from the FULL attention normalization.
+
+    Noncausal blocks permit any nonempty Q/K lengths. The legacy causal API
+    remains unchanged; all input/version/stream guards still apply.
+    """
+    if causal:
+        return prepare_backward(q,k,v,out,dout,lse,softmax_scale=softmax_scale)
+    inputs = (q,k,v,out,dout,lse)
+    if any(t.is_inference() for t in inputs):
+        raise ValueError('partial backward requires versioned tensors')
+    scale = q.size(-1)**-.5 if softmax_scale is None else float(softmax_scale)
+    delta = load_extension().prepare(*inputs,scale,False)
+    tensors = (*inputs,delta)
+    return SplitBackwardState(*tensors,scale,torch.cuda.current_stream(q.device).cuda_stream,
+                              tuple(t._version for t in tensors),causal=False)
+
+
+@torch.no_grad()
 def backward_dq(state: SplitBackwardState | VarlenSplitBackwardState, *,
                 deterministic: bool = False) -> torch.Tensor:
     """Complete dQ over ALL legal KV positions, independent of dKV selection.
@@ -160,12 +180,12 @@ def backward_dq(state: SplitBackwardState | VarlenSplitBackwardState, *,
         parts = [backward_dq(s, deterministic=deterministic) for s in state.sequences]
         return parts[0] if len(parts) == 1 else torch.cat(parts, dim=0)
     state._check()
-    return load_extension().dq(*state.tensors(), state.softmax_scale, deterministic)
+    return load_extension().dq(*state.tensors(), state.softmax_scale, deterministic, state.causal)
 
 
 @torch.no_grad()
 def backward_dq_current(state: SplitBackwardState | VarlenSplitBackwardState, *,
-                        deterministic: bool = False
+                        deterministic: bool = False, current_begin: int | None = None
                         ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """One scan: all-context dQ and compact current-only dK/dV.
 
@@ -176,13 +196,28 @@ def backward_dq_current(state: SplitBackwardState | VarlenSplitBackwardState, *,
     normal training retains the default atomic accumulation path.
     """
     if isinstance(state, VarlenSplitBackwardState):
+        if current_begin is not None:
+            raise ValueError('explicit current boundary requires a single sequence state')
         state._check_metadata()
         parts = [backward_dq_current(s, deterministic=deterministic) for s in state.sequences]
         if len(parts) == 1:
             return parts[0]
         return tuple(torch.cat([p[i] for p in parts], dim=0) for i in range(3))
     state._check()
-    return tuple(load_extension().dq_current(*state.tensors(), state.softmax_scale, deterministic))
+    if current_begin is None and not state.causal:
+        raise ValueError("partial blocks require an explicit current KV boundary")
+    if current_begin is None:
+        return tuple(load_extension().dq_current(*state.tensors(), state.softmax_scale, deterministic, -1, state.causal))
+    return tuple(load_extension().dq_current(*state.tensors(), state.softmax_scale,
+                                            deterministic, operator.index(current_begin), state.causal))
+
+
+@torch.no_grad()
+def backward_dkv_range(state: SplitBackwardState, begin: int, end: int, *, compact=True):
+    """Explicit KV interval independent of the bottom-right causal offset."""
+    state._check()
+    return tuple(load_extension().dkv(*state.tensors(), state.softmax_scale,
+                                     operator.index(begin), operator.index(end), compact, state.causal))
 
 
 @torch.no_grad()
@@ -211,7 +246,9 @@ def backward_dkv(state: SplitBackwardState | VarlenSplitBackwardState,
             return pairs[0]
         return tuple(torch.cat([p[i] for p in pairs], dim=0) for i in (0, 1))
     state._check()
+    if not state.causal and region != "all":
+        raise ValueError("partial blocks require an explicit dKV range")
     history = state.k.size(0) - state.q.size(0)
     begin = history if region == "current" else 0
     end = history if region == "history" else state.k.size(0)
-    return tuple(load_extension().dkv(*state.tensors(), state.softmax_scale, begin, end, compact))
+    return tuple(load_extension().dkv(*state.tensors(), state.softmax_scale, begin, end, compact, state.causal))

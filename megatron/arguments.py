@@ -3,6 +3,7 @@
 """Megatron arguments."""
 
 import argparse
+import math
 import dataclasses
 import json
 import os
@@ -209,7 +210,10 @@ def validate_args(args, defaults={}):
         assert not args.use_alibi, 'DSPP split attention backward does not support ALiBi'
 
     if args.dspp_memory_report_dir:
-        assert args.dspp_memory_profile, '--dspp-memory-report-dir requires --dspp-memory-profile'
+        assert args.dspp_memory_profile or args.dspp_chunk_model, \
+            '--dspp-memory-report-dir requires a memory profile or chunk model'
+    if args.dspp_chunk_model:
+        assert args.dspp, '--dspp-chunk-model requires --dspp'
     if args.dspp_memory_profile:
         assert args.dspp and args.pipeline_model_parallel_size > 1, 'counted memory requires distributed DSPP'
         assert args.dspp_schedule != 'legacy', 'counted memory requires the Plan IR path'
@@ -224,10 +228,31 @@ def validate_args(args, defaults={}):
             'DSPP requires --micro-seq-length > 0'
         assert args.use_flash_attn, \
             'DSPP requires --use-flash-attn'
-        assert args.tensor_model_parallel_size == 1 and args.context_parallel_size == 1, \
-            'DSPP B2/B3 currently supports TP=1 and CP=1'
-        assert args.world_size == args.pipeline_model_parallel_size, \
+        assert args.tensor_model_parallel_size == 1, 'DSPP currently supports TP=1'
+        assert args.world_size == args.pipeline_model_parallel_size * args.context_parallel_size, \
             'DSPP B2/B3 currently supports one pipeline replica (DP=1)'
+        if args.context_parallel_size > 1:
+            assert args.context_parallel_size in (2, 3), 'DSPP CP supports CP2/CP3 validation'
+            assert args.pipeline_model_parallel_size > 1, 'DSPP CP requires distributed V pipeline'
+            assert args.micro_seq_length % (2 * args.context_parallel_size) == 0, \
+                'DSPP CP chunk capacity must be divisible by 2*CP'
+            assert not args.context_parallel_comm_overlap_gemm, \
+                'DSPP CP requires --no-context-parallel-comm-overlap-gemm'
+            if args.kaimm_context_parallel_impl == 'query-out':
+                assert args.dspp_schedule in ('template', 'b'), 'CP-QO supports template or B'
+                assert args.dspp_schedule != 'b' or args.context_parallel_size == 2, \
+                    'CP-QO online B currently validates CP2'
+            assert args.dspp_recv_lookahead == 0 and args.dspp_send_inflight_depth == 1, \
+                'DSPP CP validated queues require --dspp-recv-lookahead 0 --dspp-send-inflight-depth 1'
+            assert not args.dspp_split_attention_backward or args.dspp_history_dkv_after_dx, \
+                'DSPP CP split backward requires after-dx'
+            assert args.dspp_schedule in ('legacy', 'template', 'b'), 'DSPP CP supports template or B'
+            assert not args.dspp_auto_chunk_size and not args.dspp_order_profile, \
+                'DSPP CP requires fixed chunks and metadata ordering'
+            assert args.dspp_schedule != 'b' or args.dspp_prefetch, \
+                'DSPP CP B requires one world-wide asynchronous planner publication'
+            assert args.DDP_impl == 'local' and not getattr(args, 'overlap_grad_reduce', False), \
+                'DSPP CP requires local DDP without overlap_grad_reduce'
         assert args.pipeline_model_parallel_size >= 1, 'DSPP requires positive PP size'
         if args.pipeline_model_parallel_size == 1:
             assert args.virtual_pipeline_model_parallel_size is None, \
@@ -286,8 +311,20 @@ def validate_args(args, defaults={}):
             assert not args.dspp_auto_chunk_size, 'schedule B/C requires fixed chunk size'
             assert args.dspp_split_attention_backward and args.dspp_history_dkv_after_dx, \
                 'schedule B/C requires split/after-dx support'
-            assert args.dspp_execution_profile and args.dspp_p2p_profile and args.dspp_memory_profile, \
-                'schedule B/C requires versioned compute/P2P and counted memory profiles'
+            assert args.dspp_memory_profile or args.dspp_chunk_model, 'schedule B/C requires counted memory'
+            if args.dspp_chunk_model:
+                assert args.dspp_schedule == 'b', 'adaptive chunks support template or B'
+                assert args.dspp_cost_model == 'profile', 'adaptive chunks use their compact cost bundle'
+            elif args.dspp_cost_model == 'theoretical':
+                assert args.dspp_schedule == 'b', 'theoretical costs currently validate B'
+                assert not args.dspp_execution_profile and not args.dspp_p2p_profile, \
+                    'theoretical costs do not consume compute/P2P timing profiles'
+                assert all(math.isfinite(v) and v > 0 for v in
+                    (args.dspp_assumed_tflops, args.dspp_assumed_bandwidth_gbps)), \
+                    'assumed throughput and bandwidth must be finite and positive'
+            else:
+                assert args.dspp_execution_profile and args.dspp_p2p_profile, \
+                    'profile costs require versioned compute/P2P profiles'
             if args.dspp_schedule == 'b':
                 assert 0 <= args.dspp_b_budget_fraction <= 1, 'invalid B planning budget fraction'
             else:
@@ -302,11 +339,19 @@ def validate_args(args, defaults={}):
             assert args.pipeline_model_parallel_size > 1, 'DSPP prefetch requires PP>1'
             assert args.dspp_schedule in ('template', 'a', 'b', 'c'), 'DSPP prefetch requires Plan IR'
             assert not args.dspp_auto_chunk_size, 'DSPP prefetch requires fixed chunk size'
-            assert args.tensor_model_parallel_size == args.context_parallel_size == args.data_parallel_size == 1, \
-                'DSPP prefetch currently supports one PP replica, TP=CP=DP=1'
+            assert args.tensor_model_parallel_size == 1 and args.data_parallel_size == args.context_parallel_size, \
+                'DSPP prefetch requires TP=1 and one sample replica (DP/CP=1)'
             assert args.dataloader_type == 'single', 'DSPP prefetch replay requires deterministic single-pass input'
             assert args.dspp_prefetch_max_bytes > 0 and args.dspp_prefetch_timeout > 0, \
                 'DSPP prefetch needs positive CPU byte limit and timeout'
+        if args.dspp_chunk_model:
+            assert args.dspp_prefetch and not args.dspp_prefetch_full_validation, \
+                'adaptive chunks require the direct prefetch execution path'
+            assert not args.dspp_auto_chunk_size and args.context_parallel_size == 1, \
+                'adaptive chunks use their own CP1 selector, not the legacy auto path'
+            assert args.dspp_schedule in ('template','b') and args.dspp_history_dkv_after_dx, \
+                'adaptive chunks require explicit task modes with template or B'
+            assert args.dspp_chunk_points >= 2 and args.dspp_chunk_step > 0, 'invalid coarse search budget'
     elif args.dspp_prefetch:
         raise ValueError('--dspp-prefetch requires --dspp')
 
@@ -1447,12 +1492,20 @@ def _add_distributed_args(parser):
     group.add_argument('--dspp', action='store_true',
                        help='Enable the DSPP variable-length packed training runtime. '
                        'Supports the single-GPU path and distributed PP/VPP=2 path.')
+    group.add_argument('--dspp-cp-layout', choices=['paired', 'hybrid'], default='hybrid',
+                       help='CP token ownership: paired reference or whole-short/shared-long hybrid.')
     group.add_argument('--dspp-schedule', choices=['legacy', 'template', 'a', 'b', 'c'], default='template',
                        help='Execute template, fixed-FB/W-only A, supply/cp-all B, or one fixed-H feedback C. '
                        'legacy retains the pre-Plan path for paired validation.')
     group.add_argument('--dspp-planner-backend', choices=['python', 'cpp'], default='cpp',
                        help='CPU ready-construction backend; cpp reuses research 027/028 rules. '
                        'Python remains available for paired plan checks.')
+    group.add_argument('--dspp-cost-model', choices=['profile', 'theoretical'], default='profile',
+                       help='Measured costs by default; theoretical FLOPs/throughput and bytes/bandwidth for correctness.')
+    group.add_argument('--dspp-assumed-tflops', type=float, default=1.,
+                       help='Assumed effective TFLOP/s for theoretical costs, not a hardware measurement.')
+    group.add_argument('--dspp-assumed-bandwidth-gbps', type=float, default=1.,
+                       help='Assumed effective GB/s (decimal) for theoretical CP/PP costs.')
     group.add_argument('--dspp-b-budget-fraction', type=float, default=.60,
                        help='Standalone algorithm B soft full-planning budget / original unsplit model time.')
     group.add_argument('--dspp-c-budget-fraction', type=float, default=.50,
@@ -1461,6 +1514,16 @@ def _add_distributed_args(parser):
                        help='B stage soft budget within C / original unsplit model time; includes preparation.')
     group.add_argument('--dspp-prefetch', action='store_true',
                        help='Prepare one future CPU input and A/B/C plan in a spawn worker; GPU inputs stay current-iteration only.')
+    group.add_argument('--dspp-chunk-model', type=str, default=None,
+                       help='Opt-in compact cross-capacity bundle; CPU-validated adaptive CP1 path.')
+    group.add_argument('--dspp-chunk-points', type=int, default=64,
+                       help='Coarse point budget, including the current capacity; provisional default.')
+    group.add_argument('--dspp-chunk-step', type=int, default=64,
+                       help='Coarse sampling grid step; 1 permits arbitrary integer capacities.')
+    group.add_argument('--dspp-chunk-spacing', choices=['linear','log'], default='log')
+    group.add_argument('--dspp-chunk-score', choices=['work','pipeline'], default='pipeline')
+    group.add_argument('--dspp-chunk-fixed', type=int, default=0,
+                       help='Evaluate only this capacity for matched fixed/adaptive comparisons; 0 searches.')
     group.add_argument('--dspp-prefetch-full-validation', action='store_true',
                        help='Use the original repeated per-rank graph validation for prefetch diagnostics and timing controls.')
     group.add_argument('--dspp-prefetch-max-bytes', type=int, default=256 * 1024 * 1024,
@@ -1498,10 +1561,12 @@ def _add_distributed_args(parser):
                        help='Ablation only: place every short sequence or long-sequence '
                        'tail in its own padded physical microbatch.')
     group.add_argument('--dspp-packing-strategy', type=str, default='baseline',
-                       choices=['baseline', 'attention-critical'],
+                       choices=['baseline', 'attention-critical', 'cp-aware'],
                        help='Residual packing policy. baseline preserves the original '
                        'greedy packer; attention-critical applies bounded continuation-safe '
-                       'LPT/local-improvement packing.')
+                       'LPT/local-improvement packing; experimental cp-aware applies '
+                       'at most 64 CP2 short relocations without extra bins (see CP report '
+                       'for the remaining CP1/CP2 forward numerical boundary).')
     group.add_argument('--dspp-v-layer-layout', type=str, default='balanced',
                        choices=['balanced', 'legacy-output-slot', 'endpoint-3-2'],
                        help='DSPP V-pipeline Transformer-layer layout. balanced assigns '

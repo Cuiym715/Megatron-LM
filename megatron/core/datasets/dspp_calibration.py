@@ -87,15 +87,23 @@ def stage_context(args, stage, chunk, *, hardware=None):
              'swiglu', 'position_embedding_type', 'rotary_percent', 'rotary_base',
              'attention_dropout', 'hidden_dropout', 'gradient_accumulation_fusion',
              'tensor_model_parallel_size', 'context_parallel_size',
+             'dspp_cp_layout',
              'sequence_parallel', 'untie_embeddings_and_output_weights',
              'recompute_granularity', 'recompute_method', 'recompute_num_layers')
-    return dict(hardware=hardware if hardware is not None else hardware_identity(),
+    result = dict(hardware=hardware if hardware is not None else hardware_identity(),
                 model={name: getattr(args, name, None) for name in names},
                 dtype=str(getattr(args, 'params_dtype', None)), pp=pp, vpp=2,
                 stage=int(stage), virtual_chunk=int(chunk), layers=layers,
                 embedding=(stage == 0 and chunk == 0),
                 output_head=(stage == 0 and chunk == 1),
                 execution='eager', overlap='compute-p2p', boundary='complete-stage-v1')
+    if getattr(args,'context_parallel_size',1)>1:
+        from .dspp_cp_layout import CP_IMPLEMENTATION
+        result['model']['kaimm_context_parallel_impl'] = getattr(args,'kaimm_context_parallel_impl','key-value')
+        result['cp_implementation'] = (
+            'owner-kv-query-out-fa-dh-v2' if getattr(args,'kaimm_context_parallel_impl','key-value') == 'query-out'
+            else CP_IMPLEMENTATION)
+    return result
 
 
 @dataclass(frozen=True)

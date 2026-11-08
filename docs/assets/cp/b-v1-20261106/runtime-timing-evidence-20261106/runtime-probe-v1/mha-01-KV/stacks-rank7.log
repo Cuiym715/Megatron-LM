@@ -1,0 +1,278 @@
+Timeout (0:01:20)!
+Thread 0x00007f09e3fff6c0 (most recent call first):
+  File "/usr/lib/python3.12/threading.py", line 359 in wait
+  File "/usr/lib/python3.12/threading.py", line 655 in wait
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/core/pipeline_parallel/schedules.py", line 2199 in send_progress_worker
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f09effff6c0 (most recent call first):
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py", line 2598 in recv
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py", line 83 in wrapper
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/core/pipeline_parallel/schedules.py", line 2092 in ack_worker
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f09d7fff6c0 (most recent call first):
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py", line 2598 in recv
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py", line 83 in wrapper
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/core/pipeline_parallel/schedules.py", line 2031 in credit_worker
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0daffff6c0 (most recent call first):
+  File "/usr/lib/python3.12/threading.py", line 355 in wait
+  File "/usr/lib/python3.12/multiprocessing/queues.py", line 251 in _feed
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0dbbfff6c0 (most recent call first):
+  File "/usr/lib/python3.12/threading.py", line 355 in wait
+  File "/usr/lib/python3.12/multiprocessing/queues.py", line 251 in _feed
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0dc7fff6c0 (most recent call first):
+  File "/usr/lib/python3.12/selectors.py", line 415 in select
+  File "/usr/lib/python3.12/multiprocessing/connection.py", line 1136 in wait
+  File "/usr/lib/python3.12/multiprocessing/connection.py", line 440 in _poll
+  File "/usr/lib/python3.12/multiprocessing/connection.py", line 257 in poll
+  File "/usr/lib/python3.12/multiprocessing/queues.py", line 113 in get
+  File "/usr/local/lib/python3.12/dist-packages/torch/utils/data/_utils/pin_memory.py", line 28 in do_one_step
+  File "/usr/local/lib/python3.12/dist-packages/torch/utils/data/_utils/pin_memory.py", line 52 in _pin_memory_loop
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0dd3fff6c0 (most recent call first):
+  File "/usr/lib/python3.12/threading.py", line 355 in wait
+  File "/usr/lib/python3.12/multiprocessing/queues.py", line 251 in _feed
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0ddffff6c0 (most recent call first):
+  File "/usr/lib/python3.12/threading.py", line 355 in wait
+  File "/usr/lib/python3.12/multiprocessing/queues.py", line 251 in _feed
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0debfff6c0 (most recent call first):
+  File "/usr/lib/python3.12/selectors.py", line 415 in select
+  File "/usr/lib/python3.12/multiprocessing/connection.py", line 1136 in wait
+  File "/usr/lib/python3.12/multiprocessing/connection.py", line 440 in _poll
+  File "/usr/lib/python3.12/multiprocessing/connection.py", line 257 in poll
+  File "/usr/lib/python3.12/multiprocessing/queues.py", line 113 in get
+  File "/usr/local/lib/python3.12/dist-packages/torch/utils/data/_utils/pin_memory.py", line 28 in do_one_step
+  File "/usr/local/lib/python3.12/dist-packages/torch/utils/data/_utils/pin_memory.py", line 52 in _pin_memory_loop
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0e27fff6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e3bffc6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e57fff6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e4bffe6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e47ffd6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e6bffd6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e73fff6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e6fffe6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e7fffe6c0 (most recent call first):
+  File "/usr/lib/python3.12/threading.py", line 359 in wait
+  File "/usr/lib/python3.12/threading.py", line 655 in wait
+  File "/workspace/venvs/megatron/lib/python3.12/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0e83fff6c0 (most recent call first):
+  File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_worker/subproc_pool.py", line 76 in _recv_msg
+  File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_worker/subproc_pool.py", line 271 in _read_thread
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f120849e540 (most recent call first):
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/core/pipeline_parallel/schedules.py", line 2248 in wait_for_send_launch
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/core/pipeline_parallel/schedules.py", line 2353 in receive
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/core/pipeline_parallel/schedules.py", line 2467 in pipelining_with_dspp_stage_local_v
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/training.py", line 673 in train_step
+  File "/workspace/experiments/dspp-cp-v1-20261106/runtime_probe_entry.py", line 16 in progress
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/tools/benchmark_dspp_cp.py", line 107 in train_step
+  File "/workspace/experiments/dspp-cp-v1-20261106/benchmark_entry.py", line 46 in remember
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/training.py", line 1103 in train
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/training.py", line 172 in pretrain
+  File "/workspace/experiments/dspp-cp-v1-20261106/benchmark_entry.py", line 54 in pretrain
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/pretrain_llama.py", line 171 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 286 in run_path
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/tools/benchmark_dspp_cp.py", line 137 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 286 in run_path
+  File "/workspace/experiments/dspp-cp-v1-20261106/benchmark_entry.py", line 56 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 286 in run_path
+  File "/workspace/experiments/dspp-cp-v1-20261106/runtime_probe_entry.py", line 21 in <module>
+Timeout (0:01:20)!
+Thread 0x00007f09e3fff6c0 (most recent call first):
+  File "/usr/lib/python3.12/threading.py", line 359 in wait
+  File "/usr/lib/python3.12/threading.py", line 634 in wait
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/core/pipeline_parallel/schedules.py", line 2199 in send_progress_worker
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f09effff6c0 (most recent call first):
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py", line 2598 in recv
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py", line 83 in wrapper
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/core/pipeline_parallel/schedules.py", line 2092 in ack_worker
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f09d7fff6c0 (most recent call first):
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py", line 2598 in recv
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py", line 83 in wrapper
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/core/pipeline_parallel/schedules.py", line 2031 in credit_worker
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0daffff6c0 (most recent call first):
+  File "/usr/lib/python3.12/threading.py", line 355 in wait
+  File "/usr/lib/python3.12/multiprocessing/queues.py", line 251 in _feed
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0dbbfff6c0 (most recent call first):
+  File "/usr/lib/python3.12/threading.py", line 355 in wait
+  File "/usr/lib/python3.12/multiprocessing/queues.py", line 251 in _feed
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0dc7fff6c0 (most recent call first):
+  File "/usr/lib/python3.12/selectors.py", line 415 in select
+  File "/usr/lib/python3.12/multiprocessing/connection.py", line 1136 in wait
+  File "/usr/lib/python3.12/multiprocessing/connection.py", line 440 in _poll
+  File "/usr/lib/python3.12/multiprocessing/connection.py", line 257 in poll
+  File "/usr/lib/python3.12/multiprocessing/queues.py", line 113 in get
+  File "/usr/local/lib/python3.12/dist-packages/torch/utils/data/_utils/pin_memory.py", line 28 in do_one_step
+  File "/usr/local/lib/python3.12/dist-packages/torch/utils/data/_utils/pin_memory.py", line 52 in _pin_memory_loop
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0dd3fff6c0 (most recent call first):
+  File "/usr/lib/python3.12/threading.py", line 355 in wait
+  File "/usr/lib/python3.12/multiprocessing/queues.py", line 251 in _feed
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0ddffff6c0 (most recent call first):
+  File "/usr/lib/python3.12/threading.py", line 355 in wait
+  File "/usr/lib/python3.12/multiprocessing/queues.py", line 251 in _feed
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0debfff6c0 (most recent call first):
+  File "/usr/lib/python3.12/selectors.py", line 415 in select
+  File "/usr/lib/python3.12/multiprocessing/connection.py", line 1136 in wait
+  File "/usr/lib/python3.12/multiprocessing/connection.py", line 440 in _poll
+  File "/usr/lib/python3.12/multiprocessing/connection.py", line 257 in poll
+  File "/usr/lib/python3.12/multiprocessing/queues.py", line 113 in get
+  File "/usr/local/lib/python3.12/dist-packages/torch/utils/data/_utils/pin_memory.py", line 28 in do_one_step
+  File "/usr/local/lib/python3.12/dist-packages/torch/utils/data/_utils/pin_memory.py", line 52 in _pin_memory_loop
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0e27fff6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e3bffc6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e57fff6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e4bffe6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e47ffd6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e6bffd6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e73fff6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e6fffe6c0 (most recent call first):
+  <no Python frame>
+
+Thread 0x00007f0e7fffe6c0 (most recent call first):
+  File "/usr/lib/python3.12/threading.py", line 359 in wait
+  File "/usr/lib/python3.12/threading.py", line 655 in wait
+  File "/workspace/venvs/megatron/lib/python3.12/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f0e83fff6c0 (most recent call first):
+  File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_worker/subproc_pool.py", line 76 in _recv_msg
+  File "/usr/local/lib/python3.12/dist-packages/torch/_inductor/compile_worker/subproc_pool.py", line 271 in _read_thread
+  File "/usr/lib/python3.12/threading.py", line 1010 in run
+  File "/usr/lib/python3.12/threading.py", line 1073 in _bootstrap_inner
+  File "/usr/lib/python3.12/threading.py", line 1030 in _bootstrap
+
+Thread 0x00007f120849e540 (most recent call first):
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/core/pipeline_parallel/schedules.py", line 2248 in wait_for_send_launch
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/core/pipeline_parallel/schedules.py", line 2353 in receive
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/core/pipeline_parallel/schedules.py", line 2467 in pipelining_with_dspp_stage_local_v
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/training.py", line 673 in train_step
+  File "/workspace/experiments/dspp-cp-v1-20261106/runtime_probe_entry.py", line 16 in progress
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/tools/benchmark_dspp_cp.py", line 107 in train_step
+  File "/workspace/experiments/dspp-cp-v1-20261106/benchmark_entry.py", line 46 in remember
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/training.py", line 1103 in train
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/megatron/training.py", line 172 in pretrain
+  File "/workspace/experiments/dspp-cp-v1-20261106/benchmark_entry.py", line 54 in pretrain
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/pretrain_llama.py", line 171 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 286 in run_path
+  File "/workspace/experiments/dspp-cp-v1-20261106/source-current/tools/benchmark_dspp_cp.py", line 137 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 286 in run_path
+  File "/workspace/experiments/dspp-cp-v1-20261106/benchmark_entry.py", line 56 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 98 in _run_module_code
+  File "<frozen runpy>", line 286 in run_path
+  File "/workspace/experiments/dspp-cp-v1-20261106/runtime_probe_entry.py", line 21 in <module>

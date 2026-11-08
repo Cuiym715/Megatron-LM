@@ -1,0 +1,46 @@
+{
+  "status": "CPU-preparation-only-no-GPUlaunch",
+  "purpose": "Originalb remaininginputdomains, usingknowncontractlengths anduntruncatedreal arXivdocuments; preparewhilecurrentformalrolls, no serverCPUanalysis",
+  "source": "samecurrentarchive+commonpersistentPPstreamentry; arithmetic/modelH1024FFN2816/16L/PP4CP2fixed",
+  "workloads": [
+    {
+      "name": "short-packed-v512",
+      "lengths": [
+        800,
+        224,
+        600,
+        424,
+        1500,
+        548,
+        700,
+        700
+      ],
+      "repeats": 32,
+      "vocab": 512
+    },
+    {
+      "name": "short-tail-v512",
+      "lengths": [
+        648,
+        4608,
+        768,
+        768,
+        6401,
+        2305,
+        97,
+        31
+      ],
+      "repeats": 32,
+      "vocab": 512
+    },
+    {
+      "name": "arxiv-native32k",
+      "base": "/workspace/datasets/slimpajama_arxiv_50k/megatron/slimpajama_arxiv_50k_text_document",
+      "selection": "first256whole naturaldocumentswithrawlength2..32769, originaltokens/wholeitems/noclip; recordindices+idxidentity",
+      "vocab": 151936
+    }
+  ],
+  "formal_configuration": "eachinput MHA/GQA, currentKV/QO,5warm20timed, twoABBAblocks perhead, original60s3idlechecks; finite/nonskipped/equalinputs/actualtokens required",
+  "GPU_launch": "onlyaftercurrent16reviewandresourcecheck; nooverlap, boundedcontroller; rawnumericalfailuresretained",
+  "completion": "properpaired fullupdates, noCPUtiming orprofileasthroughput; freezeperinputmodelincludingvocab"
+}

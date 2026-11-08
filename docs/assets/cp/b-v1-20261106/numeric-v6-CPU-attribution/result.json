@@ -1,0 +1,139 @@
+{
+  "methods": [
+    {
+      "method": "mha-kv-cp2",
+      "elements": 206603264,
+      "native": {
+        "params_before": {
+          "passed": true,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "params_after": {
+          "passed": true,
+          "max_relative_l2": 0.01210610989911274,
+          "failed_tensors": 0
+        },
+        "gradients": {
+          "passed": true,
+          "max_relative_l2": 0.0031706477235046064,
+          "failed_tensors": 0
+        },
+        "outputs": {
+          "passed": true,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "dx": {
+          "passed": true,
+          "max_relative_l2": 0.010787247836077317,
+          "failed_tensors": 0
+        },
+        "logits": {
+          "passed": true,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "loss": {
+          "passed": true,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        }
+      },
+      "whole_model_gradient_relative_l2": 0.0010357035274292067,
+      "whole_model_actual_update_relative_l2": 0.017063924003839007,
+      "per_stage_actual_update": [
+        {
+          "stage": 0,
+          "relative_l2": 0.022905716244701457,
+          "gate_pass": false
+        },
+        {
+          "stage": 1,
+          "relative_l2": 0.01585769743355042,
+          "gate_pass": true
+        },
+        {
+          "stage": 2,
+          "relative_l2": 0.014158025368317789,
+          "gate_pass": true
+        },
+        {
+          "stage": 3,
+          "relative_l2": 0.01345351067021025,
+          "gate_pass": true
+        }
+      ],
+      "note": "Descriptive whole-model norm alongside the previously declared per-stage guard. This analysis does not change acceptance or certify a failed configuration."
+    },
+    {
+      "method": "mha-qo-fused",
+      "elements": 206603264,
+      "native": {
+        "params_before": {
+          "passed": true,
+          "max_relative_l2": 0.0,
+          "failed_tensors": 0
+        },
+        "params_after": {
+          "passed": true,
+          "max_relative_l2": 0.016813744896566514,
+          "failed_tensors": 0
+        },
+        "gradients": {
+          "passed": true,
+          "max_relative_l2": 0.003969697677818786,
+          "failed_tensors": 0
+        },
+        "outputs": {
+          "passed": true,
+          "max_relative_l2": 0.01855457077010326,
+          "failed_tensors": 0
+        },
+        "dx": {
+          "passed": false,
+          "max_relative_l2": 0.02763979370359565,
+          "failed_tensors": 264
+        },
+        "logits": {
+          "passed": false,
+          "max_relative_l2": 0.01948876181720505,
+          "failed_tensors": 84
+        },
+        "loss": {
+          "passed": true,
+          "max_relative_l2": 5.858227338967712e-06,
+          "failed_tensors": 0
+        }
+      },
+      "whole_model_gradient_relative_l2": 0.002630846722029081,
+      "whole_model_actual_update_relative_l2": 0.04115377878877202,
+      "per_stage_actual_update": [
+        {
+          "stage": 0,
+          "relative_l2": 0.04305752485851247,
+          "gate_pass": false
+        },
+        {
+          "stage": 1,
+          "relative_l2": 0.040832392553183765,
+          "gate_pass": false
+        },
+        {
+          "stage": 2,
+          "relative_l2": 0.04045805180607776,
+          "gate_pass": false
+        },
+        {
+          "stage": 3,
+          "relative_l2": 0.0401439627811721,
+          "gate_pass": false
+        }
+      ],
+      "note": "Descriptive whole-model norm alongside the previously declared per-stage guard. This analysis does not change acceptance or certify a failed configuration."
+    }
+  ],
+  "reference": "PP4CP1 same actual88064-token failed input and explicitly injected initial weights/optimizer",
+  "scope": "one aligned complete update, no trajectory/throughput claim",
+  "cuda_initialized": false
+}

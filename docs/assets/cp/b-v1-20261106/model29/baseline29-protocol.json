@@ -1,0 +1,80 @@
+{
+  "status": "frozen-ready-with-known-numerical-error",
+  "scope": "b section1 first target currentKV/currentoptimizedQO baseline, no D/H and no onlineB",
+  "model": {
+    "layers": 29,
+    "hidden": 2048,
+    "ffn": 5504,
+    "q_heads": 16,
+    "head_dim": 128,
+    "pp": 4,
+    "cp": 2,
+    "tp": 1,
+    "sample_dp": 1,
+    "virtual_chunks": 2,
+    "layers_per_virtual_stage": "3/4/4/4/4/4/4/2",
+    "chunk": 2048,
+    "max_seq": 32768,
+    "micro_batch": 4,
+    "global_batch": 8,
+    "seed": 1234,
+    "layout": "endpoint-3-2",
+    "vocab": 32128,
+    "physical_layers": [
+      5,
+      8,
+      8,
+      8
+    ]
+  },
+  "packing": "hybrid, baseline, warmup-short-steady-long, balanced; lookahead0/inflight1",
+  "arithmetic": "BF16 model/activation, full GEMM reduction, deterministic FA2 backward, common exact-p0 residual. Both backends identical; current long-input numerical errors unresolved. No CP1 canonical/pending wrappers.",
+  "first_batch": {
+    "dataset": "/workspace/outputs/dspp-cp-longtask-20261101-1602/data/longmix-v512",
+    "vocab": 512,
+    "kv_heads": [
+      8,
+      1
+    ],
+    "order_per_head_group": [
+      "KV",
+      "QO",
+      "QO",
+      "KV",
+      "QO",
+      "KV",
+      "KV",
+      "QO"
+    ],
+    "warmup": 5,
+    "timed_updates": 20,
+    "windows": 16,
+    "job_timeout_seconds": 600,
+    "note": "Two ABBA pairs, second pair reversed to balance pair-block drift. Effective actual tokens from rank0 metrics per update; sum timed valid_tokens divided by slowest rank whole-window seconds. No padded maxseq-rate substitution. Same dataset binary/index SHA, seed, index-map identity, batch/sample ordering, optimizer and update count. Compare timed per-update valid_tokens and physical task counts across methods before admitting results.",
+    "dataloader": "single, frozen document order, dataset256documents;25*8=200documents without cycling",
+    "first_update_expected_training_lengths": [
+      32768,
+      24576,
+      16384,
+      12288,
+      800,
+      224,
+      600,
+      424
+    ],
+    "first_update_expected_valid_tokens": 88064
+  },
+  "timing_exclusions": "No tensor snapshots, owner audit, timeline/events, profiler, server CPU research/analysis/compression. Only low overhead GPU PID/resource and host load monitoring. Keep native raw times plus explicit exclusions when polluted.",
+  "review_gate": "2026-11-06 explicit user authorization replaces numerical-pass prerequisite for current-version performance across the entire a\u2013f master plan. Preserve native v5/v6 failures, no tolerance relaxation or numerical certification. Require finite complete non-skipped updates, identical source/model/data/valid tokens and clean resources.",
+  "after_first_batch": "Freeze29LbaselinecurrentKV/QOthenremainingoriginalbworkloads/profiles/capacity/templateB. Do notrestart16Lformal. Wholec\u2013fcontinues.",
+  "actual_domain_gate": "Same frozenlongmixv512 input documents/labels (0..511); modelsoftmax32128 to matchPP8reference. No truncation. Previous16Lnumericfailures not29Lcertification; knownerrorsallowedforperformance, finite/nonskipped/input/modelownership guards retained.",
+  "entry_env_required": {
+    "CP_V1_FULL_REDUCTION": "1",
+    "CP_V1_DETERMINISTIC_FA": "1"
+  },
+  "numerically_certified": false,
+  "authorization": "performance-authorization-20261106.json",
+  "warmup_control": "One CUDA synchronize + world barrier after first untimed complete update in both backends, then original5warm20timed. No P2P debug, stack/thread sampler or per-timed-update extra synchronization. Changes warmup only; original uninstrumented KV failure retained, not claimed repaired.",
+  "runtime_probe_evidence": "runtime-probe-v2 diagnostic three updates allrankcomplete, finite; stopped only by stale controller25record assertion. Diagnostic is not throughput.",
+  "runtime_correction": "CommonKV/QO NCCLenqueueMutex/Workwaitoutside/nativeorder0 plus persistentPP CUDAstreams; isolated2line source-derivedpatch, originaldepth1, noaddedperupdateGPUfence, noCPUdiagnostic sampler. Staticpatchidentityoutside timing; cachefinalaftertiming.; isolatedlayoutfunctioncode admitsPP4/29 sameendpoint3/2, nativeVPP2args validatedCPU; actualglobalownedlayers checkedbeforefirstuntimedupdate andafterwindow receipts."
+}

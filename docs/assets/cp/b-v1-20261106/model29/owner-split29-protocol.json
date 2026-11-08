@@ -1,0 +1,57 @@
+{
+  "status": "prepared-originalb3-shared-functional-H-owner-not-performance",
+  "purpose": "Missingactual29L/GQA1/Q16 nonemptyH functional/unique-memory evidence; 6updates same32K input. No full numerical matrix, throughput/bandwidth/capacitylimit or B acceptance.",
+  "base": "same29Lbaselinecommand+benchmark_entry29 and commonruntimeadapters; MHAQ16/GQA1 distinct; vocab32128 andfrozenlongmix input, TP1PP4CP2VPP2endpoint3/2chunk2048",
+  "iterations": {
+    "warmup": 2,
+    "recorded": 4,
+    "total": 6,
+    "reason": "bothlong/shortphases warmed; eventiterations3..6, only profile/functional evidence, notonlinethroughput"
+  },
+  "cases": [
+    {
+      "name": "gqa1-QO-owners-split",
+      "head": "gqa1",
+      "backend": "QO",
+      "mode": "owners-split",
+      "extra_argv": [
+        "--dspp-split-attention-backward",
+        "--dspp-history-dkv-after-dx"
+      ],
+      "output_flags": {
+        "--dspp-memory-audit-dir": "case/owners"
+      },
+      "resource": "Shared if maxsamebackend fusedbaseline perrank reserved+8GiB fits. Thisis provisional admission cushion, not a certified split capacity bound.",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    }
+  ],
+  "offline": {
+    "compute": "cpu_calibrate29.py calibrate_dspp_stage.py --input fused/timeline split/timeline --cp-max --output backend-compute.json --report holdout.json",
+    "memory": "cpu_calibrate29.py calibrate_dspp_cp_memory.py --benchmark split-case --owners combined-owner-root --output backend-memory.json",
+    "guards": "OnlyafterGPUcaseclosed; helpermatches29Llayout. Matchstage/virtualchunk/model/CPimpl/hardware/FA/GEMM/runtimepatch identities; maxoverCPpairs. No profilefittingorownerhooksduringformalBcomparison."
+  },
+  "reuse": {
+    "p2p": "CheckexistingPP4twoCPlanesA800/NCCL/payloadcoverage; reusevalidmeasuredpoints, onlymeasuremissingedges/bytes. Bandwidthmeasurementexclusive.",
+    "memory": "Measuredallowancesnotcertifiedbounds; do notdividehistoryKVacrossCPblindly; preserveuncoveredworkspace/liveowners"
+  },
+  "timeout_seconds_per_case": 600,
+  "worker_source_preparation": {
+    "status": "script-prepared-not-run",
+    "script": "dspp/Megatron-LM-kwai/docs/assets/cp/b-v1-20261106/model29/prepare_model29_source.py",
+    "command": "docker exec tinacui-megatron /workspace/venvs/megatron/bin/python -u /workspace/experiments/dspp-cp-v1-20261106/prepare_model29_source.py",
+    "source": "/workspace/experiments/dspp-cp-v1-20261106/source-model29",
+    "reason": "Spawnedplanner doesnotinheritmainprocesscodepatch; materializesame2lineguardupdateinnewisolatedcopy. NeededbeforeBworkers; bothtemplate/Bandmatchingprofilesusenewcopy. Notproductionchange.",
+    "resource": "CPUonly, sharednumeric.lock rejectswhilecurrentformalrunning; afterbaselineGPUclose",
+    "proof": "model29-source-proof.json"
+  },
+  "split_cache_preparation": {
+    "entry": "dspp/Megatron-LM-kwai/docs/assets/cp/b-v1-20261106/model29/benchmark_entry29_profile.py",
+    "CPU_command": "env CUDA_VISIBLE_DEVICES= CP_V1_SOURCE=/workspace/experiments/dspp-cp-v1-20261106/source-model29 DSPP_FA_SPLIT_CACHE=/workspace/cache/dspp-fa-split python benchmark_entry29_profile.py --warm-cache-only",
+    "resource": "OnlywhenactiveformalGPUcloses; existingqueueCPUlockmustbeheld. Explicitarch8,0initializesnoCUDA.",
+    "guard": "Fourkernel sourcefilesmustexactlymatchpinnedexistingones; cachehashincludesTorch/CUDA/ABI/sourcebytes. Retainoriginalfilenames toavoiddirectory-onlyNinja rebuild; no installed/upstreamFA modifications. GPUprofile uses sameentrywithoutwarmflag."
+  },
+  "controller": "dspp/Megatron-LM-kwai/docs/assets/cp/b-v1-20261106/model29/run_profile29.py",
+  "bounded_batches": "Onehead/kind perbatch, max4cases; compute beforeowner; Codexanalyzeaftereachbatch. OwnercasesunfitmemorygopendingwithoutGPUlaunch; foreignPIDaloneallowed. Computeprofileexclusive, ownersneverthroughput.",
+  "ready_command_after_activation": "python run_profile29.py --head mha --kind compute --batch profile29-mha-compute-v1"
+}

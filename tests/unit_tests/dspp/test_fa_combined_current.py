@@ -118,5 +118,8 @@ def test_combined_single_main_launch(tmp_path):
     path=tmp_path/'combined.pt.trace.json';prof.export_chrome_trace(str(path))
     kernels=[e for e in json.loads(path.read_text())['traceEvents'] if e.get('cat')=='kernel']
     mains=[e for e in kernels if 'dq_current_kernel' in e['name']]
-    assert len(mains)==1 and mains[0]['args']['grid']==[3,1,4]
+    # The deployed SM80 specialization uses a 128-wide K tile; other
+    # supported targets use 64. The contract here is one main launch, not
+    # the old specialization's fixed x-grid size.
+    assert len(mains)==1 and mains[0]['args']['grid'][1:]==[1,4]
     assert not any('split_kernel<' in e['name'] or 'flash_bwd_dq_dk_dv' in e['name'] for e in kernels)

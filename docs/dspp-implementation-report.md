@@ -1,6 +1,6 @@
 # DSPP 当前实现与实验报告
 
-更新日期：2026-11-01（B/PP8增补；基础章节保留2026-09-13快照）
+更新日期：2026-11-04（补充D/H tile分派设计；B/PP8结果保留2026-11-01记录，基础章节保留2026-09-13快照）
 
 2026-09-13基础实现状态：Milestone A、B1、B2+B3、C1+C2 已实现；launch starvation、大消息 matched receive lookahead 和有界 multi-inflight 已完成针对性优化；no-history packed KV 冗余、input-mode 观测不一致、运行时自适应 chunk size 和大消息 P2P 卡死已修复/实现
 
@@ -8,7 +8,44 @@
 
 当前选择性D/H、跨轮异步规划及运行时精简见[算法B当前实现与改进记录](dspp-algorithm-b-implementation.md)。2026-11-01已删除DSPP内容指纹/重复审计，固定profile每进程加载，复用同轮元数据；B搜索、目标、依赖及候选容量计算保留，当前正收益使用P实测模型。
 
+CP 的实现、验证结果、性能及未解决项统一见[CP report](dspp-context-parallel-execution-report.md)，下一步任务见[CP plan](dspp-context-parallel-implementation-plan.md)。本页不重复维护 CP 实验结果。
+
 61层受控输入下，精简后baseline/B三次配对汇总吞吐+2.82%；同首尾减层规则的独立三方法复测为baseline1942.98ms、B在线1880.17ms（+3.34%）、InfiniPipe端点适配版5741.03ms。两批B是相同精简源码，不是新增两种算法；每项5预热＋20计时，默认高性能FA。完整配置、变体失败/负收益、适配口径及范围以新文档为准。
+
+## 2026-11-04增补：D/H tile分派与设备配置缓存
+
+### 设计与适用范围
+
+拆分反向沿用固定版本FA2的内核traits。当前支持范围仍为BF16、head dimension 128及已支持/对应编译的SM80–SM90架构；本次不扩大dtype、head dimension或架构支持范围。tile的两个维度分别对应Q行数与KV行数，不是训练输入的`chunk_size`。
+
+**D复用FA2完整backward的资源选择规则，H保留独立的64×64策略。** D初始化时读取设备的`sharedMemPerBlockOptin`：达到144 KiB选择64×128及其配套warp/寄存器参数，否则选择64×64及其配套参数。该条件判断单block的共享内存能力，不读取当前剩余显存，也不在训练前运行测速来选tile。原版F/B继续由已安装FA库自身分派。
+
+| 路径 | 本次修改前的A800 | 当前A800 | 当前L40 |
+| --- | --- | --- | --- |
+| D | 编译期按SM80选择64×128 | 根据共享内存能力选择64×128 | 根据共享内存能力选择64×64 |
+| H | 64×64 | 64×64 | 64×64 |
+
+因此，相对本次修改前的正式实现，**A800的D/H tile及配套traits均保持不变**；改变的是D的选择依据与配置初始化方式。曾验证过将H也套用完整backward分派的中间副本，但最终实现没有采用这一策略，其测试记录不作为最终H64版本的源码身份。
+
+D需要汇总全部dQ并计算当前dKV，其结构更接近完整backward；复用FA2规则是默认适配策略，不是D全局最优性的证明。H仅计算历史dKV，没有dQ累加路径，较大的KV tile对完整backward的收益不能直接外推给H。较小tile可能通过资源占用和并行度取得更好的表现；尚未用硬件profiler分离各因素的贡献。保留H64的直接依据是已有A800 attention-only测量，以及L40 H64的既有正确性/执行验证：
+
+- A800、hidden2048、Q2048、history2K：H64×128为0.8325ms，H64×64为0.6052ms，后者耗时低27.3%。
+- 同配置history14K：分别4.5978ms与3.9004ms，后者耗时低15.2%。
+- 这些是2026-10-30已有5预热＋15重复的微测，比较包含整套tile/warp/寄存器配置；不代表全部shape或其他GPU的最优选择，也不作为本次新增训练吞吐结果。[原始H128测量](../../archive/completed/a800-sm80-opt/results/benchmarks/sm80-64x128.json)、[原始H64测量](../../archive/completed/a800-sm80-opt/results/benchmarks/sm80-d64x128-h64x64.json)、[对照整理](../../tile-dispatch-h64-20261104/historical-H-comparison.json)。
+
+规则来源：[固定FA2版本的head-dim-128 backward launcher](https://github.com/Dao-AILab/flash-attention/blob/v2.7.4.post1/csrc/flash_attn/src/flash_bwd_launch_template.h#L213-L244)。D/H改动位于[backward.cu](../megatron/core/kv_cache/fa_split_src/backward.cu)，来源及实现约束见[THIRD_PARTY.md](../megatron/core/kv_cache/fa_split_src/THIRD_PARTY.md)。
+
+### 初始化与热路径
+
+设备配置按“进程＋CUDA device”缓存。首次使用该设备时读取一次设备属性，保存共享内存上限、SM数量和D配置，检查所选D/H内核的实际资源需求，并为7个内核各设置一次动态共享内存属性。后续同线程、同设备调用命中thread-local指针，无需重新读取设备属性或取得全局互斥锁；其他线程首次访问已有设备时通过进程级缓存取得同一配置。确定性dQ路径所需SM数量也从该缓存读取。
+
+相对修改前，本次还将原本逐次launch执行的`cudaFuncSetAttribute`移到设备初始化阶段，增加两套D模板实例及只供诊断读取的初始化计数接口。上述属于分派、初始化和可观测性改动；F/B调用、D/H计算公式、梯度区域/路由、默认确定性设置以及调度搜索策略均未因本次变更修改。不能将“没有重复查询”写成“整轮性能已证明完全不变”，首次编译与初始化也不在此作性能保证。
+
+### 验证与部署状态
+
+2026-11-04在g37物理GPU6使用隔离源码副本、单卡共享负载执行小规模测试，限制PyTorch分配上限为1GiB。最终D64×128/H64×64组合的41项测试通过，覆盖融合FA/独立FP64对照、GQA、非对齐边界、packed输入、流/状态约束、确定性路径和设备缓存。首次资源读取计数为1，32轮重复调用及其他线程访问后仍为1；内核属性设置计数始终为7。峰值allocated 92.6MiB、reserved 136MiB，进程已退出。L40未在本次重新测试，训练吞吐未测。
+
+本地源码与测试副本的SHA逐文件一致；本次未覆盖服务器正在运行任务的源码。完整结果与边界见[最终验证](../../tile-dispatch-h64-20261104/verification.json)、[测试日志](../../tile-dispatch-h64-20261104/check.log)，回归入口为[test_fa_tile_dispatch.py](../tests/unit_tests/dspp/test_fa_tile_dispatch.py)。
 
 下列第1–13节保留早期基础实现/实验快照，其中“固定PP3”“attention bubble filling尚未实现”等不能作为当前B/PP8状态；历史数字与记录不覆盖或改写。
 

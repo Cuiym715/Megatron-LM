@@ -1,0 +1,88 @@
+{
+  "rows": [
+    {
+      "mode": "baseline",
+      "repeat": 0,
+      "cpu_ms": 0.5314442701637745,
+      "tasks": 11,
+      "cp2_bf16_mha8_transport_bytes": 157810688
+    },
+    {
+      "mode": "cp-aware",
+      "repeat": 0,
+      "cpu_ms": 0.887699481099844,
+      "tasks": 11,
+      "cp2_bf16_mha8_transport_bytes": 144441344
+    },
+    {
+      "mode": "baseline",
+      "repeat": 1,
+      "cpu_ms": 0.4804099630564451,
+      "tasks": 11,
+      "cp2_bf16_mha8_transport_bytes": 157810688
+    },
+    {
+      "mode": "cp-aware",
+      "repeat": 1,
+      "cpu_ms": 0.9312216751277447,
+      "tasks": 11,
+      "cp2_bf16_mha8_transport_bytes": 144441344
+    },
+    {
+      "mode": "baseline",
+      "repeat": 2,
+      "cpu_ms": 0.5107238702476025,
+      "tasks": 11,
+      "cp2_bf16_mha8_transport_bytes": 157810688
+    },
+    {
+      "mode": "cp-aware",
+      "repeat": 2,
+      "cpu_ms": 0.9431746602058411,
+      "tasks": 11,
+      "cp2_bf16_mha8_transport_bytes": 144441344
+    },
+    {
+      "mode": "baseline",
+      "repeat": 3,
+      "cpu_ms": 0.5335326213389635,
+      "tasks": 11,
+      "cp2_bf16_mha8_transport_bytes": 157810688
+    },
+    {
+      "mode": "cp-aware",
+      "repeat": 3,
+      "cpu_ms": 0.908522205427289,
+      "tasks": 11,
+      "cp2_bf16_mha8_transport_bytes": 144441344
+    },
+    {
+      "mode": "baseline",
+      "repeat": 4,
+      "cpu_ms": 0.5024480633437634,
+      "tasks": 11,
+      "cp2_bf16_mha8_transport_bytes": 157810688
+    },
+    {
+      "mode": "cp-aware",
+      "repeat": 4,
+      "cpu_ms": 0.9390859864652157,
+      "tasks": 11,
+      "cp2_bf16_mha8_transport_bytes": 144441344
+    }
+  ],
+  "summary": [
+    {
+      "mode": "baseline",
+      "cpu_ms": 0.5107238702476025,
+      "tasks": 11,
+      "payload_bytes": 157810688
+    },
+    {
+      "mode": "cp-aware",
+      "cpu_ms": 0.9312216751277447,
+      "tasks": 11,
+      "payload_bytes": 144441344
+    }
+  ]
+}

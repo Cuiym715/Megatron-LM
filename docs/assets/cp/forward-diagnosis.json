@@ -1,0 +1,322 @@
+{
+  "scope": "Early pre-optimization basic-CP diagnostic, not an explanation or acceptance of the later cp-aware failing input.",
+  "remote_root": "/workspace/outputs/dspp-cp-stage2-exec01",
+  "source_identity": "source-identity.json: early_diagnostic_archive",
+  "original_full_update_criteria": {
+    "status": "failed-original-numerical-criteria",
+    "reports": 12,
+    "criteria": {
+      "atol": 0.004,
+      "rtol": 0.01,
+      "relative_l2_max": 0.02
+    },
+    "iterations": [
+      {
+        "iteration": 1,
+        "rank_reports": 4,
+        "categories": {
+          "params_before": {
+            "max_abs": 0.0,
+            "max_relative_l2": 0.0,
+            "failed_rank_reports": 0
+          },
+          "gradients": {
+            "max_abs": 0.0017700418829917908,
+            "max_relative_l2": 0.006123366891007942,
+            "failed_rank_reports": 0
+          },
+          "params_after": {
+            "max_abs": 0.002197265625,
+            "max_relative_l2": 0.011317842348024137,
+            "failed_rank_reports": 0
+          },
+          "outputs": {
+            "max_abs": 0.003910064697265625,
+            "max_relative_l2": 0.001926585209300094,
+            "failed_rank_reports": 0
+          },
+          "dx": {
+            "max_abs": 6.103515625e-05,
+            "max_relative_l2": 0.007297991587803254,
+            "failed_rank_reports": 0
+          },
+          "logits": {
+            "max_abs": 0.015625,
+            "max_relative_l2": 0.0035110480389924487,
+            "failed_rank_reports": 2
+          },
+          "loss": {
+            "max_abs": 8.678436279296875e-05,
+            "max_relative_l2": 8.239363095421875e-06,
+            "failed_rank_reports": 0
+          }
+        },
+        "valid_token_logit_mismatches": 13312
+      },
+      {
+        "iteration": 2,
+        "rank_reports": 4,
+        "categories": {
+          "params_before": {
+            "max_abs": 0.002197265625,
+            "max_relative_l2": 0.011317842348024137,
+            "failed_rank_reports": 0
+          },
+          "gradients": {
+            "max_abs": 0.0014095306396484375,
+            "max_relative_l2": 0.01851157407162672,
+            "failed_rank_reports": 0
+          },
+          "params_after": {
+            "max_abs": 0.00341796875,
+            "max_relative_l2": 0.011608738975477305,
+            "failed_rank_reports": 0
+          },
+          "outputs": {
+            "max_abs": 0.01565265655517578,
+            "max_relative_l2": 0.012122504534331899,
+            "failed_rank_reports": 4
+          },
+          "dx": {
+            "max_abs": 3.4332275390625e-05,
+            "max_relative_l2": 0.010706614884851277,
+            "failed_rank_reports": 0
+          },
+          "logits": {
+            "max_abs": 0.037109375,
+            "max_relative_l2": 0.016129718352568125,
+            "failed_rank_reports": 2
+          },
+          "loss": {
+            "max_abs": 0.0006847381591796875,
+            "max_relative_l2": 7.441673808635182e-05,
+            "failed_rank_reports": 0
+          }
+        },
+        "valid_token_logit_mismatches": 1587018
+      },
+      {
+        "iteration": 3,
+        "rank_reports": 4,
+        "categories": {
+          "params_before": {
+            "max_abs": 0.00341796875,
+            "max_relative_l2": 0.011608738975477305,
+            "failed_rank_reports": 0
+          },
+          "gradients": {
+            "max_abs": 0.001743704080581665,
+            "max_relative_l2": 0.01874871150037166,
+            "failed_rank_reports": 0
+          },
+          "params_after": {
+            "max_abs": 0.00390625,
+            "max_relative_l2": 0.011600929064585565,
+            "failed_rank_reports": 0
+          },
+          "outputs": {
+            "max_abs": 0.0299224853515625,
+            "max_relative_l2": 0.012446680459335016,
+            "failed_rank_reports": 4
+          },
+          "dx": {
+            "max_abs": 2.193450927734375e-05,
+            "max_relative_l2": 0.011326169188254366,
+            "failed_rank_reports": 0
+          },
+          "logits": {
+            "max_abs": 0.04296875,
+            "max_relative_l2": 0.016323225788264898,
+            "failed_rank_reports": 2
+          },
+          "loss": {
+            "max_abs": 0.0026617050170898438,
+            "max_relative_l2": 0.0003139089207494134,
+            "failed_rank_reports": 0
+          }
+        },
+        "valid_token_logit_mismatches": 970060
+      }
+    ]
+  },
+  "first_divergence": {
+    "status": "diagnostic-only-not-accepted",
+    "cp1_control_reports": 2,
+    "cp1_control_all_categories_passed": true,
+    "cp1_control_attention_all_bitwise_equal": true,
+    "cp2_linear_reports": 4,
+    "equal_input_different_output_examples": [
+      {
+        "rank": 0,
+        "examples": [
+          {
+            "name": "l0:p0:c0:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+            "input": {
+              "name": "l0:p0:c0:module.module.language_model.encoder.layers.0.self_attention.dense:input",
+              "different_elements": 0,
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "output": {
+              "name": "l0:p0:c0:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+              "different_elements": 1,
+              "max_abs": 4.76837158203125e-07,
+              "relative_l2": 1.588286112002519e-07
+            }
+          },
+          {
+            "name": "l0:p1:c0:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+            "input": {
+              "name": "l0:p1:c0:module.module.language_model.encoder.layers.0.self_attention.dense:input",
+              "different_elements": 0,
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "output": {
+              "name": "l0:p1:c0:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+              "different_elements": 1,
+              "max_abs": 4.76837158203125e-07,
+              "relative_l2": 1.588286112002519e-07
+            }
+          }
+        ]
+      },
+      {
+        "rank": 1,
+        "examples": [
+          {
+            "name": "l0:p0:c0:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+            "input": {
+              "name": "l0:p0:c0:module.module.language_model.encoder.layers.0.self_attention.dense:input",
+              "different_elements": 0,
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "output": {
+              "name": "l0:p0:c0:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+              "different_elements": 1,
+              "max_abs": 1.52587890625e-05,
+              "relative_l2": 9.516473849649777e-06
+            }
+          },
+          {
+            "name": "l0:p1:c0:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+            "input": {
+              "name": "l0:p1:c0:module.module.language_model.encoder.layers.0.self_attention.dense:input",
+              "different_elements": 0,
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "output": {
+              "name": "l0:p1:c0:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+              "different_elements": 1,
+              "max_abs": 1.52587890625e-05,
+              "relative_l2": 9.516473849649777e-06
+            }
+          }
+        ]
+      },
+      {
+        "rank": 2,
+        "examples": [
+          {
+            "name": "l1:p0:c1:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+            "input": {
+              "name": "l1:p0:c1:module.module.language_model.encoder.layers.0.self_attention.dense:input",
+              "different_elements": 0,
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "output": {
+              "name": "l1:p0:c1:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+              "different_elements": 3,
+              "max_abs": 0.00048828125,
+              "relative_l2": 9.183407997549124e-05
+            }
+          },
+          {
+            "name": "l1:p1:c1:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+            "input": {
+              "name": "l1:p1:c1:module.module.language_model.encoder.layers.0.self_attention.dense:input",
+              "different_elements": 0,
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "output": {
+              "name": "l1:p1:c1:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+              "different_elements": 3,
+              "max_abs": 0.00048828125,
+              "relative_l2": 9.183407997549124e-05
+            }
+          },
+          {
+            "name": "l0:p0:c0:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+            "input": {
+              "name": "l0:p0:c0:module.module.language_model.encoder.layers.0.self_attention.dense:input",
+              "different_elements": 0,
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "output": {
+              "name": "l0:p0:c0:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+              "different_elements": 2,
+              "max_abs": 0.000244140625,
+              "relative_l2": 4.432057137092136e-05
+            }
+          }
+        ]
+      },
+      {
+        "rank": 3,
+        "examples": [
+          {
+            "name": "l1:p0:c0:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+            "input": {
+              "name": "l1:p0:c0:module.module.language_model.encoder.layers.0.self_attention.dense:input",
+              "different_elements": 0,
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "output": {
+              "name": "l1:p0:c0:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+              "different_elements": 2,
+              "max_abs": 1.9073486328125e-06,
+              "relative_l2": 4.413479901600232e-07
+            }
+          },
+          {
+            "name": "l1:p0:c1:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+            "input": {
+              "name": "l1:p0:c1:module.module.language_model.encoder.layers.0.self_attention.dense:input",
+              "different_elements": 0,
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "output": {
+              "name": "l1:p0:c1:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+              "different_elements": 5,
+              "max_abs": 0.00048828125,
+              "relative_l2": 7.066509678148777e-05
+            }
+          },
+          {
+            "name": "l1:p1:c0:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+            "input": {
+              "name": "l1:p1:c0:module.module.language_model.encoder.layers.0.self_attention.dense:input",
+              "different_elements": 0,
+              "max_abs": 0.0,
+              "relative_l2": 0.0
+            },
+            "output": {
+              "name": "l1:p1:c0:module.module.language_model.encoder.layers.0.self_attention.dense:output",
+              "different_elements": 2,
+              "max_abs": 1.9073486328125e-06,
+              "relative_l2": 4.413479901600232e-07
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "later_fp64_projection_evidence": "Independent projection: full and sharded BF16 shape errors approximately 0.17%; original full shape reproduced original snapshot bitwise. See numerical-contract.json; does not establish all later forward differences as harmless."
+}

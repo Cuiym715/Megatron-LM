@@ -7,6 +7,7 @@ Use warmed iterations only. Never add current/future measurements to a profile
 already bound to a performance comparison. Memory audits remain separate.
 """
 import argparse
+from collections import defaultdict
 import json
 from pathlib import Path
 import sys
@@ -20,15 +21,30 @@ def main():
     parser.add_argument('--input', nargs='+', required=True)
     parser.add_argument('--output', required=True)
     parser.add_argument('--report', required=True)
+    parser.add_argument('--cp-max', action='store_true',
+                        help='Use the slowest CP lane for each real stage task sample.')
     args = parser.parse_args()
-    records, sources = [], []
+    records, sources, lanes = [], [], defaultdict(list)
     for source in args.input:
         path = Path(source)
         paths = sorted(path.glob('iteration_*_rank_*.json')) if path.is_dir() else [path]
         for path in paths:
-            rows = list(timeline_records(json.loads(path.read_text())))
-            records.extend(rows)
+            payload = json.loads(path.read_text())
+            rows = list(timeline_records(payload))
+            if args.cp_max:
+                for row in rows:
+                    key = (str(source), payload['iteration'], row['stage'], row['chunk'],
+                           row['kind'], row['logical_microbatch'], row['physical_microbatch'])
+                    lanes[key].append(row)
+            else:
+                records.extend(rows)
             sources.append(dict(path=str(path), records=len(rows)))
+    if args.cp_max:
+        for rows in lanes.values():
+            cp = rows[0]['context']['model']['context_parallel_size']
+            if len(rows) != cp:
+                raise ValueError(f'incomplete CP timing sample: expected {cp}, got {len(rows)}')
+            records.append(max(rows, key=lambda row: row['duration_ms']))
     if not records:
         raise ValueError('no complete-stage calibration samples')
     model = StageCalibration(records)

@@ -1,0 +1,36 @@
+{
+  "status": "frozen-ready",
+  "scope": "Targeted same-backend correctness of newNCCL setting on4GPU; not oldcross-backenderrordiagnosis or8GPUperformance",
+  "physical_gpu_indices": [
+    2,
+    3,
+    4,
+    5
+  ],
+  "layers": 16,
+  "pp": 2,
+  "cp": 2,
+  "tp": 1,
+  "sample_dp": 1,
+  "vpp": 2,
+  "layers_per_virtual_stage": 4,
+  "hidden": 1024,
+  "ffn": 2816,
+  "q_heads": 8,
+  "head_dim": 128,
+  "chunk": 2048,
+  "vocab": 512,
+  "input": "existing longmix-v512 first8 docs, max32768,88064validtokens",
+  "jobs": [
+    "KV reference NCCLimplicit0",
+    "KV samebackend comparison implicit1",
+    "QO reference NCCLimplicit0",
+    "QO samebackend comparison implicit1"
+  ],
+  "updates_per_job": 1,
+  "timeout_seconds": 300,
+  "arithmetic": "commonexactp0/fullBF16GEMMreduction/deterministicFA2 backward, NCCL_RACE_FATAL1 inalljobs",
+  "checks": "Nativecompletegradients/dx/outputs/logits/loss +completeFP32masterbefore/after/actualdelta; oldtolerancesunchanged. Numericalfailuresretaineddescriptively, not gateknown-errorperformance orreopenrootcause.",
+  "resources": "Select4actuallyfreeUUIDs beforefreeze/launch. Eachjob3samples>=60s, hostauditorfilterselectedUUIDs; externalindependentsingleGPUjobs recordedbutuntouched. Unknownexternaldistributed/communicationload blockscommunicatingprobe. Noformalbandwidthor8GPUthroughputonsharedserver.",
+  "after_batch": "Reviewcomplete4rankreportsperjob; thennew4GPUcontinuous8updateKV/QOfunctionaltestwithnodebug/nosnapshots,finite/non-skippedupdates, no throughputclaim.8GPUtargetNCCLpilot remainsseparate."
+}

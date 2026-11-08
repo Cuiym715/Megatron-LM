@@ -130,9 +130,11 @@ class LlamaModel(MegatronModule):
                 retriever_attn_mask=None,
                 labels=None, tokentype_ids=None, inference_params=None):
 
+        from megatron.core.kv_cache.dspp_packed_attention import DsppSequenceKVState
+        dspp_state = kv_cache if isinstance(kv_cache, DsppSequenceKVState) else None
         if not (self.pre_process and self.vocab_in_pp):
             input_ids, position_ids, attention_mask, labels = \
-                slice_lm_inputs_along_cp(input_ids, position_ids, attention_mask, labels)
+                slice_lm_inputs_along_cp(input_ids, position_ids, attention_mask, labels, dspp_state)
 
         lm_output = self.language_model(
             input_ids,
@@ -149,14 +151,14 @@ class LlamaModel(MegatronModule):
                 lm_output._labels = labels
                 return lm_output
             else:
-                return self.post_process_forward(lm_output, labels)
+                return self.post_process_forward(lm_output, labels, dspp_state=dspp_state)
         else:
             return lm_output
 
     def pre_process_forward(self, input_ids):
         return self.language_model.embedding(input_ids, None)
 
-    def post_process_forward(self, lm_output, labels, pipeline_parallel=False):
+    def post_process_forward(self, lm_output, labels, pipeline_parallel=False, dspp_state=None):
         if self.vocab_in_pp:
             lm_output = self.language_model.final_layernorm(lm_output)
         if self.untie_embeddings_and_output_weights:
@@ -168,7 +170,7 @@ class LlamaModel(MegatronModule):
             lm_output, labels, weight,
             self.parallel_output,
             self.fp16_lm_cross_entropy,
-            pipeline_parallel))
+            pipeline_parallel), dspp_state=dspp_state)
 
     def state_dict_for_save_checkpoint(self, prefix='', keep_vars=False):
 

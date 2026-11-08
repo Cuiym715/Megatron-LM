@@ -1,0 +1,42 @@
+{
+  "status": "complete-CPU-reviewed-diagnostic",
+  "cuda_initialized": false,
+  "numerically_certified": false,
+  "actual_update_relative_l2": 0.04077025185925122,
+  "old_update_relative_l2": 0.04123245281043918,
+  "elements": 206603264,
+  "native_reports": 8,
+  "master_reports": 8,
+  "initial_masters_exact": true,
+  "dx_max_relative_l2": 0.02742159383272155,
+  "logits_pass": false,
+  "per_stage": [
+    {
+      "rank": 0,
+      "update_relative_l2": 0.04291679537942577,
+      "reference_update_squared_norm": 49.751752820462315
+    },
+    {
+      "rank": 2,
+      "update_relative_l2": 0.040348435662556074,
+      "reference_update_squared_norm": 48.45260920975689
+    },
+    {
+      "rank": 4,
+      "update_relative_l2": 0.04008144850112969,
+      "reference_update_squared_norm": 48.29625575556578
+    },
+    {
+      "rank": 6,
+      "update_relative_l2": 0.039585273379219736,
+      "reference_update_squared_norm": 48.20149284507361
+    }
+  ],
+  "retained_criteria": {
+    "actual_update_relative_l2_max": 0.02
+  },
+  "numerical_pass": false,
+  "controller_postcheck_error": "KeyError('valid_tokens')",
+  "correction": "Only source pipeline stage0 reports valid_tokens; controller incorrectly required it on every rank. Full GPU evidence already existed, CPU review corrected admission; no GPU rerun.",
+  "interpretation": "FP32 weightedO CPsum alone does not resolve original QO error; no performance/source adoption, shared wall clock is not throughput."
+}

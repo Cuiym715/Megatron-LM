@@ -45,19 +45,20 @@ class CompiledStorage:
                 _, created, scratch = history_state_bytes(
                     memory.args, len(memory.reference.schedules), stage, c, meta)
                 unit = row['pending_bytes_per_token'][c]
-                key_tokens = sum(meta.key_lengths)
+                counts = _token_counts(memory,meta)
+                key_tokens = counts[0]
                 rows.append((row['activation_bytes'][c], row['weight_forward_bytes'][c],
                              row['weight_backward_bytes'][c], row['capture_bytes'][c],
                              row['attention_bytes_per_key_token'][c] * key_tokens,
                              created, scratch, key_tokens * unit,
-                             sum(i.token_offset for i in meta.items) * unit,
+                             counts[1] * unit,
                              any(i.has_history for i in meta.items)))
                 identity = (c, memory.mapping[n.microbatch, n.split])
-                for item in meta.items:
+                for item_index,item in enumerate(meta.items):
                     key = (*identity, item.sequence_id, item.segment_id)
                     if key in segments:
                         raise ValueError('duplicate memory segment')
-                    segments[key] = (index, item.token_length * unit)
+                    segments[key] = (index, counts[2][item_index] * unit)
             writers = defaultdict(set)
             for n in seq:
                 if n.kind != 'F':
@@ -181,6 +182,35 @@ class CompiledStorage:
         return peak, count, tuple(sizes)
 
 
+
+def attention_token_counts(args, meta):
+    """Per-rank maxima for Q/O owners; native KV keeps global-history counts.
+
+    Non-final segments occupy complete physical chunks, so their local KV
+    histories are evenly sharded. Current packed tails/shorts use actual owners.
+    Called once per input metadata in CountedMemory, not per search candidate.
+    """
+    cp = getattr(args,'context_parallel_size',1)
+    if cp < 2 or getattr(args,'kaimm_context_parallel_impl','key-value') != 'query-out':
+        return sum(meta.key_lengths),sum(i.token_offset for i in meta.items),tuple(i.token_length for i in meta.items)
+    from megatron.core.datasets.dspp_cp_layout import hybrid_cp_ownership, cp_token_ranges
+    rows = (hybrid_cp_ownership(meta,cp).rank_indices
+            if getattr(args,'dspp_cp_layout','paired') == 'hybrid' else
+            tuple(tuple(i for a,b in cp_token_ranges(meta.chunk_size,cp,r) for i in range(a,b)) for r in range(cp)))
+    offsets = meta.cu_seqlens_q
+    from bisect import bisect_left
+    rows = tuple(tuple(sorted(row)) for row in rows)
+    item_max = tuple(max(bisect_left(row,offsets[i+1])-bisect_left(row,offsets[i]) for row in rows)
+                     for i in range(len(meta.items)))
+    current = max(bisect_left(row,meta.valid_token_count) for row in rows)
+    history = sum((i.token_offset+cp-1)//cp for i in meta.items)
+    return current+history,history,item_max
+
+
+def _token_counts(memory,meta):
+    cache = getattr(memory,'local_attention_counts',None)
+    return cache[id(meta)] if cache is not None else attention_token_counts(memory.args,meta)
+
 def stage_attention_sizes(args, pp, stage, chunk, capacity):
     from megatron.core.dspp_layout import physical_layer_range
     hq = args.num_attention_heads
@@ -195,6 +225,8 @@ def stage_attention_sizes(args, pp, stage, chunk, capacity):
     # Current Q/K/V, O and outer LSE; also covers a shared unsplit QKV backing
     # plus O. Calibration takes the maximum with observed backing sizes.
     # Assembled K/V is charged separately from the original cached K/V.
+    if getattr(args,'kaimm_context_parallel_impl','key-value') == 'query-out':
+        capacity //= getattr(args,'context_parallel_size',1)
     capture = capacity * ((2*hq + 2*hk)*dim*2 + hq*4) * layers
     kv_per_token = 2 * hk * dim * 2 * layers  # BF16 dK/dV and assembled K/V
     return capture, kv_per_token
@@ -239,7 +271,7 @@ def records(memory, plan, positions, actual):
             # A single capture allocation serves F/B, W and delayed H. A
             # selected H extends its lifetime instead of adding another copy.
             add(stage, row['capture_bytes'][c], f, capture_users, 'attention_capture')
-            add(stage, row['attention_bytes_per_key_token'][c] * sum(meta.key_lengths),
+            add(stage, row['attention_bytes_per_key_token'][c] * _token_counts(memory,meta)[0],
                 f, [backward] + ([h] if selected else []), 'attention_kv')
             if selected:
                 _, created, scratch = history_state_bytes(memory.args, len(plan.schedules), stage, c, meta)
@@ -251,11 +283,11 @@ def records(memory, plan, positions, actual):
             task = dict(meta=meta, backward=backward, writer=h if selected else backward,
                         selected=selected, identity=identity)
             tasks[f] = task
-            for item in meta.items:
+            for item_index,item in enumerate(meta.items):
                 key = (*identity, item.sequence_id, item.segment_id)
                 if key in segments:
                     raise ValueError('duplicate memory segment')
-                segments[key] = (f, item)
+                segments[key] = (f, item, _token_counts(memory,meta)[2][item_index])
     if {k for k in actual if k[1] == 'H'} != expected_h:
         raise ValueError('orphan or history-free H')
 
@@ -270,7 +302,7 @@ def records(memory, plan, positions, actual):
                 key = (*task['identity'], item.sequence_id, segment)
                 if key not in segments:
                     raise ValueError('missing history memory segment')
-                target_f, _ = segments[key]
+                target_f, _, _ = segments[key]
                 consumer = tasks[target_f]['backward']
                 if positions[task['writer']] >= positions[consumer]:
                     raise ValueError('history consumer precedes required H/backward')
@@ -279,18 +311,19 @@ def records(memory, plan, positions, actual):
     source_tasks = {t['writer']: t for t in tasks.values()}
     for key, producer_set in writers.items():
         producers = sorted(producer_set, key=positions.__getitem__)
-        target_f, item = segments[key]
+        target_f, item, local_length = segments[key]
         consumer = tasks[target_f]['backward']
         first_users[producers[0]].add(consumer)
         if len(producers) > 1:
             stage, c = key[:2]
             unit = memory.stages[stage]['pending_bytes_per_token'][c]
-            add(stage, item.token_length * unit, producers[1], [consumer], 'pending_accumulation')
+            add(stage, local_length * unit, producers[1], [consumer], 'pending_accumulation')
     for writer, users in first_users.items():
         task = source_tasks[writer]
         meta = task['meta']
         # H returns compact history; fused B returns current + history.
-        length = sum(i.token_offset for i in meta.items) if task['selected'] else sum(meta.key_lengths)
+        counts = _token_counts(memory,meta)
+        length = counts[1] if task['selected'] else counts[0]
         unit = memory.stages[writer[0]]['pending_bytes_per_token'][writer[2]]
         add(writer[0], length * unit, writer, users, 'pending_backing')
     return plan, tuple(owners), dict(sizes)

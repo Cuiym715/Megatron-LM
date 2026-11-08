@@ -8,6 +8,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from functools import partial
+from pathlib import Path
 from typing import Callable, Deque, Dict, Iterator, List, Optional, Tuple, Union, Type
 
 import torch
@@ -1576,6 +1577,8 @@ class _DsppVTaskBatch:
         self.kv_state = DsppSequenceKVState(
             split_attention_backward=split_attention_backward,
             history_dkv_after_dx=history_dkv_after_dx,
+            cp_layout=getattr(get_args(), 'dspp_cp_layout', 'paired'),
+            cp_impl=getattr(get_args(), 'kaimm_context_parallel_impl', 'key-value'),
         )
         self.inputs = {}
         self.outputs = {}
@@ -1727,6 +1730,8 @@ def pipelining_with_dspp_stage_local_v(*,
         logical_batches, ordering, schedule_split_counts, execution_plan, local_plan_hash = (
             prefetch.acquire_execution(args.curr_iteration + 1, num_microbatches,
                 args.consumed_train_samples, dtype, tensor_shape, micro_seq_length))
+        if getattr(args, 'dspp_chunk_model', None):
+            micro_seq_length = execution_plan.wire_shape[0]
         adaptive_layout = None
         schedule_groups = ordering.schedule_groups
         split_counts = [len(group) for group in schedule_groups]
@@ -1843,6 +1848,10 @@ def pipelining_with_dspp_stage_local_v(*,
             # Rendezvous without serializing or comparing plan fingerprints.
             failed = torch.tensor([int(plan_error is not None)], dtype=torch.int32, device='cpu')
             dist.all_reduce(failed, group=parallel_state.get_pipeline_model_parallel_group_gloo())
+            if parallel_state.get_context_parallel_world_size() > 1:
+                # One sample replica: PP propagation followed by CP propagation
+                # reaches every participant before any attention collective.
+                dist.all_reduce(failed, group=parallel_state.get_data_parallel_group_gloo())
             if failed.item():
                 raise RuntimeError(plan_error or 'DSPP peer preparation failed')
             args._dspp_last_schedule_plan = execution_plan.to_dict()
@@ -1889,6 +1898,11 @@ def pipelining_with_dspp_stage_local_v(*,
                             and slot_to_task[n.microbatch, n.split][0] == logical_id}
                 task_batches[logical_id, chunk].kv_state.configure_task_modes(
                     tuple(p.meta for p in training_batch.physical_microbatches), selected)
+            if parallel_state.get_context_parallel_world_size() > 1:
+                from megatron.core.kv_cache.dspp_cp_attention import prepare_cp_metadata
+                prepare_cp_metadata(task_batches[logical_id,chunk].kv_state,
+                    tuple(p.meta for p in training_batch.physical_microbatches),
+                    parallel_state.get_context_parallel_group())
 
     ordering_metadata = {
         'plan_hash': local_plan_hash if execution_plan is not None else None,
@@ -1958,6 +1972,12 @@ def pipelining_with_dspp_stage_local_v(*,
         for peer, keys in expected_sends.items()
     }
     inflight_sends = {peer: deque() for peer in expected_sends}
+    cp_p2p = parallel_state.get_context_parallel_world_size() > 1
+    # A queued send must depend on its producer, never on unrelated CP work
+    # enqueued later on the compute stream. Receives likewise have no producer
+    # compute dependency; their Work.wait joins compute only at consumption.
+    send_streams = {peer: torch.cuda.Stream() for peer in expected_sends} if cp_p2p else {}
+    recv_streams = {peer: torch.cuda.Stream() for peer in expected_sends} if cp_p2p else {}
     recv_lookahead = int(getattr(args, 'dspp_recv_lookahead', 2))
     send_inflight_depth = int(
         getattr(args, 'dspp_send_inflight_depth', 2)
@@ -2091,7 +2111,7 @@ def pipelining_with_dspp_stage_local_v(*,
         thread.start()
         ack_threads.append(thread)
 
-    def flush_ready_sends(peer=None):
+    def flush_ready_sends_impl(peer=None):
         peers = (peer,) if peer is not None else tuple(expected_sends)
         launched = 0
         for target in peers:
@@ -2106,7 +2126,8 @@ def pipelining_with_dspp_stage_local_v(*,
                 key = expected_sends[target][cursor]
                 if key not in ready_sends[target]:
                     break
-                tensor = ready_sends[target][key]
+                entry = ready_sends[target][key]
+                tensor, produced = entry if cp_p2p else (entry, None)
                 payload_bytes = tensor.numel() * tensor.element_size()
                 with credit_locks[target]:
                     credit_count = credit_counts[target]
@@ -2122,11 +2143,16 @@ def pipelining_with_dspp_stage_local_v(*,
                 peer_rank = parallel_state.get_pipeline_model_parallel_global_rank(target)
                 group = group_for(stage, target)
                 operation = dist.P2POp(dist.isend, tensor, peer_rank, group)
-                if timeline.recording:
-                    with timeline.communication(f"send_s{stage}_to_s{target}/{key}"):
+                stream_context = (torch.cuda.stream(send_streams[target])
+                                  if cp_p2p else contextlib.nullcontext())
+                with stream_context:
+                    if produced is not None:
+                        send_streams[target].wait_event(produced)
+                    if timeline.recording:
+                        with timeline.communication(f"send_s{stage}_to_s{target}/{key}"):
+                            request = dist.batch_isend_irecv([operation])[0]
+                    else:
                         request = dist.batch_isend_irecv([operation])[0]
-                else:
-                    request = dist.batch_isend_irecv([operation])[0]
                 ack = torch.ones(1, dtype=torch.uint8, device='cpu')
                 ack_request = dist.isend(
                     ack,
@@ -2149,9 +2175,46 @@ def pipelining_with_dspp_stage_local_v(*,
                 launched += 1
         return launched
 
+    send_progress_stop = threading.Event()
+    send_progress_wakeup = threading.Event()
+    send_progress_error = []
+    send_progress_thread = None
+
+    def flush_ready_sends(peer=None):
+        if not cp_p2p:
+            return flush_ready_sends_impl(peer)
+        if send_progress_error:
+            raise RuntimeError(f'CP PP send progress failed: {send_progress_error[0]}')
+        send_progress_wakeup.set()
+        return 0
+
+    if cp_p2p:
+        device = torch.cuda.current_device()
+        def send_progress_worker():
+            # A CP collective (or a CUDA allocation waiting on its stream)
+            # may block the training host thread. Already produced PP data
+            # must still be submitted; producer events exclude later work.
+            torch.cuda.set_device(device)
+            try:
+                while not send_progress_stop.is_set():
+                    if flush_ready_sends_impl() == 0:
+                        send_progress_wakeup.wait(.0001)
+                        send_progress_wakeup.clear()
+            except Exception as exc:
+                send_progress_error.append(f'{type(exc).__name__}: {exc}')
+        send_progress_thread = threading.Thread(target=send_progress_worker,
+            name=f'dspp-cp-send-{stage}', daemon=True)
+        send_progress_thread.start()
+
     def submit_send(peer, node, tensor):
         key = message_key(node)
-        ready_sends[peer][key] = tensor.contiguous()
+        tensor = tensor.contiguous()
+        if cp_p2p:
+            produced = torch.cuda.Event()
+            produced.record()
+            ready_sends[peer][key] = (tensor, produced)
+        else:
+            ready_sends[peer][key] = tensor
         debug_p2p(f'queued-send peer={peer} key={key}')
         if recv_lookahead > 0:
             ready_index = torch.tensor(
@@ -2187,6 +2250,12 @@ def pipelining_with_dspp_stage_local_v(*,
                 time.sleep(0.00005)
 
     def post_receive(sender, cursor):
+        stream_context = (torch.cuda.stream(recv_streams[sender])
+                          if cp_p2p else contextlib.nullcontext())
+        with stream_context:
+            return post_receive_on_stream(sender, cursor)
+
+    def post_receive_on_stream(sender, cursor):
         key = expected_receives[sender][cursor]
         tensor = torch.empty(
             recv_shape, dtype=dtype, device=torch.cuda.current_device(),
@@ -2289,6 +2358,8 @@ def pipelining_with_dspp_stage_local_v(*,
         progress.wait_return(progress_token)
         debug_p2p(f'wait-returned-recv sender={sender} key={key}')
         fill_receive_lookahead(sender)
+        if cp_p2p:
+            tensor.record_stream(torch.cuda.current_stream())
         return tensor
 
     def detach_boundary(tensor):
@@ -2301,7 +2372,10 @@ def pipelining_with_dspp_stage_local_v(*,
     memory_audit = None
     if getattr(args, 'dspp_memory_audit_dir', None):
         from megatron.core.pipeline_parallel.dspp_memory import MemoryAudit
-        memory_audit = MemoryAudit(args.dspp_memory_audit_dir, stage,
+        directory = args.dspp_memory_audit_dir
+        if parallel_state.get_context_parallel_world_size() > 1:
+            directory = str(Path(directory) / f'cp{parallel_state.get_context_parallel_rank()}')
+        memory_audit = MemoryAudit(directory, stage,
                                    int(getattr(args, 'curr_iteration', -1)) + 1)
 
     def audit_memory(label):
@@ -2314,7 +2388,8 @@ def pipelining_with_dspp_stage_local_v(*,
                 'W-closures': (WeightGradStore.cache, WeightGradStore.weight_grad_queue,
                                WeightGradStore.keyed_weight_grads),
                 'local-boundary': (local_forward, local_backward),
-                'send': (ready_sends, inflight_sends),
+                'send': ({p:tuple(q.values()) for p,q in ready_sends.items()},
+                         {p:tuple(q) for p,q in inflight_sends.items()}),
                 'recv': pending_receives,
             })
 
@@ -2495,6 +2570,12 @@ def pipelining_with_dspp_stage_local_v(*,
     ):
         if flush_ready_sends() == 0:
             time.sleep(0.00005)
+    if send_progress_thread is not None:
+        send_progress_stop.set()
+        send_progress_wakeup.set()
+        send_progress_thread.join()
+        if send_progress_error:
+            raise RuntimeError(f'CP PP send progress failed: {send_progress_error[0]}')
     for thread in credit_threads:
         thread.join()
     for thread in ack_threads:
@@ -2564,7 +2645,6 @@ def pipelining_with_dspp_stage_local_v(*,
         # Tasks and communication are drained on every rank before comparing;
         # no per-task synchronization or Python tensor walks are introduced.
         import json
-        from pathlib import Path
         predicted = args._dspp_memory_plan
         allocated = torch.cuda.max_memory_allocated()
         report = dict(predicted, stage=stage, iteration=execution_plan.binding.iteration_id,
@@ -2576,6 +2656,8 @@ def pipelining_with_dspp_stage_local_v(*,
         directory = getattr(args, 'dspp_memory_report_dir', None)
         if directory:
             path = Path(directory)
+            if parallel_state.get_context_parallel_world_size() > 1:
+                path /= f'cp{parallel_state.get_context_parallel_rank()}'
             path.mkdir(parents=True, exist_ok=True)
             (path / f'iteration_{report["iteration"]:06d}_stage_{stage}.json').write_text(
                 json.dumps(report, indent=2))

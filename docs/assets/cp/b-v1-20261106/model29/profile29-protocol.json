@@ -1,0 +1,373 @@
+{
+  "status": "controller-and-protocol-prepared-local-no-GPUlaunch",
+  "purpose": "Originalb matching29L complete-stage F/Bfused/D/H/W andmemory; avoidold16L/singleownerprofile substitution",
+  "base": "same29Lbaselinecommand+benchmark_entry29 and commonruntimeadapters; MHAQ16/GQA1 distinct; vocab32128 andfrozenlongmix input, TP1PP4CP2VPP2endpoint3/2chunk2048",
+  "iterations": {
+    "warmup": 2,
+    "recorded": 4,
+    "total": 6,
+    "reason": "bothlong/shortphases warmed; eventiterations3..6, only profile/functional evidence, notonlinethroughput"
+  },
+  "cases": [
+    {
+      "name": "mha-KV-compute-fused",
+      "head": "mha",
+      "backend": "KV",
+      "mode": "compute-fused",
+      "extra_argv": [
+        "--dspp-task-timing-only",
+        "--dspp-task-timing-scope",
+        "all",
+        "--timing-log-level",
+        "0",
+        "--kaimm-cuda-synchronize-level",
+        "0",
+        "--dspp-timeline-iterations",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "output_flags": {
+        "--dspp-timeline-dir": "case/timeline"
+      },
+      "resource": "exclusive8GPU3samples60s",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "mha-KV-compute-split",
+      "head": "mha",
+      "backend": "KV",
+      "mode": "compute-split",
+      "extra_argv": [
+        "--dspp-split-attention-backward",
+        "--dspp-history-dkv-after-dx",
+        "--dspp-task-timing-only",
+        "--dspp-task-timing-scope",
+        "all",
+        "--timing-log-level",
+        "0",
+        "--kaimm-cuda-synchronize-level",
+        "0",
+        "--dspp-timeline-iterations",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "output_flags": {
+        "--dspp-timeline-dir": "case/timeline"
+      },
+      "resource": "exclusive8GPU3samples60s",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "mha-KV-owners-fused",
+      "head": "mha",
+      "backend": "KV",
+      "mode": "owners-fused",
+      "extra_argv": [],
+      "output_flags": {
+        "--dspp-memory-audit-dir": "case/owners"
+      },
+      "resource": "shared-memory-only usingcorrespondingcompletedcomputepeakreserved+2GiB perrank, noidle/noforeignPIDgate",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "mha-KV-owners-split",
+      "head": "mha",
+      "backend": "KV",
+      "mode": "owners-split",
+      "extra_argv": [
+        "--dspp-split-attention-backward",
+        "--dspp-history-dkv-after-dx"
+      ],
+      "output_flags": {
+        "--dspp-memory-audit-dir": "case/owners"
+      },
+      "resource": "shared-memory-only usingcorrespondingcompletedcomputepeakreserved+2GiB perrank, noidle/noforeignPIDgate",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "mha-QO-compute-fused",
+      "head": "mha",
+      "backend": "QO",
+      "mode": "compute-fused",
+      "extra_argv": [
+        "--dspp-task-timing-only",
+        "--dspp-task-timing-scope",
+        "all",
+        "--timing-log-level",
+        "0",
+        "--kaimm-cuda-synchronize-level",
+        "0",
+        "--dspp-timeline-iterations",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "output_flags": {
+        "--dspp-timeline-dir": "case/timeline"
+      },
+      "resource": "exclusive8GPU3samples60s",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "mha-QO-compute-split",
+      "head": "mha",
+      "backend": "QO",
+      "mode": "compute-split",
+      "extra_argv": [
+        "--dspp-split-attention-backward",
+        "--dspp-history-dkv-after-dx",
+        "--dspp-task-timing-only",
+        "--dspp-task-timing-scope",
+        "all",
+        "--timing-log-level",
+        "0",
+        "--kaimm-cuda-synchronize-level",
+        "0",
+        "--dspp-timeline-iterations",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "output_flags": {
+        "--dspp-timeline-dir": "case/timeline"
+      },
+      "resource": "exclusive8GPU3samples60s",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "mha-QO-owners-fused",
+      "head": "mha",
+      "backend": "QO",
+      "mode": "owners-fused",
+      "extra_argv": [],
+      "output_flags": {
+        "--dspp-memory-audit-dir": "case/owners"
+      },
+      "resource": "shared-memory-only usingcorrespondingcompletedcomputepeakreserved+2GiB perrank, noidle/noforeignPIDgate",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "mha-QO-owners-split",
+      "head": "mha",
+      "backend": "QO",
+      "mode": "owners-split",
+      "extra_argv": [
+        "--dspp-split-attention-backward",
+        "--dspp-history-dkv-after-dx"
+      ],
+      "output_flags": {
+        "--dspp-memory-audit-dir": "case/owners"
+      },
+      "resource": "shared-memory-only usingcorrespondingcompletedcomputepeakreserved+2GiB perrank, noidle/noforeignPIDgate",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "gqa1-KV-compute-fused",
+      "head": "gqa1",
+      "backend": "KV",
+      "mode": "compute-fused",
+      "extra_argv": [
+        "--dspp-task-timing-only",
+        "--dspp-task-timing-scope",
+        "all",
+        "--timing-log-level",
+        "0",
+        "--kaimm-cuda-synchronize-level",
+        "0",
+        "--dspp-timeline-iterations",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "output_flags": {
+        "--dspp-timeline-dir": "case/timeline"
+      },
+      "resource": "exclusive8GPU3samples60s",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "gqa1-KV-compute-split",
+      "head": "gqa1",
+      "backend": "KV",
+      "mode": "compute-split",
+      "extra_argv": [
+        "--dspp-split-attention-backward",
+        "--dspp-history-dkv-after-dx",
+        "--dspp-task-timing-only",
+        "--dspp-task-timing-scope",
+        "all",
+        "--timing-log-level",
+        "0",
+        "--kaimm-cuda-synchronize-level",
+        "0",
+        "--dspp-timeline-iterations",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "output_flags": {
+        "--dspp-timeline-dir": "case/timeline"
+      },
+      "resource": "exclusive8GPU3samples60s",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "gqa1-KV-owners-fused",
+      "head": "gqa1",
+      "backend": "KV",
+      "mode": "owners-fused",
+      "extra_argv": [],
+      "output_flags": {
+        "--dspp-memory-audit-dir": "case/owners"
+      },
+      "resource": "shared-memory-only usingcorrespondingcompletedcomputepeakreserved+2GiB perrank, noidle/noforeignPIDgate",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "gqa1-KV-owners-split",
+      "head": "gqa1",
+      "backend": "KV",
+      "mode": "owners-split",
+      "extra_argv": [
+        "--dspp-split-attention-backward",
+        "--dspp-history-dkv-after-dx"
+      ],
+      "output_flags": {
+        "--dspp-memory-audit-dir": "case/owners"
+      },
+      "resource": "shared-memory-only usingcorrespondingcompletedcomputepeakreserved+2GiB perrank, noidle/noforeignPIDgate",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "gqa1-QO-compute-fused",
+      "head": "gqa1",
+      "backend": "QO",
+      "mode": "compute-fused",
+      "extra_argv": [
+        "--dspp-task-timing-only",
+        "--dspp-task-timing-scope",
+        "all",
+        "--timing-log-level",
+        "0",
+        "--kaimm-cuda-synchronize-level",
+        "0",
+        "--dspp-timeline-iterations",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "output_flags": {
+        "--dspp-timeline-dir": "case/timeline"
+      },
+      "resource": "exclusive8GPU3samples60s",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "gqa1-QO-compute-split",
+      "head": "gqa1",
+      "backend": "QO",
+      "mode": "compute-split",
+      "extra_argv": [
+        "--dspp-split-attention-backward",
+        "--dspp-history-dkv-after-dx",
+        "--dspp-task-timing-only",
+        "--dspp-task-timing-scope",
+        "all",
+        "--timing-log-level",
+        "0",
+        "--kaimm-cuda-synchronize-level",
+        "0",
+        "--dspp-timeline-iterations",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "output_flags": {
+        "--dspp-timeline-dir": "case/timeline"
+      },
+      "resource": "exclusive8GPU3samples60s",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "gqa1-QO-owners-fused",
+      "head": "gqa1",
+      "backend": "QO",
+      "mode": "owners-fused",
+      "extra_argv": [],
+      "output_flags": {
+        "--dspp-memory-audit-dir": "case/owners"
+      },
+      "resource": "shared-memory-only usingcorrespondingcompletedcomputepeakreserved+2GiB perrank, noidle/noforeignPIDgate",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    },
+    {
+      "name": "gqa1-QO-owners-split",
+      "head": "gqa1",
+      "backend": "QO",
+      "mode": "owners-split",
+      "extra_argv": [
+        "--dspp-split-attention-backward",
+        "--dspp-history-dkv-after-dx"
+      ],
+      "output_flags": {
+        "--dspp-memory-audit-dir": "case/owners"
+      },
+      "resource": "shared-memory-only usingcorrespondingcompletedcomputepeakreserved+2GiB perrank, noidle/noforeignPIDgate",
+      "timing_eligible": false,
+      "admission": "6completefinite/nonskippedupdates; actual29Lownership; samefrozenfirst48documents; compute8ranksCPpairscompleteeventrows; ownersuniquestorage/liveintervals; actualnonemptyH requiredforsplit; no numericalacceptanceclaim"
+    }
+  ],
+  "offline": {
+    "compute": "cpu_calibrate29.py calibrate_dspp_stage.py --input fused/timeline split/timeline --cp-max --output backend-compute.json --report holdout.json",
+    "memory": "cpu_calibrate29.py calibrate_dspp_cp_memory.py --benchmark split-case --owners combined-owner-root --output backend-memory.json",
+    "guards": "OnlyafterGPUcaseclosed; helpermatches29Llayout. Matchstage/virtualchunk/model/CPimpl/hardware/FA/GEMM/runtimepatch identities; maxoverCPpairs. No profilefittingorownerhooksduringformalBcomparison."
+  },
+  "reuse": {
+    "p2p": "CheckexistingPP4twoCPlanesA800/NCCL/payloadcoverage; reusevalidmeasuredpoints, onlymeasuremissingedges/bytes. Bandwidthmeasurementexclusive.",
+    "memory": "Measuredallowancesnotcertifiedbounds; do notdividehistoryKVacrossCPblindly; preserveuncoveredworkspace/liveowners"
+  },
+  "timeout_seconds_per_case": 600,
+  "worker_source_preparation": {
+    "status": "script-prepared-not-run",
+    "script": "dspp/Megatron-LM-kwai/docs/assets/cp/b-v1-20261106/model29/prepare_model29_source.py",
+    "command": "docker exec tinacui-megatron /workspace/venvs/megatron/bin/python -u /workspace/experiments/dspp-cp-v1-20261106/prepare_model29_source.py",
+    "source": "/workspace/experiments/dspp-cp-v1-20261106/source-model29",
+    "reason": "Spawnedplanner doesnotinheritmainprocesscodepatch; materializesame2lineguardupdateinnewisolatedcopy. NeededbeforeBworkers; bothtemplate/Bandmatchingprofilesusenewcopy. Notproductionchange.",
+    "resource": "CPUonly, sharednumeric.lock rejectswhilecurrentformalrunning; afterbaselineGPUclose",
+    "proof": "model29-source-proof.json"
+  },
+  "split_cache_preparation": {
+    "entry": "dspp/Megatron-LM-kwai/docs/assets/cp/b-v1-20261106/model29/benchmark_entry29_profile.py",
+    "CPU_command": "env CUDA_VISIBLE_DEVICES= CP_V1_SOURCE=/workspace/experiments/dspp-cp-v1-20261106/source-model29 DSPP_FA_SPLIT_CACHE=/workspace/cache/dspp-fa-split python benchmark_entry29_profile.py --warm-cache-only",
+    "resource": "OnlywhenactiveformalGPUcloses; existingqueueCPUlockmustbeheld. Explicitarch8,0initializesnoCUDA.",
+    "guard": "Fourkernel sourcefilesmustexactlymatchpinnedexistingones; cachehashincludesTorch/CUDA/ABI/sourcebytes. Retainoriginalfilenames toavoiddirectory-onlyNinja rebuild; no installed/upstreamFA modifications. GPUprofile uses sameentrywithoutwarmflag."
+  },
+  "controller": "dspp/Megatron-LM-kwai/docs/assets/cp/b-v1-20261106/model29/run_profile29.py",
+  "bounded_batches": "Onehead/kind perbatch, max4cases; compute beforeowner; Codexanalyzeaftereachbatch. OwnercasesunfitmemorygopendingwithoutGPUlaunch; foreignPIDaloneallowed. Computeprofileexclusive, ownersneverthroughput.",
+  "ready_command_after_activation": "python run_profile29.py --head mha --kind compute --batch profile29-mha-compute-v1"
+}

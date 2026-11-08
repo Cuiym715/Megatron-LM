@@ -1,0 +1,41 @@
+{
+  "status": "excluded-external-GPU-load-no-throughput",
+  "first_unknown": {
+    "time": 1793932817.0606163,
+    "unknown": [
+      {
+        "uuid": "GPU-498d1b37-c44f-2c2c-e8d1-0c4b70fcb80d",
+        "pid": 353107,
+        "memory": "416 MiB",
+        "ancestry": [
+          {
+            "host_pid": 353107,
+            "namespace_pids": [
+              353107
+            ],
+            "name": "python",
+            "uid": "32021\t32021\t32021\t32021",
+            "state": "I (idle)",
+            "start_ticks": 499406935
+          }
+        ]
+      }
+    ]
+  },
+  "own_stop": {
+    "time": 1793932941.9950912,
+    "reason": "external GPU0 PID353107 entered; polluted timing, release our verified supervised process group only",
+    "controller": 1045690,
+    "timeout_pid": 1045712,
+    "start_ticks": 499404848,
+    "own_group_members": [
+      1045712,
+      1045713
+    ],
+    "signal": "SIGTERM",
+    "other_processes_signaled": false
+  },
+  "training_exit_code": 1,
+  "production_patch_unchanged": true,
+  "interpretation": "QO pilot cannot establish intrinsic runtime failure or speed; foreign GPU0 task entered. Do not blame its work or claim same QO hang root cause. External process untouched; our GPU ranks released."
+}

@@ -1,0 +1,266 @@
+{
+  "status": "timing-reviewed-numerical-errors-unresolved",
+  "numerically_certified": false,
+  "scope": "Current version performance only; preserve v5/v6 numerical failures. First batch of b; continue b then c\u2013f.",
+  "source": {
+    "archive": "/home/test/test01/tinacui/outputs/dspp-qo-20261105-exec01/candidate-theoretical-validated-source.tar.gz",
+    "archive_sha256": "abae3c76e26dd6e27fb51ee0d2ccddc3f8eee1feed8ce399f4a4c1c5503c807c",
+    "isolated": "/home/test/test01/tinacui/experiments/dspp-cp-v1-20261106/source-current",
+    "required_sha256": {
+      "megatron/core/kv_cache/dspp_cp_attention.py": "39ef16a0783275a85b8b490270b640c6c0b24935ec0534b4a58b91fdaa95a65c",
+      "megatron/core/kv_cache/dspp_cp_qo_attention.py": "5ac72e8c511a69587caf75eb8c685943173342893d195b102d6cfe914b9bb525",
+      "megatron/core/kv_cache/fa_split.py": "a1b629626db60c3bf4e1cbd330655f38a89ee32a9d465fdc46b37b76e464c31c",
+      "megatron/core/pipeline_parallel/dspp_prefetch.py": "67cd39528beacaf7b713e7e0e731b5417777a2d86298d07539215dc225926c9e",
+      "megatron/core/pipeline_parallel/dspp_plan_b.py": "4fea1ca686e6e78a918be5addc2e9b8e4a37d617946e0a8f7562fe4c642324c9",
+      "megatron/core/pipeline_parallel/schedules.py": "17ac7d968c556dacbe065ac1f62984db69bb1d18440ad080e34e023c54f5f4f2",
+      "tools/validate_dspp_plan_training.py": "3a14e107a562def59dd54fc1fa978b38253d8f3efe8d4387590ef7f36444f582",
+      "tools/benchmark_dspp_cp.py": "ab475be6a48e7453e397ea34cab58d90da62f2d147a47929d289a64789c06b74",
+      "examples/run_dspp_cp.sh": "0ea73366c186aab91193773116c2020c2e3f29915ab99a624c0615634328d83f"
+    },
+    "current_working_differences": [],
+    "selection": "validated archive, never unmeasured local/current working changes"
+  },
+  "arithmetic": "BF16 model/activation, full GEMM reduction, deterministic FA2 backward, common exact-p0 residual. Both backends identical; current long-input numerical errors unresolved. No CP1 canonical/pending wrappers.",
+  "warmup_control": "One CUDA synchronize + world barrier after first untimed complete update in both backends, then original5warm20timed. No P2P debug, stack/thread sampler or per-timed-update extra synchronization. Changes warmup only; original uninstrumented KV failure retained, not claimed repaired.",
+  "groups": {
+    "mha": {
+      "methods": {
+        "KV": {
+          "tokens_per_second": 12440.340630824327,
+          "peak_allocated_bytes": 10162472960,
+          "peak_reserved_bytes": 10326376448
+        },
+        "QO": {
+          "tokens_per_second": 9559.979265140131,
+          "peak_allocated_bytes": 9675720704,
+          "peak_reserved_bytes": 9869197312
+        }
+      },
+      "QO_vs_KV": -0.2315339628681321,
+      "pair_block_QO_vs_KV": [
+        -0.2512544127858395,
+        -0.2110439181234236
+      ]
+    },
+    "gqa1": {
+      "methods": {
+        "KV": {
+          "tokens_per_second": 12258.291450301907,
+          "peak_allocated_bytes": 8146766848,
+          "peak_reserved_bytes": 8407482368
+        },
+        "QO": {
+          "tokens_per_second": 9695.709491532407,
+          "peak_allocated_bytes": 8058177536,
+          "peak_reserved_bytes": 8367636480
+        }
+      },
+      "QO_vs_KV": -0.20904886860936778,
+      "pair_block_QO_vs_KV": [
+        -0.2312111217299344,
+        -0.18689779428440434
+      ]
+    }
+  },
+  "windows": [
+    {
+      "name": "mha-01-KV",
+      "valid_tokens": 109920,
+      "seconds": 8.725243352353573,
+      "tokens_per_second": 12597.929428564288,
+      "peak_allocated_bytes": 10162472960,
+      "peak_reserved_bytes": 10326376448
+    },
+    {
+      "name": "mha-02-QO",
+      "valid_tokens": 109920,
+      "seconds": 11.750941357575357,
+      "tokens_per_second": 9354.144204722716,
+      "peak_allocated_bytes": 9675720704,
+      "peak_reserved_bytes": 9869197312
+    },
+    {
+      "name": "mha-03-QO",
+      "valid_tokens": 109920,
+      "seconds": 11.685045821592212,
+      "tokens_per_second": 9406.895075831395,
+      "peak_allocated_bytes": 9675720704,
+      "peak_reserved_bytes": 9869197312
+    },
+    {
+      "name": "mha-04-KV",
+      "valid_tokens": 109920,
+      "seconds": 8.822348630055785,
+      "tokens_per_second": 12459.26732316233,
+      "peak_allocated_bytes": 10162472960,
+      "peak_reserved_bytes": 10326376448
+    },
+    {
+      "name": "mha-05-QO",
+      "valid_tokens": 109920,
+      "seconds": 11.22946652956307,
+      "tokens_per_second": 9788.53267077478,
+      "peak_allocated_bytes": 9675720704,
+      "peak_reserved_bytes": 9869197312
+    },
+    {
+      "name": "mha-06-KV",
+      "valid_tokens": 109920,
+      "seconds": 9.052929012104869,
+      "tokens_per_second": 12141.926646395168,
+      "peak_allocated_bytes": 10162472960,
+      "peak_reserved_bytes": 10326376448
+    },
+    {
+      "name": "mha-07-KV",
+      "valid_tokens": 109920,
+      "seconds": 8.742562691681087,
+      "tokens_per_second": 12572.97246545266,
+      "peak_allocated_bytes": 10162472960,
+      "peak_reserved_bytes": 10326376448
+    },
+    {
+      "name": "mha-08-QO",
+      "valid_tokens": 109920,
+      "seconds": 11.326277842745185,
+      "tokens_per_second": 9704.865228112605,
+      "peak_allocated_bytes": 9675720704,
+      "peak_reserved_bytes": 9848225792
+    },
+    {
+      "name": "gqa1-01-KV",
+      "valid_tokens": 109920,
+      "seconds": 8.817406120710075,
+      "tokens_per_second": 12466.251241600747,
+      "peak_allocated_bytes": 8146766848,
+      "peak_reserved_bytes": 8407482368
+    },
+    {
+      "name": "gqa1-02-QO",
+      "valid_tokens": 109920,
+      "seconds": 11.749619810841978,
+      "tokens_per_second": 9355.1963186563,
+      "peak_allocated_bytes": 8058177536,
+      "peak_reserved_bytes": 8346664960
+    },
+    {
+      "name": "gqa1-03-QO",
+      "valid_tokens": 109920,
+      "seconds": 10.918606974184513,
+      "tokens_per_second": 10067.218305401975,
+      "peak_allocated_bytes": 8058177536,
+      "peak_reserved_bytes": 8367636480
+    },
+    {
+      "name": "gqa1-04-KV",
+      "valid_tokens": 109920,
+      "seconds": 8.6096745217219,
+      "tokens_per_second": 12767.033146569685,
+      "peak_allocated_bytes": 8146766848,
+      "peak_reserved_bytes": 8407482368
+    },
+    {
+      "name": "gqa1-05-QO",
+      "valid_tokens": 109920,
+      "seconds": 11.598123641684651,
+      "tokens_per_second": 9477.39508526518,
+      "peak_allocated_bytes": 8058177536,
+      "peak_reserved_bytes": 8346664960
+    },
+    {
+      "name": "gqa1-06-KV",
+      "valid_tokens": 109920,
+      "seconds": 9.142117911018431,
+      "tokens_per_second": 12023.472139592533,
+      "peak_allocated_bytes": 8146766848,
+      "peak_reserved_bytes": 8407482368
+    },
+    {
+      "name": "gqa1-07-KV",
+      "valid_tokens": 109920,
+      "seconds": 9.29876899998635,
+      "tokens_per_second": 11820.919521730388,
+      "peak_allocated_bytes": 8146766848,
+      "peak_reserved_bytes": 8407482368
+    },
+    {
+      "name": "gqa1-08-QO",
+      "valid_tokens": 109920,
+      "seconds": 11.081542925909162,
+      "tokens_per_second": 9919.196337091465,
+      "peak_allocated_bytes": 8058177536,
+      "peak_reserved_bytes": 8367636480
+    }
+  ],
+  "runtime_correction": "CommonKV/QO NCCLenqueueMutex/Workwaitoutside/nativeorder0 plus persistentPP CUDAstreams; isolated2line source-derivedpatch, originaldepth1, noaddedperupdateGPUfence, noCPUdiagnostic sampler. Staticpatchidentityoutside timing; cachefinalaftertiming.; isolatedlayoutfunctioncode admitsPP4/29 sameendpoint3/2, nativeVPP2args validatedCPU; actualglobalownedlayers checkedbeforefirstuntimedupdate andafterwindow receipts.",
+  "runtime_entry_sha256": "d7df563b129fb939cb554ce4de94d87c073065f09ce01bd502a1121e980f0440",
+  "model": {
+    "layers": 29,
+    "hidden": 2048,
+    "ffn": 5504,
+    "q_heads": 16,
+    "head_dim": 128,
+    "pp": 4,
+    "cp": 2,
+    "tp": 1,
+    "sample_dp": 1,
+    "virtual_chunks": 2,
+    "layers_per_virtual_stage": "3/4/4/4/4/4/4/2",
+    "chunk": 2048,
+    "max_seq": 32768,
+    "micro_batch": 4,
+    "global_batch": 8,
+    "seed": 1234,
+    "layout": "endpoint-3-2",
+    "vocab": 32128,
+    "physical_layers": [
+      5,
+      8,
+      8,
+      8
+    ]
+  },
+  "workload": "short-packed-v512",
+  "input_identity": {
+    "status": "frozen-verified",
+    "time": 1793945697.2690928,
+    "workload": "short-packed-v512",
+    "bin_sha256": "7b67be0bd1262c616a0937b068bf789ca51f16bc1da50d7cc8c9fcf7abbb8941",
+    "idx_sha256": "c718656caa29547ce35aea1b6f3281483d6325df637a4a157e2538eab2fb6606",
+    "bin_size": 352256,
+    "bin_mtime_ns": 1793945670000000000,
+    "bin_inode": 162130346559748065,
+    "bin_resolved_path": "/workspace/experiments/dspp-cp-v1-20261106/data-v1/short-packed-v512.bin",
+    "source_metadata": {
+      "name": "short-packed-v512",
+      "vocab": 512,
+      "documents": 256,
+      "training_lengths_pattern": [
+        800,
+        224,
+        600,
+        424,
+        1500,
+        548,
+        700,
+        700
+      ],
+      "repeats": 32,
+      "single_loader_train_iters": 25,
+      "documents_consumed": 200,
+      "bin_sha256": "7b67be0bd1262c616a0937b068bf789ca51f16bc1da50d7cc8c9fcf7abbb8941",
+      "idx_sha256": "c718656caa29547ce35aea1b6f3281483d6325df637a4a157e2538eab2fb6606",
+      "first_update_valid_tokens": 5496,
+      "timed_valid_tokens": 109920
+    },
+    "truncated_documents": 0,
+    "native_reader_verified": true,
+    "token_range": [
+      1,
+      511
+    ],
+    "cuda_initialized": false,
+    "view_content_sha256": "49dfaf5e9b8dbad791d4d0803215cd4ce4ddd274d1b8478385b4126150ac8ec2",
+    "binary_hash_scope": "entire synthetic file"
+  }
+}

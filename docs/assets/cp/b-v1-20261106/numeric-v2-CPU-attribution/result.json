@@ -1,0 +1,1016 @@
+{
+  "scope": "first aligned full update, one rank per replicated CP pair, full model; not trajectory",
+  "elements": 271352832,
+  "gradient_relative_l2": 0.0025703055138441722,
+  "gradient_changed_signs": 111392,
+  "changed_sign_fraction": 0.00041050612657692845,
+  "master_update_relative_l2": 0.026962870085012827,
+  "master_update_gate": 0.02,
+  "master_update_pass": false,
+  "native_failures": [],
+  "largest_gradient_relative_errors": [
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0037181467603698616,
+      "changed_signs": 4,
+      "gradient_error_ss": 3.1514721900061414e-08,
+      "reference_ss": 0.00227960931599408
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.003702849326399537,
+      "changed_signs": 7255,
+      "gradient_error_ss": 7.339408026550457e-05,
+      "reference_ss": 5.3528977994768585
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.1.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.003669246160817508,
+      "changed_signs": 0,
+      "gradient_error_ss": 1.0201041786614289e-08,
+      "reference_ss": 0.0007576887335924485
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.embedding.word_embeddings.weight",
+      "elements": 32899072,
+      "gradient_relative_l2": 0.0036081535434322512,
+      "changed_signs": 966,
+      "gradient_error_ss": 0.00012552168442565948,
+      "reference_ss": 9.64159173333071
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.word_embeddings.weight",
+      "elements": 32899072,
+      "gradient_relative_l2": 0.0036081535434322512,
+      "changed_signs": 966,
+      "gradient_error_ss": 0.00012552168442565948,
+      "reference_ss": 9.64159173333071
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0035404631660664165,
+      "changed_signs": 0,
+      "gradient_error_ss": 4.950142975168426e-09,
+      "reference_ss": 0.00039490950054240785
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.0035079866318068246,
+      "changed_signs": 3381,
+      "gradient_error_ss": 0.0010712662578958951,
+      "reference_ss": 87.05256389439708
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.1.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.003434428593719045,
+      "changed_signs": 6599,
+      "gradient_error_ss": 2.243098531619758e-05,
+      "reference_ss": 1.9016884489940322
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.0.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0033054299734687244,
+      "changed_signs": 2,
+      "gradient_error_ss": 1.748631103836492e-08,
+      "reference_ss": 0.0016004506134860265
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.1.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.0032676667614173647,
+      "changed_signs": 3198,
+      "gradient_error_ss": 0.0003191154262515057,
+      "reference_ss": 29.88630868157543
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.0031309011792999396,
+      "changed_signs": 5921,
+      "gradient_error_ss": 9.916529423971136e-06,
+      "reference_ss": 1.0116283334636247
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.1.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0029853144917403943,
+      "changed_signs": 2,
+      "gradient_error_ss": 2.3132086362534726e-09,
+      "reference_ss": 0.000259558124080076
+    }
+  ],
+  "all_parameter_gradients": [
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.embedding.word_embeddings.weight",
+      "elements": 32899072,
+      "gradient_relative_l2": 0.0036081535434322512,
+      "changed_signs": 966,
+      "gradient_error_ss": 0.00012552168442565948,
+      "reference_ss": 9.64159173333071
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.0.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0033054299734687244,
+      "changed_signs": 2,
+      "gradient_error_ss": 1.748631103836492e-08,
+      "reference_ss": 0.0016004506134860265
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.0.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 0.0028658021058577256,
+      "changed_signs": 3859,
+      "gradient_error_ss": 3.4693611768048236e-05,
+      "reference_ss": 4.224323015080735
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.002541799085251574,
+      "changed_signs": 907,
+      "gradient_error_ss": 0.0008399058176508876,
+      "reference_ss": 130.00143651888504
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0037181467603698616,
+      "changed_signs": 4,
+      "gradient_error_ss": 3.1514721900061414e-08,
+      "reference_ss": 0.00227960931599408
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.003702849326399537,
+      "changed_signs": 7255,
+      "gradient_error_ss": 7.339408026550457e-05,
+      "reference_ss": 5.3528977994768585
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.0035079866318068246,
+      "changed_signs": 3381,
+      "gradient_error_ss": 0.0010712662578958951,
+      "reference_ss": 87.05256389439708
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.1.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.002485290161573719,
+      "changed_signs": 0,
+      "gradient_error_ss": 6.168268561319124e-09,
+      "reference_ss": 0.0009986402657547453
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.1.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 0.0023373078332172216,
+      "changed_signs": 3255,
+      "gradient_error_ss": 1.2762779005177707e-05,
+      "reference_ss": 2.336218292547869
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.1.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.0022865848018138566,
+      "changed_signs": 820,
+      "gradient_error_ss": 0.0003632574442878174,
+      "reference_ss": 69.47681451840181
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.1.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.003669246160817508,
+      "changed_signs": 0,
+      "gradient_error_ss": 1.0201041786614289e-08,
+      "reference_ss": 0.0007576887335924485
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.1.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.003434428593719045,
+      "changed_signs": 6599,
+      "gradient_error_ss": 2.243098531619758e-05,
+      "reference_ss": 1.9016884489940322
+    },
+    {
+      "rank": 0,
+      "name": "0:module.module.language_model.encoder.layers.1.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.0032676667614173647,
+      "changed_signs": 3198,
+      "gradient_error_ss": 0.0003191154262515057,
+      "reference_ss": 29.88630868157543
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.language_model.encoder.layers.0.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.00012370234897980559,
+      "changed_signs": 0,
+      "gradient_error_ss": 6.198869542672902e-13,
+      "reference_ss": 4.0509473951252676e-05
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.language_model.encoder.layers.0.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 1.5670231657563314e-05,
+      "changed_signs": 27,
+      "gradient_error_ss": 2.391007387039937e-11,
+      "reference_ss": 0.09737110179096978
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 5.572412835971189e-06,
+      "changed_signs": 0,
+      "gradient_error_ss": 9.75760839093173e-11,
+      "reference_ss": 3.1423663564667006
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 3.609511845196486e-05,
+      "changed_signs": 0,
+      "gradient_error_ss": 5.2045173726256166e-14,
+      "reference_ss": 3.9946940235472406e-05
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 3.7196426123625944e-06,
+      "changed_signs": 0,
+      "gradient_error_ss": 1.34988161265671e-12,
+      "reference_ss": 0.09756482118919363
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 6.333287661726992e-07,
+      "changed_signs": 0,
+      "gradient_error_ss": 6.206706054331674e-13,
+      "reference_ss": 1.547400558170315
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.language_model.encoder.layers.1.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 1.3184850218546464e-06,
+      "changed_signs": 0,
+      "gradient_error_ss": 5.637851296924623e-17,
+      "reference_ss": 3.243121473240512e-05
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.language_model.encoder.layers.1.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 4.3411489999014737e-08,
+      "changed_signs": 0,
+      "gradient_error_ss": 1.5352996658704532e-16,
+      "reference_ss": 0.08146738400139167
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.language_model.encoder.layers.1.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.0,
+      "changed_signs": 0,
+      "gradient_error_ss": 0.0,
+      "reference_ss": 2.8329927341605683
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.language_model.encoder.layers.1.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0,
+      "changed_signs": 0,
+      "gradient_error_ss": 0.0,
+      "reference_ss": 3.871593288475557e-05
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.language_model.encoder.layers.1.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.0,
+      "changed_signs": 0,
+      "gradient_error_ss": 0.0,
+      "reference_ss": 0.09222254960019301
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.language_model.encoder.layers.1.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.0,
+      "changed_signs": 0,
+      "gradient_error_ss": 0.0,
+      "reference_ss": 1.482124888964669
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.language_model.encoder.final_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0,
+      "changed_signs": 0,
+      "gradient_error_ss": 0.0,
+      "reference_ss": 0.000755453850580645
+    },
+    {
+      "rank": 0,
+      "name": "1:module.module.word_embeddings.weight",
+      "elements": 32899072,
+      "gradient_relative_l2": 0.0036081535434322512,
+      "changed_signs": 966,
+      "gradient_error_ss": 0.00012552168442565948,
+      "reference_ss": 9.64159173333071
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.0.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.002665425783214859,
+      "changed_signs": 0,
+      "gradient_error_ss": 3.7723054518697206e-09,
+      "reference_ss": 0.0005309744972958349
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.0.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 0.002367965082674161,
+      "changed_signs": 2990,
+      "gradient_error_ss": 7.535821396720995e-06,
+      "reference_ss": 1.343940397663855
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.002252580443724525,
+      "changed_signs": 737,
+      "gradient_error_ss": 0.00022275350888827615,
+      "reference_ss": 43.89994085948575
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0035404631660664165,
+      "changed_signs": 0,
+      "gradient_error_ss": 4.950142975168426e-09,
+      "reference_ss": 0.00039490950054240785
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.0031309011792999396,
+      "changed_signs": 5921,
+      "gradient_error_ss": 9.916529423971136e-06,
+      "reference_ss": 1.0116283334636247
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.0029290969982876756,
+      "changed_signs": 2812,
+      "gradient_error_ss": 0.00014093357428507247,
+      "reference_ss": 16.426572654171828
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.1.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0023474665138705116,
+      "changed_signs": 1,
+      "gradient_error_ss": 2.1345845593560857e-09,
+      "reference_ss": 0.0003873598035867352
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.1.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 0.0021653709588943877,
+      "changed_signs": 2781,
+      "gradient_error_ss": 4.757475566797464e-06,
+      "reference_ss": 1.0146399329534816
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.1.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.0021686204092455823,
+      "changed_signs": 676,
+      "gradient_error_ss": 0.00015550631365465653,
+      "reference_ss": 33.06594545487303
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.1.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0029853144917403943,
+      "changed_signs": 2,
+      "gradient_error_ss": 2.3132086362534726e-09,
+      "reference_ss": 0.000259558124080076
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.1.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.0027885290976495244,
+      "changed_signs": 5441,
+      "gradient_error_ss": 5.291736474532091e-06,
+      "reference_ss": 0.6805308965006027
+    },
+    {
+      "rank": 2,
+      "name": "0:module.module.language_model.encoder.layers.1.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.0026020258092647485,
+      "changed_signs": 2438,
+      "gradient_error_ss": 7.404706543603741e-05,
+      "reference_ss": 10.936658508219946
+    },
+    {
+      "rank": 2,
+      "name": "1:module.module.language_model.encoder.layers.0.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0009628829477283743,
+      "changed_signs": 0,
+      "gradient_error_ss": 4.35127186196557e-11,
+      "reference_ss": 4.693201784433402e-05
+    },
+    {
+      "rank": 2,
+      "name": "1:module.module.language_model.encoder.layers.0.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 0.0005996574434568172,
+      "changed_signs": 912,
+      "gradient_error_ss": 4.310030481130306e-08,
+      "reference_ss": 0.11985989248574762
+    },
+    {
+      "rank": 2,
+      "name": "1:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.0003808452852294736,
+      "changed_signs": 113,
+      "gradient_error_ss": 5.602520207548653e-07,
+      "reference_ss": 3.8626580645687607
+    },
+    {
+      "rank": 2,
+      "name": "1:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0010331080334004751,
+      "changed_signs": 0,
+      "gradient_error_ss": 4.5234237740151795e-11,
+      "reference_ss": 4.238144881359459e-05
+    },
+    {
+      "rank": 2,
+      "name": "1:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.00043529503810040227,
+      "changed_signs": 779,
+      "gradient_error_ss": 2.2727563772468114e-08,
+      "reference_ss": 0.11994591220621896
+    },
+    {
+      "rank": 2,
+      "name": "1:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.00020803390788092963,
+      "changed_signs": 206,
+      "gradient_error_ss": 8.020259447149017e-08,
+      "reference_ss": 1.8531909168265555
+    },
+    {
+      "rank": 2,
+      "name": "1:module.module.language_model.encoder.layers.1.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0006720028500571721,
+      "changed_signs": 0,
+      "gradient_error_ss": 1.750673634413945e-11,
+      "reference_ss": 3.8767068468915315e-05
+    },
+    {
+      "rank": 2,
+      "name": "1:module.module.language_model.encoder.layers.1.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 0.0003215925120953953,
+      "changed_signs": 530,
+      "gradient_error_ss": 1.135340010262853e-08,
+      "reference_ss": 0.10977768969599919
+    },
+    {
+      "rank": 2,
+      "name": "1:module.module.language_model.encoder.layers.1.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.00016014297984864528,
+      "changed_signs": 42,
+      "gradient_error_ss": 8.790949085640838e-08,
+      "reference_ss": 3.427835356976193
+    },
+    {
+      "rank": 2,
+      "name": "1:module.module.language_model.encoder.layers.1.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0006110345276819996,
+      "changed_signs": 0,
+      "gradient_error_ss": 1.846610147779315e-11,
+      "reference_ss": 4.9458815902527127e-05
+    },
+    {
+      "rank": 2,
+      "name": "1:module.module.language_model.encoder.layers.1.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.0001398687569896686,
+      "changed_signs": 250,
+      "gradient_error_ss": 2.2963221470083984e-09,
+      "reference_ss": 0.11737926446059417
+    },
+    {
+      "rank": 2,
+      "name": "1:module.module.language_model.encoder.layers.1.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 3.338591790036459e-05,
+      "changed_signs": 33,
+      "gradient_error_ss": 1.975283209030766e-09,
+      "reference_ss": 1.7721591844859466
+    },
+    {
+      "rank": 4,
+      "name": "0:module.module.language_model.encoder.layers.0.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0024773001072254017,
+      "changed_signs": 1,
+      "gradient_error_ss": 1.5309211796325471e-09,
+      "reference_ss": 0.00024945693871756777
+    },
+    {
+      "rank": 4,
+      "name": "0:module.module.language_model.encoder.layers.0.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 0.002109918893053581,
+      "changed_signs": 2542,
+      "gradient_error_ss": 2.9609893692845103e-06,
+      "reference_ss": 0.6651281460869114
+    },
+    {
+      "rank": 4,
+      "name": "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.0020588443859462123,
+      "changed_signs": 707,
+      "gradient_error_ss": 9.039679597469668e-05,
+      "reference_ss": 21.32583244268182
+    },
+    {
+      "rank": 4,
+      "name": "0:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0029493329016257435,
+      "changed_signs": 0,
+      "gradient_error_ss": 1.4546818513237942e-09,
+      "reference_ss": 0.00016723240260143528
+    },
+    {
+      "rank": 4,
+      "name": "0:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.002534373546606164,
+      "changed_signs": 4845,
+      "gradient_error_ss": 3.001152918157986e-06,
+      "reference_ss": 0.46724737585764053
+    },
+    {
+      "rank": 4,
+      "name": "0:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.0023051429212722894,
+      "changed_signs": 2238,
+      "gradient_error_ss": 4.151415168341004e-05,
+      "reference_ss": 7.812687499369907
+    },
+    {
+      "rank": 4,
+      "name": "0:module.module.language_model.encoder.layers.1.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.002056636951343469,
+      "changed_signs": 0,
+      "gradient_error_ss": 8.445592324894413e-10,
+      "reference_ss": 0.00019967093194382077
+    },
+    {
+      "rank": 4,
+      "name": "0:module.module.language_model.encoder.layers.1.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 0.0019171335033144304,
+      "changed_signs": 2431,
+      "gradient_error_ss": 1.7302092939060467e-06,
+      "reference_ss": 0.4707539001390588
+    },
+    {
+      "rank": 4,
+      "name": "0:module.module.language_model.encoder.layers.1.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.001866170071325194,
+      "changed_signs": 600,
+      "gradient_error_ss": 5.497635953205202e-05,
+      "reference_ss": 15.786052313815008
+    },
+    {
+      "rank": 4,
+      "name": "0:module.module.language_model.encoder.layers.1.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.002570273958560416,
+      "changed_signs": 2,
+      "gradient_error_ss": 9.75651290923365e-10,
+      "reference_ss": 0.00014768479733754314
+    },
+    {
+      "rank": 4,
+      "name": "0:module.module.language_model.encoder.layers.1.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.0022328403390294667,
+      "changed_signs": 4267,
+      "gradient_error_ss": 1.8391988775050887e-06,
+      "reference_ss": 0.36890399124028084
+    },
+    {
+      "rank": 4,
+      "name": "0:module.module.language_model.encoder.layers.1.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.0020376083089290757,
+      "changed_signs": 1934,
+      "gradient_error_ss": 2.3819843802659347e-05,
+      "reference_ss": 5.737167155262943
+    },
+    {
+      "rank": 4,
+      "name": "1:module.module.language_model.encoder.layers.0.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0013624346507630958,
+      "changed_signs": 0,
+      "gradient_error_ss": 1.1161099574062834e-10,
+      "reference_ss": 6.012784262597373e-05
+    },
+    {
+      "rank": 4,
+      "name": "1:module.module.language_model.encoder.layers.0.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 0.0010612628419943454,
+      "changed_signs": 1320,
+      "gradient_error_ss": 1.842632523081565e-07,
+      "reference_ss": 0.16360358471556655
+    },
+    {
+      "rank": 4,
+      "name": "1:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.0008564372703165385,
+      "changed_signs": 305,
+      "gradient_error_ss": 3.7271865767625927e-06,
+      "reference_ss": 5.081477607975474
+    },
+    {
+      "rank": 4,
+      "name": "1:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0015553654832093102,
+      "changed_signs": 0,
+      "gradient_error_ss": 1.3975244534408945e-10,
+      "reference_ss": 5.776895374758303e-05
+    },
+    {
+      "rank": 4,
+      "name": "1:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.0010026463266295616,
+      "changed_signs": 1824,
+      "gradient_error_ss": 1.5213677758555715e-07,
+      "reference_ss": 0.15133475539515026
+    },
+    {
+      "rank": 4,
+      "name": "1:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.0007094128211718335,
+      "changed_signs": 610,
+      "gradient_error_ss": 1.2481971960882788e-06,
+      "reference_ss": 2.4801910518343164
+    },
+    {
+      "rank": 4,
+      "name": "1:module.module.language_model.encoder.layers.1.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.001250441563440649,
+      "changed_signs": 1,
+      "gradient_error_ss": 9.162513903602593e-11,
+      "reference_ss": 5.859868161400242e-05
+    },
+    {
+      "rank": 4,
+      "name": "1:module.module.language_model.encoder.layers.1.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 0.0008533094075792112,
+      "changed_signs": 1177,
+      "gradient_error_ss": 1.009945862100552e-07,
+      "reference_ss": 0.13870273565268876
+    },
+    {
+      "rank": 4,
+      "name": "1:module.module.language_model.encoder.layers.1.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.0006347357943104827,
+      "changed_signs": 224,
+      "gradient_error_ss": 1.6957405389610669e-06,
+      "reference_ss": 4.208946668190039
+    },
+    {
+      "rank": 4,
+      "name": "1:module.module.language_model.encoder.layers.1.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0012152492867090392,
+      "changed_signs": 0,
+      "gradient_error_ss": 8.651523238339011e-11,
+      "reference_ss": 5.858168091665912e-05
+    },
+    {
+      "rank": 4,
+      "name": "1:module.module.language_model.encoder.layers.1.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.000712916394454355,
+      "changed_signs": 1379,
+      "gradient_error_ss": 6.912558684000428e-08,
+      "reference_ss": 0.13600711464044477
+    },
+    {
+      "rank": 4,
+      "name": "1:module.module.language_model.encoder.layers.1.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.00044518827032864603,
+      "changed_signs": 392,
+      "gradient_error_ss": 4.268198482184159e-07,
+      "reference_ss": 2.1535610146411566
+    },
+    {
+      "rank": 6,
+      "name": "0:module.module.language_model.encoder.layers.0.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.00216466873603971,
+      "changed_signs": 0,
+      "gradient_error_ss": 6.410637408319853e-10,
+      "reference_ss": 0.00013681015155009952
+    },
+    {
+      "rank": 6,
+      "name": "0:module.module.language_model.encoder.layers.0.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 0.0018022622889815438,
+      "changed_signs": 2108,
+      "gradient_error_ss": 1.1797478942523474e-06,
+      "reference_ss": 0.36320617192161636
+    },
+    {
+      "rank": 6,
+      "name": "0:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.0016694993882893302,
+      "changed_signs": 563,
+      "gradient_error_ss": 3.112898787465593e-05,
+      "reference_ss": 11.168438878061714
+    },
+    {
+      "rank": 6,
+      "name": "0:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0024285089840745512,
+      "changed_signs": 1,
+      "gradient_error_ss": 6.255842332408401e-10,
+      "reference_ss": 0.00010607336971870828
+    },
+    {
+      "rank": 6,
+      "name": "0:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.0020020901387885815,
+      "changed_signs": 3883,
+      "gradient_error_ss": 1.1458723927878932e-06,
+      "reference_ss": 0.2858702774226776
+    },
+    {
+      "rank": 6,
+      "name": "0:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.0017642234240659179,
+      "changed_signs": 1688,
+      "gradient_error_ss": 1.4518567071356895e-05,
+      "reference_ss": 4.664623406420537
+    },
+    {
+      "rank": 6,
+      "name": "0:module.module.language_model.encoder.layers.1.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0019517075462739861,
+      "changed_signs": 1,
+      "gradient_error_ss": 4.4546609375256923e-10,
+      "reference_ss": 0.00011694594592403563
+    },
+    {
+      "rank": 6,
+      "name": "0:module.module.language_model.encoder.layers.1.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 0.001581811304141329,
+      "changed_signs": 1977,
+      "gradient_error_ss": 7.57494395436465e-07,
+      "reference_ss": 0.30274018659262525
+    },
+    {
+      "rank": 6,
+      "name": "0:module.module.language_model.encoder.layers.1.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.0014979020246078812,
+      "changed_signs": 443,
+      "gradient_error_ss": 2.1046451816652513e-05,
+      "reference_ss": 9.380199472309222
+    },
+    {
+      "rank": 6,
+      "name": "0:module.module.language_model.encoder.layers.1.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.002284257319763937,
+      "changed_signs": 1,
+      "gradient_error_ss": 4.850170848172235e-10,
+      "reference_ss": 9.295376528508262e-05
+    },
+    {
+      "rank": 6,
+      "name": "0:module.module.language_model.encoder.layers.1.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.0017207586888845277,
+      "changed_signs": 3185,
+      "gradient_error_ss": 7.531957666396748e-07,
+      "reference_ss": 0.2543711937016577
+    },
+    {
+      "rank": 6,
+      "name": "0:module.module.language_model.encoder.layers.1.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.0015123608852999123,
+      "changed_signs": 1366,
+      "gradient_error_ss": 9.12070838658618e-06,
+      "reference_ss": 3.98765610117374
+    },
+    {
+      "rank": 6,
+      "name": "1:module.module.language_model.encoder.layers.0.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0017476063335593159,
+      "changed_signs": 1,
+      "gradient_error_ss": 2.821240563852647e-10,
+      "reference_ss": 9.237466991918121e-05
+    },
+    {
+      "rank": 6,
+      "name": "1:module.module.language_model.encoder.layers.0.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 0.0014071688526970602,
+      "changed_signs": 1802,
+      "gradient_error_ss": 4.5611181755031916e-07,
+      "reference_ss": 0.230345057222696
+    },
+    {
+      "rank": 6,
+      "name": "1:module.module.language_model.encoder.layers.0.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.001278109927647592,
+      "changed_signs": 400,
+      "gradient_error_ss": 1.3506955119157425e-05,
+      "reference_ss": 8.268391662036857
+    },
+    {
+      "rank": 6,
+      "name": "1:module.module.language_model.encoder.layers.0.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0018722469221613893,
+      "changed_signs": 1,
+      "gradient_error_ss": 3.1088750327142403e-10,
+      "reference_ss": 8.869048186250524e-05
+    },
+    {
+      "rank": 6,
+      "name": "1:module.module.language_model.encoder.layers.0.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.0014856550861816781,
+      "changed_signs": 2896,
+      "gradient_error_ss": 4.7321025823421263e-07,
+      "reference_ss": 0.2143967326090392
+    },
+    {
+      "rank": 6,
+      "name": "1:module.module.language_model.encoder.layers.0.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.0012303886030207846,
+      "changed_signs": 1129,
+      "gradient_error_ss": 5.318413462718957e-06,
+      "reference_ss": 3.513156509378203
+    },
+    {
+      "rank": 6,
+      "name": "1:module.module.language_model.encoder.layers.1.input_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0015198454151725419,
+      "changed_signs": 0,
+      "gradient_error_ss": 2.06255682731909e-10,
+      "reference_ss": 8.929087680190257e-05
+    },
+    {
+      "rank": 6,
+      "name": "1:module.module.language_model.encoder.layers.1.self_attention.query_key_value.weight",
+      "elements": 3145728,
+      "gradient_relative_l2": 0.0011904168063750441,
+      "changed_signs": 1664,
+      "gradient_error_ss": 2.85499096248283e-07,
+      "reference_ss": 0.20146826135098395
+    },
+    {
+      "rank": 6,
+      "name": "1:module.module.language_model.encoder.layers.1.self_attention.dense.weight",
+      "elements": 1048576,
+      "gradient_relative_l2": 0.0010809274735997002,
+      "changed_signs": 396,
+      "gradient_error_ss": 6.76591255466129e-06,
+      "reference_ss": 5.790729386484178
+    },
+    {
+      "rank": 6,
+      "name": "1:module.module.language_model.encoder.layers.1.post_attention_layernorm.weight",
+      "elements": 1024,
+      "gradient_relative_l2": 0.0017156752583825934,
+      "changed_signs": 0,
+      "gradient_error_ss": 1.9513660761034946e-10,
+      "reference_ss": 6.629313753394906e-05
+    },
+    {
+      "rank": 6,
+      "name": "1:module.module.language_model.encoder.layers.1.mlp.dense_h_to_4h.weight",
+      "elements": 5767168,
+      "gradient_relative_l2": 0.001275105182013635,
+      "changed_signs": 2284,
+      "gradient_error_ss": 2.7453594738445066e-07,
+      "reference_ss": 0.16885238411090225
+    },
+    {
+      "rank": 6,
+      "name": "1:module.module.language_model.encoder.layers.1.mlp.dense_4h_to_h.weight",
+      "elements": 2883584,
+      "gradient_relative_l2": 0.0009657707430874397,
+      "changed_signs": 901,
+      "gradient_error_ss": 2.6058680323632666e-06,
+      "reference_ss": 2.79385799724077
+    }
+  ],
+  "cuda_initialized": false,
+  "interpretation": "Small gradient error and sign changes may explain Adam first-update sensitivity, but signs alone do not prove a routing/kernel root cause. No thresholds changed."
+}

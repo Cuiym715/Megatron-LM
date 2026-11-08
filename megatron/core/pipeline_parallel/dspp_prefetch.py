@@ -76,6 +76,8 @@ def _planner_main(jobs, results):
             result = dict(iteration=iteration, input_hash=input_hash, plan=plan.to_dict(),
                 worker_started_at=started, worker_verified_at=time.perf_counter(),
                 worker_cuda_initialized=torch.cuda.is_initialized(), error=None)
+            if getattr(request[0], 'dspp_memory_report_dir', None):
+                result['memory_report'] = request[0]._dspp_memory_plan
         except Exception as exc:
             result = dict(iteration=iteration, input_hash=input_hash, plan=None,
                 worker_started_at=started, worker_verified_at=time.perf_counter(),
@@ -85,10 +87,11 @@ def _planner_main(jobs, results):
 
 
 class CpuPlanner:
-    def __init__(self):
+    def __init__(self, *, target=None, target_args=()):
         ctx = mp.get_context('spawn')
         self.jobs, self.results = ctx.Queue(maxsize=1), ctx.Queue(maxsize=2)
-        self.process = ctx.Process(target=_planner_main, args=(self.jobs, self.results), daemon=True)
+        self.process = ctx.Process(target=target or _planner_main,
+                                   args=(self.jobs, self.results, *target_args), daemon=True)
         # Set these before spawn imports torch/numpy, then restore the parent.
         names = ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'CUDA_VISIBLE_DEVICES')
         old = {name: os.environ.get(name) for name in names}
@@ -215,13 +218,14 @@ def choose_plan(packet, result, reference=None):
 class DsppIterationPrefetch:
     """Opt-in training iterator wrapper. It is never stored in checkpoint args."""
 
-    def __init__(self, args, data_iterator, get_batch_func):
+    def __init__(self, args, data_iterator, get_batch_func, *, planner_factory=None, plan_selector=None):
         from megatron.core.datasets.dspp_calibration import stage_context
         from megatron.microbatches import build_num_microbatches_calculator
-        freeze_runtime_profiles(args)
+        if not getattr(args, 'dspp_chunk_model', None):
+            freeze_runtime_profiles(args)
         self.args, self.materialize = args, get_batch_func.dspp_materialize_cpu
         self.rank = dist.get_rank()
-        # DP=TP=CP=1: the world is exactly one PP replica. This group is not
+        # TP=sample-DP=1: the world is exactly one PP x CP replica. This group is not
         # shared with current-iteration ready/credit/ack or training NCCL.
         self.group = dist.new_group(ranks=list(range(dist.get_world_size())), backend='gloo')
         self.source = self.rank == 0
@@ -233,6 +237,7 @@ class DsppIterationPrefetch:
         self.prepared_memory = None
         self.prepared_reference = None
         self.checked_execution = None
+        self.plan_selector = plan_selector
         if self.source:
             self.iterator = data_iterator[0] if isinstance(data_iterator, list) else data_iterator
             self.cfg = SimpleNamespace(**deepcopy({k: v for k, v in vars(args).items()
@@ -242,7 +247,7 @@ class DsppIterationPrefetch:
             self.calculator = build_num_microbatches_calculator(
                 SimpleNamespace(**{**vars(self.cfg), 'rank': 1}))
             try:
-                self.planner = CpuPlanner()
+                self.planner = (planner_factory or CpuPlanner)()
             except Exception as exc:
                 self.worker_startup_error = f'worker-startup: {type(exc).__name__}: {exc}'
         atexit.register(self.close)
@@ -274,6 +279,7 @@ class DsppIterationPrefetch:
         metadata = tuple(DsppTrainingBatch(b.plan, (), input_identity=b.input_identity) for b in batches)
         request = (cfg, metadata, self.contexts, started)
         reference, _ = _build(request, False)
+        reference_memory = getattr(cfg, '_dspp_memory_plan', None)
         cpu_ordering = cfg._dspp_cpu_ordering
         cpu_counts = tuple(cfg._dspp_cpu_counts)
         self.prepared_reference = (iteration, reference)
@@ -294,6 +300,10 @@ class DsppIterationPrefetch:
         metrics = dict(requested_at=started, fetched_at=fetched, metadata_ready_at=ready,
             enqueued_at=time.perf_counter(), host_bytes=host_bytes, metadata_bytes=metadata_bytes,
             submission_error=error, states=['fetched', 'metadata_ready', 'prepared-fallback', 'planning'])
+        if getattr(cfg, 'dspp_memory_report_dir', None):
+            # The template report was computed above; copy it before cfg's
+            # private fields are stripped for the spawned planner request.
+            metrics['memory_report'] = reference_memory
         return CpuIteration(iteration, consumed, num_microbatches, tuple(batches),
                             {}, reference.binding.input_hash, metrics, cpu_ordering, cpu_counts)
 
@@ -326,8 +336,8 @@ class DsppIterationPrefetch:
                 # Only cold start waits for optimization. Later boundaries use
                 # an available verified result or the same-input fallback.
                 until = begin + self.args.dspp_prefetch_timeout if cold else time.perf_counter()
-                while True:
-                    if self.planner is None or not self.planner.process.is_alive():
+                while not packet.metrics.get('rule_only', False):
+                    if self.planner is None or self.planner.process is None or not self.planner.process.is_alive():
                         packet.metrics['submission_error'] = self.worker_startup_error or 'worker-unavailable'
                         break
                     item = self.planner.poll()
@@ -341,7 +351,9 @@ class DsppIterationPrefetch:
                     else:
                         time.sleep(.002)
                 reference = self.prepared_reference[1]
-                plan, reason = choose_plan(packet, result, reference=reference)
+                plan, reason = (self.plan_selector or choose_plan)(packet, result, reference=reference)
+                if result and not reason and 'memory_report' in result:
+                    packet.metrics['memory_report'] = result['memory_report']
                 checked = None
                 packet.metrics.update(cold=cold, fallback_reason=reason, late_results=self.late_results,
                     boundary_started_at=begin, input_wait_ms=(input_ready-begin)*1000,
@@ -390,7 +402,7 @@ class DsppIterationPrefetch:
             ordering = self._active_cpu_ordering
             counts = self._active_cpu_counts
             self.args._dspp_counted_memory = None
-            self.args._dspp_memory_plan = None
+            self.args._dspp_memory_plan = self.active.get('memory_report')
             self.args._dspp_last_schedule_plan = plan.to_dict()
         except Exception as exc:
             error = f'{type(exc).__name__}: {exc}'

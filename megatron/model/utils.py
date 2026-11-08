@@ -94,9 +94,29 @@ if _compile_swiglu:
     swiglu = torch.compile(swiglu, dynamic=True)
 
 
-def slice_lm_inputs_along_cp(input_ids, position_ids, attention_mask, labels):
+def slice_lm_inputs_along_cp(input_ids, position_ids, attention_mask, labels, dspp_state=None):
     CP = mpu.get_context_parallel_world_size()
     if CP >= 2:
+        if dspp_state is not None:
+            from megatron.core.datasets.dspp_cp_layout import cp_token_ranges
+            meta = dspp_state.current_meta
+            rank = mpu.get_context_parallel_rank()
+            if dspp_state.cp_layout == 'hybrid':
+                indices = dspp_state.cp_ownership(meta, CP).rank_indices[rank]
+            else:
+                indices = tuple(i for a, b in cp_token_ranges(meta.chunk_size, CP, rank)
+                                for i in range(a, b))
+            def select(tensor):
+                if tensor is None or not isinstance(tensor, torch.Tensor):
+                    return tensor
+                key = ('input-index', meta.microbatch_id, rank, tensor.device)
+                index = dspp_state._cp_prepared.get(key)
+                if index is None:
+                    index = torch.tensor(indices, dtype=torch.long, device=tensor.device)
+                    dspp_state._cp_prepared[key] = index
+                valid = tensor.index_select(-1, index)
+                return torch.nn.functional.pad(valid, (0, meta.chunk_size//CP-len(indices)))
+            return select(input_ids), select(position_ids), attention_mask, select(labels)
         # Check inputs with the same context parallel rank are equal
         args = get_args()
         if args.curr_iteration < args.iteration + args.kaimm_warmup_iters:
@@ -116,7 +136,11 @@ def slice_lm_inputs_along_cp(input_ids, position_ids, attention_mask, labels):
     return input_ids, position_ids, attention_mask, labels
 
 
-def gather_post_lm_output_along_cp(output):
+def gather_post_lm_output_along_cp(output, dspp_state=None):
+    if (dspp_state is not None and dspp_state.cp_layout == 'hybrid'
+            and mpu.get_context_parallel_world_size() > 1):
+        from megatron.core.kv_cache.dspp_cp_attention import dspp_cp_gather_output
+        return dspp_cp_gather_output(output, dspp_state, mpu.get_context_parallel_group())
     return dattention.forward_gather_backward_slice(output, 1, mpu.get_context_parallel_group())
 
 

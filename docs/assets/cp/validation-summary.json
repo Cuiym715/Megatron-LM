@@ -1,0 +1,236 @@
+{
+  "note": "Completed reports; original failures retained. Archival hashes are computed once outside training.",
+  "memory": [
+    {
+      "rank": 6,
+      "within_bound": true,
+      "allocated_peak": 10192158720
+    },
+    {
+      "rank": 7,
+      "within_bound": true,
+      "allocated_peak": 10154809344
+    },
+    {
+      "rank": 4,
+      "within_bound": true,
+      "allocated_peak": 10284549120
+    },
+    {
+      "rank": 2,
+      "within_bound": true,
+      "allocated_peak": 9914286080
+    },
+    {
+      "rank": 5,
+      "within_bound": true,
+      "allocated_peak": 10255341568
+    },
+    {
+      "rank": 1,
+      "within_bound": true,
+      "allocated_peak": 10028107776
+    },
+    {
+      "rank": 0,
+      "within_bound": true,
+      "allocated_peak": 10143392768
+    },
+    {
+      "rank": 3,
+      "within_bound": true,
+      "allocated_peak": 9905756160
+    }
+  ],
+  "profiles": [
+    {
+      "path": "/workspace/outputs/dspp-cp-longtask-20261101-1602/profile-long-v512/compute-clean.json",
+      "bytes": 17452653,
+      "sha256": "659b6bdbd66cfbebbf296028dc261f1f5e7e0db0af1d0a87392f867338453e84"
+    },
+    {
+      "path": "/workspace/outputs/dspp-cp-longtask-20261101-1602/profile-long-v512/memory.json",
+      "bytes": 8098,
+      "sha256": "75dee90fd32f2d9052d0ab2a3ce3394b651f0e2b1f1887d5744c508fc5c62637"
+    },
+    {
+      "path": "/workspace/outputs/dspp-cp-longtask-20261101-1602/profile-long-v512/p2p.json",
+      "bytes": 20666,
+      "sha256": "1de9644f3de7ecf9b7211210830244c0e4a94da8e246e62556f743dab39738e8"
+    }
+  ],
+  "online": {
+    "reports": 16,
+    "checks": 112,
+    "passed": 112,
+    "failed_categories": []
+  },
+  "cp_aware_cp1": {
+    "reports": 12,
+    "checks": 84,
+    "passed": 77,
+    "failed_categories": [
+      "logits",
+      "outputs"
+    ]
+  },
+  "cp_aware_immediate": {
+    "reports": 12,
+    "checks": 84,
+    "passed": 84,
+    "failed_categories": []
+  },
+  "tests": {
+    "cpu_main": "58 passed;8 obsolete-contract tests deselected",
+    "cp1_native": "42 passed; old x-grid assertion failed; revised single-launch contract:1 passed",
+    "profile_hardware": "6 passed",
+    "gpu_wait": "2 passed"
+  },
+  "remote_root": "/workspace/outputs/dspp-cp-longtask-20261101-1602",
+  "operators": [
+    {
+      "run": "contracts-cp-aware",
+      "statuses": [
+        "passed",
+        "passed"
+      ],
+      "cases_per_rank": [
+        81,
+        81
+      ]
+    },
+    {
+      "run": "contracts-cross-bin-baseline",
+      "statuses": [
+        "passed",
+        "passed"
+      ],
+      "cases_per_rank": [
+        9,
+        9
+      ]
+    },
+    {
+      "run": "contracts-full-v2",
+      "statuses": [
+        "passed",
+        "passed"
+      ],
+      "cases_per_rank": [
+        72,
+        72
+      ]
+    },
+    {
+      "run": "contracts-hybrid-v1",
+      "statuses": [
+        "passed",
+        "passed"
+      ],
+      "cases_per_rank": [
+        72,
+        72
+      ]
+    },
+    {
+      "run": "contracts-kv-fused-hybrid",
+      "statuses": [
+        "passed",
+        "passed"
+      ],
+      "cases_per_rank": [
+        72,
+        72
+      ]
+    },
+    {
+      "run": "contracts-kv-fused-paired",
+      "statuses": [
+        "passed",
+        "passed"
+      ],
+      "cases_per_rank": [
+        72,
+        72
+      ]
+    }
+  ],
+  "full_updates": [
+    {
+      "run": "update-aligned-v2/cp2-fused",
+      "reports": 12,
+      "comparisons": 84,
+      "passed": 84
+    },
+    {
+      "run": "update-aligned-v2/cp2-immediate",
+      "reports": 12,
+      "comparisons": 84,
+      "passed": 84
+    },
+    {
+      "run": "update-cp-aware-cp2/cp1-comparison-report",
+      "reports": 12,
+      "comparisons": 84,
+      "passed": 77
+    },
+    {
+      "run": "update-cp-aware-cp2/immediate",
+      "reports": 12,
+      "comparisons": 84,
+      "passed": 84
+    },
+    {
+      "run": "update-delayed-v1",
+      "reports": 12,
+      "comparisons": 84,
+      "passed": 84
+    },
+    {
+      "run": "update-delayed-v2-stream",
+      "reports": 12,
+      "comparisons": 84,
+      "passed": 84
+    },
+    {
+      "run": "update-online-pp4-v1/online",
+      "reports": 16,
+      "comparisons": 112,
+      "passed": 112
+    }
+  ],
+  "limits": {
+    "aligned_updates": "Parameters and optimizer state aligned to the reference before every update; not a continuous-trajectory equivalence test.",
+    "online_reference": "Same CP2 fused template, not CP1.",
+    "unresolved_forward": "No same-failing-input ablation of basic CP, hybrid ownership, KV fusion and cp-aware packing. Cause remains unconfirmed.",
+    "update-v1": "Later continuous BF16 trajectory gradients exceeded original criteria. Partial completed JSON counts do not establish a pass.",
+    "cp_aware_performance": "CPU/payload measurements only; no candidate-specific end-to-end throughput benchmark."
+  },
+  "obsolete_test_contracts": [
+    {
+      "test": "test_v3_identity_and_layout_cannot_silently_reuse_other_profiles",
+      "count": 1,
+      "obsolete_requirement": "CountedMemory content fingerprint"
+    },
+    {
+      "test": "test_underestimated_analytic_floors_rejected",
+      "count": 3,
+      "obsolete_requirement": "Repeated full analytic-floor validation on each construction"
+    },
+    {
+      "test": "test_checked_execution_binds_actual_input_plan_and_current_contract",
+      "count": 2,
+      "obsolete_requirement": "Full graph/checksum/input audit"
+    },
+    {
+      "test": "test_fast_commit_has_one_agreement_and_catches_corruption_before_materialization",
+      "count": 1,
+      "obsolete_requirement": "Old agreement mock and full corruption audit"
+    },
+    {
+      "test": "test_fast_commit_still_checks_live_gpu_capacity",
+      "count": 1,
+      "obsolete_requirement": "Deleted repeated fast-commit GPU capacity audit"
+    }
+  ]
+}

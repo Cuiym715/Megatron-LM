@@ -20,6 +20,7 @@ from .dspp_plan import (
 from .dspp_memory_counts import CountedMemory
 from .dspp_plan_b import plan_configuration_b
 from .dspp_plan_c import plan_configuration_c
+from megatron.core.datasets.dspp_theoretical_cost import TheoreticalCostModel
 
 
 def _file_version(path):
@@ -111,6 +112,13 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
     planning_begin = time.perf_counter() if planning_started is None else planning_started
     mode = getattr(args, 'dspp_schedule', 'template')
     explicit_history = explicit_history or (mode in ('b', 'c') and not forward_only)
+    # A CP prefetch template with the same split/profile configuration is the
+    # unsplit v2 fallback used by B, suitable for a like-for-like comparison.
+    explicit_history = explicit_history or (not forward_only
+        and getattr(args, 'context_parallel_size', 1) > 1
+        and getattr(args, 'dspp_memory_profile', None)
+        and getattr(args, 'dspp_split_attention_backward', False)
+        and getattr(args, 'dspp_history_dkv_after_dx', False))
     binding, task_map, metadata, slot_meta, execution_version = runtime_inputs(
         args, len(schedules), schedule_groups, batches, dtype, tensor_shape,
         chunk_size, forward_only)
@@ -121,8 +129,9 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
         raise ValueError('explicit D/H requires fixed capacity, after-dx and a memory profile')
     reference = template_plan(schedules, split_counts, task_map, binding,
         history_dependencies=history_dependencies(task_map, metadata) if explicit_history else None)
-    payload_bytes = chunk_size * args.hidden_size * (2 if str(dtype) in {'torch.bfloat16', 'torch.float16'} else 4)
-    reference = replace(reference, wire_shape=(chunk_size, 1, args.hidden_size),
+    local_capacity = chunk_size // getattr(args, 'context_parallel_size', 1)
+    payload_bytes = local_capacity * args.hidden_size * (2 if str(dtype) in {'torch.bfloat16', 'torch.float16'} else 4)
+    reference = replace(reference, wire_shape=(local_capacity, 1, args.hidden_size),
                         wire_dtype=str(dtype), wire_bytes=payload_bytes)
     memory_path = getattr(args, 'dspp_memory_profile', None)
     memory = (CountedMemory.load(memory_path, args, reference, slot_meta, dtype, chunk_size)
@@ -138,17 +147,20 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
         raise ValueError('P1 A requires fused B, without dKV splitting')
     if getattr(args, 'dspp_auto_chunk_size', False):
         raise ValueError('schedule A/B/C requires fixed chunk size')
+    theoretical = getattr(args, 'dspp_cost_model', 'profile') == 'theoretical'
     execution_path = getattr(args, 'dspp_execution_profile', None)
-    if not execution_path:
+    if not theoretical and not execution_path:
         raise ValueError('schedule A/B/C requires an explicit execution profile')
-    model = load_runtime_calibration(execution_path, execution_version)
-    if mode in ('b', 'c') and not isinstance(model, StageCalibration):
+    model = TheoreticalCostModel(args, metadata) if theoretical else load_runtime_calibration(execution_path, execution_version)
+    stage_model = isinstance(model, (StageCalibration, TheoreticalCostModel))
+    if mode in ('b', 'c') and not stage_model:
         raise ValueError('B/C requires a versioned complete-stage calibration')
-    enforce_uncertainty = not (isinstance(model, StageCalibration) and
-        model.interpolation_policy.get('acceptance') == 'nominal-makespan-v1')
-    contexts = calibration_contexts or ({(stage, chunk): stage_context(args, stage, chunk)
+    enforce_uncertainty = not (theoretical or (isinstance(model, StageCalibration) and
+        model.interpolation_policy.get('acceptance') == 'nominal-makespan-v1'))
+    contexts = calibration_contexts or ({(stage, chunk): (
+                    dict(stage=stage, virtual_chunk=chunk) if theoretical else stage_context(args, stage, chunk))
                 for stage in range(len(schedules)) for chunk in range(2)
-                } if isinstance(model, StageCalibration) else {})
+                } if stage_model else {})
     compute, tokens, errors, unreliable = {}, {}, {}, False
     for seq in schedules:
         for n in seq:
@@ -156,7 +168,7 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
             if meta is None:
                 compute[key] = 0.0
                 continue
-            if isinstance(model, StageCalibration):
+            if stage_model:
                 prediction = model.predict_detailed(contexts[n.stage, n.chunk],
                     'B_fused' if n.kind == 'B' else n.kind, meta)
             else:
@@ -165,17 +177,19 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
             if prediction.source == 'validated-query-interpolation':
                 errors[key] = prediction.error_ms
             if (prediction.duration_ms is None or not math.isfinite(prediction.duration_ms) or prediction.duration_ms <= 0 or prediction.extrapolated
-                    or prediction.confidence not in {'high', 'medium'}):
+                    or prediction.confidence not in ({'assumed'} if theoretical else {'high', 'medium'})):
                 unreliable = True
             if n.kind == 'F':
                 tokens[key] = meta.valid_token_count
     if unreliable:
         return reference, replace(reference, algorithm=mode.upper(), fallback_reason='unreliable-compute-cost')
-    p2p = load_p2p_cost_model(getattr(args, 'dspp_p2p_profile', None))
+    p2p = None if theoretical else load_p2p_cost_model(getattr(args, 'dspp_p2p_profile', None))
     messages = {}
     # Wire tensors have fixed dense capacity even for communication-only padding.
     for (sender, receiver), lane in receive_orders(schedules).items():
-        if isinstance(model, StageCalibration):
+        if theoretical:
+            duration = model.p2p_ms(payload_bytes)
+        elif stage_model:
             prediction = p2p.predict_detailed(payload_bytes,
                 direction=f'{sender}->{receiver}', overlap='compute')
             if prediction.extrapolated:
@@ -200,7 +214,7 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
                              for op in ('D', 'H')]
                 if any(p.duration_ms is None or not math.isfinite(p.duration_ms)
                        or p.duration_ms <= 0 or p.extrapolated
-                       or p.confidence not in {'high', 'medium'} for p in estimates):
+                       or p.confidence not in ({'assumed'} if theoretical else {'high', 'medium'}) for p in estimates):
                     unavailable.append(node_key(n))
                 else:
                     split_costs[node_key(n)] = tuple(p.duration_ms for p in estimates)
@@ -223,6 +237,8 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
                                                   enforce=enforce_uncertainty)
         args._dspp_memory_plan = memory.check(candidate)
         candidate.planning_info['unavailable_split_costs'] = unavailable
+        if theoretical:
+            candidate.planning_info.update(model.assumptions())
         # Export cost belongs to planning; collective publication is recorded
         # separately by the executor and never treated as hidden work.
         elapsed = (time.perf_counter()-planning_begin)*1000

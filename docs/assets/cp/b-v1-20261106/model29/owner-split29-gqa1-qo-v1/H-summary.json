@@ -1,0 +1,68 @@
+{
+  "status": "complete-function-only",
+  "history": [
+    {
+      "rank": 0,
+      "completed_jobs": 810,
+      "nonempty_parts": 2400,
+      "history_tokens": 12902400
+    },
+    {
+      "rank": 1,
+      "completed_jobs": 810,
+      "nonempty_parts": 2400,
+      "history_tokens": 12902400
+    },
+    {
+      "rank": 2,
+      "completed_jobs": 1296,
+      "nonempty_parts": 3840,
+      "history_tokens": 20643840
+    },
+    {
+      "rank": 3,
+      "completed_jobs": 1296,
+      "nonempty_parts": 3840,
+      "history_tokens": 20643840
+    },
+    {
+      "rank": 4,
+      "completed_jobs": 1296,
+      "nonempty_parts": 3840,
+      "history_tokens": 20643840
+    },
+    {
+      "rank": 5,
+      "completed_jobs": 1296,
+      "nonempty_parts": 3840,
+      "history_tokens": 20643840
+    },
+    {
+      "rank": 6,
+      "completed_jobs": 1296,
+      "nonempty_parts": 3840,
+      "history_tokens": 20643840
+    },
+    {
+      "rank": 7,
+      "completed_jobs": 1296,
+      "nonempty_parts": 3840,
+      "history_tokens": 20643840
+    }
+  ],
+  "updates_per_rank": 6,
+  "owner_files": 16,
+  "numerically_certified": false,
+  "scope": "Original29LGQA1Q16QO targetshape function andowners only; not fused/split gradientupdate comparison,25updatestability orformalperformance",
+  "source": {
+    "status": "prepared-isolated-realfile-layout29",
+    "time": 1793953380.1284137,
+    "source": "/workspace/experiments/dspp-cp-v1-20261106/source-model29",
+    "base_archive_sha256": "abae3c76e26dd6e27fb51ee0d2ccddc3f8eee1feed8ce399f4a4c1c5503c807c",
+    "only_changed_file": "megatron/core/dspp_layout.py",
+    "old_sha256": "d7c70e3ffe5b69f30fa784efac60e6dfd69d6bc34b84a434221c51021cfac24f",
+    "new_sha256": "8e39ba56c0c749b33b501533a97f2e4b48f212239f2693ef63b2a6cf2dd77da2",
+    "reason": "SpawnedCPUplanner workers neednative29Llayout file, not onlymainprocessfunctionpatch. Effective29Llayerlogicidenticaltoalreadymeasuredbaselineentry.",
+    "production_modified": false
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "status": "frozen-ready-with-known-numerical-error",
+  "scope": "shared-resource functional liveness only, no numerical equivalence or throughput",
+  "model": {
+    "layers": 16,
+    "hidden": 1024,
+    "ffn": 2816,
+    "q_heads": 8,
+    "head_dim": 128,
+    "pp": 4,
+    "cp": 2,
+    "tp": 1,
+    "sample_dp": 1,
+    "virtual_chunks": 2,
+    "layers_per_virtual_stage": 2,
+    "chunk": 2048,
+    "max_seq": 32768,
+    "micro_batch": 4,
+    "global_batch": 8,
+    "seed": 1234
+  },
+  "packing": "hybrid, baseline, warmup-short-steady-long, balanced; lookahead0/inflight1",
+  "arithmetic": "BF16 model/activation, full GEMM reduction, deterministic FA2 backward, common exact-p0 residual. Both backends identical; current long-input numerical errors unresolved. No CP1 canonical/pending wrappers.",
+  "first_batch": {
+    "dataset": "/workspace/outputs/dspp-cp-longtask-20261101-1602/data/longmix-v512",
+    "vocab": 512,
+    "kv_heads": [
+      8,
+      1
+    ],
+    "order_per_head_group": [
+      "KV"
+    ],
+    "warmup": 5,
+    "timed_updates": 3,
+    "windows": 1,
+    "job_timeout_seconds": 300,
+    "note": "Two ABBA pairs, second pair reversed to balance pair-block drift. Effective actual tokens from rank0 metrics per update; sum timed valid_tokens divided by slowest rank whole-window seconds. No padded maxseq-rate substitution. Same dataset binary/index SHA, seed, index-map identity, batch/sample ordering, optimizer and update count. Compare timed per-update valid_tokens and physical task counts across methods before admitting results.",
+    "dataloader": "single, frozen document order, dataset256documents;25*8=200documents without cycling",
+    "first_update_expected_training_lengths": [
+      32768,
+      24576,
+      16384,
+      12288,
+      800,
+      224,
+      600,
+      424
+    ],
+    "first_update_expected_valid_tokens": 88064,
+    "expected_valid_tokens_per_update": [
+      88064,
+      37286,
+      88064,
+      37286,
+      88064,
+      37286,
+      88064,
+      37286
+    ]
+  },
+  "timing_exclusions": "No tensor snapshots, owner audit, timeline/events, profiler, server CPU research/analysis/compression. Only low overhead GPU PID/resource and host load monitoring. Keep native raw times plus explicit exclusions when polluted.",
+  "review_gate": "2026-11-06 explicit user authorization replaces numerical-pass prerequisite for current-version performance across the entire a–f master plan. Preserve native v5/v6 failures, no tolerance relaxation or numerical certification. Require finite complete non-skipped updates, identical source/model/data/valid tokens and clean resources.",
+  "after_first_batch": "Analyze current end-to-end baseline before tuning; then short-tail/short-packing workloads, one arXiv with vocabulary explicitly declared, one representative frozenfirstQO; separate diagnosis/storage/capacity16/32/64K and matching backend F/B/D/H/W/P2P/memory before fourtemplate/B groups. No targetCP1 or6card results substituted.",
+  "actual_domain_gate": "Actual 32K/vocab512 domain identity bound to existing failed v5 input and manifest. User explicitly defers numerical diagnosis; no further numerical pass is required before performance. Label all results current version with unresolved numerical errors.",
+  "entry_env_required": {
+    "CP_V1_FULL_REDUCTION": "1",
+    "CP_V1_DETERMINISTIC_FA": "1"
+  },
+  "numerically_certified": false,
+  "authorization": "performance-authorization-20261106.json",
+  "warmup_control": "One CUDA synchronize + world barrier after first untimed complete update in both backends, then original5warm20timed. No P2P debug, stack/thread sampler or per-timed-update extra synchronization. Changes warmup only; original uninstrumented KV failure retained, not claimed repaired.",
+  "runtime_probe_evidence": "runtime-probe-v2 diagnostic three updates allrankcomplete, finite; stopped only by stale controller25record assertion. Diagnostic is not throughput.",
+  "nccl_control": {
+    "NCCL_LAUNCH_ORDER_IMPLICIT": "1",
+    "NCCL_LAUNCH_RACE_FATAL": "1",
+    "requires_loaded_nccl": ">=2.26 checked at startup",
+    "hypothesis": "Cross-communicator CP/main-thread and PP/send-thread launch ordering may explain debug-sensitive hang; not proved. Fatal race detection retained; do not disable.",
+    "sources": [
+      "https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/communicators.html#using-multiple-nccl-communicators-concurrently",
+      "https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html#nccl-launch-order-implicit"
+    ]
+  },
+  "timing_eligible": false,
+  "resource_mode": "shared-functional",
+  "required_free_MiB": 20480,
+  "minimum_free_during_run_MiB": 1024,
+  "admission": "Require8completefinite/nonskippedupdates onall8ranks; rawtimings excluded because shared. Doesnotcertify numericalequivalence orrepairoriginalnormalpath.",
+  "host_launch_correction": "One process-wideRLock around NCCL collective/P2Pbatch host API calls; Gloo bypasses, nativeisend/irecv identities retained, no newGPU synchronization ormathchanges; implicit1/racefatal1 retained"
+}

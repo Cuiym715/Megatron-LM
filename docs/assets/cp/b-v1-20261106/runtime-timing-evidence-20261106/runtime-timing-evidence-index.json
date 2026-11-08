@@ -1,0 +1,67 @@
+{
+  "baseline-longmix-v1": {
+    "status": "stopped",
+    "error": "AssertionError('failed/polluted mha-01-KV')",
+    "jobs": [
+      {
+        "name": "mha-01-KV",
+        "exit_code": 1,
+        "polluted": false
+      }
+    ],
+    "audit_unknown": false,
+    "production_patch_unchanged": true
+  },
+  "runtime-probe-v1": {
+    "status": "stopped",
+    "error": "AssertionError('failed/polluted mha-01-KV')",
+    "jobs": [
+      {
+        "name": "mha-01-KV",
+        "exit_code": 1,
+        "polluted": false
+      }
+    ],
+    "audit_unknown": false,
+    "production_patch_unchanged": true
+  },
+  "runtime-probe-v2": {
+    "status": "stopped",
+    "error": "AssertionError()",
+    "jobs": [
+      {
+        "name": "mha-01-KV",
+        "exit_code": 0,
+        "polluted": false
+      }
+    ],
+    "audit_unknown": false,
+    "production_patch_unchanged": true
+  },
+  "baseline-longmix-v2": {
+    "status": "stopped",
+    "error": "AssertionError('failed/polluted mha-01-KV')",
+    "jobs": [
+      {
+        "name": "mha-01-KV",
+        "exit_code": 124,
+        "polluted": false
+      }
+    ],
+    "audit_unknown": false,
+    "production_patch_unchanged": true
+  },
+  "qo-pilot-v1": {
+    "status": "stopped",
+    "error": "AssertionError('host ownership audit unavailable/unclean')",
+    "jobs": [
+      {
+        "name": "mha-01-QO",
+        "exit_code": 1,
+        "polluted": true
+      }
+    ],
+    "audit_unknown": true,
+    "production_patch_unchanged": true
+  }
+}

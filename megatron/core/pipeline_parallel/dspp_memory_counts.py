@@ -16,7 +16,7 @@ import torch
 from .dspp_plan import PlanOwner, digest, node_key, order_owner_peaks
 from .dspp_progress import dspp_communication_buffer_count
 from .dspp_memory_lifetimes import (
-    ACCOUNTING, CompiledStorage, stage_attention_sizes, records as storage_records,
+    ACCOUNTING, CompiledStorage, stage_attention_sizes, attention_token_counts, records as storage_records,
 )
 from megatron.core.dspp_layout import physical_layer_range
 from megatron.core.datasets.dspp_profile_snapshot import profile_snapshot
@@ -30,16 +30,24 @@ def memory_layout(args, pp, dtype, chunk_size):
         'rotary_percent', 'rotary_base', 'hidden_dropout', 'attention_dropout',
         'gradient_accumulation_fusion', 'tensor_model_parallel_size',
         'context_parallel_size', 'sequence_parallel', 'transformer_impl',
+        'dspp_cp_layout',
         'untie_embeddings_and_output_weights', 'recompute_granularity',
         'recompute_method', 'recompute_num_layers', 'use_flash_attn',
         'rms_norm', 'use_fast_rms_norm', 'layernorm_epsilon',
         'use_rotary_position_embeddings', 'disable_bias_linear',
         'bias_gelu_fusion', 'bias_dropout_fusion', 'fp32_residual_connection',
     )
-    return dict(pp=pp, vpp=2, dtype=str(dtype), chunk_size=chunk_size,
+    result = dict(pp=pp, vpp=2, dtype=str(dtype), chunk_size=chunk_size,
                 model={k: getattr(args, k, None) for k in names},
                 mode=('after-dx-eager-v1' if getattr(args, 'dspp_history_dkv_after_dx', False)
                       else 'fused-B-eager-v1'), torch=torch.__version__, cuda=torch.version.cuda)
+    if getattr(args,'context_parallel_size',1)>1:
+        from megatron.core.datasets.dspp_cp_layout import CP_IMPLEMENTATION
+        result['model']['kaimm_context_parallel_impl'] = getattr(args,'kaimm_context_parallel_impl','key-value')
+        result['cp_implementation'] = (
+            'owner-kv-query-out-fa-dh-v2' if getattr(args,'kaimm_context_parallel_impl','key-value') == 'query-out'
+            else CP_IMPLEMENTATION)
+    return result
 
 
 def history_state_bytes(args, pp, stage, chunk, meta):
@@ -64,12 +72,41 @@ def history_state_bytes(args, pp, stage, chunk, meta):
         stage, chunk)
     layers = end - begin
     q, k, c = meta.valid_token_count, sum(meta.key_lengths), meta.chunk_size
+    cp = getattr(args,'context_parallel_size',1)
+    if cp > 1 and getattr(args,'kaimm_context_parallel_impl','key-value') == 'query-out':
+        local_keys,_,_ = attention_token_counts(args,meta)
+        rows = sum(i.token_length for i in meta.items if i.has_history)
+        rounded = sum(i.token_length+5*127 for i in meta.items if i.has_history)
+        source = c//cp*((2*hq+2*hk)*dim*2+hq*4)+2*local_keys*hk*dim*2
+        # Retained H copies of full current Q/O/dO, global LSE and shared delta.
+        created = 3*rows*hq*dim*2+(rows+rounded)*hq*4
+        scratch = (2*local_keys*hq*dim*2+8*local_keys*hk*dim*2
+                   +((c+127)//128*128)*hq*dim*4)
+        return source*layers,created*layers,scratch
     source = (c * (2 * hq + 2 * hk) * dim * 2 + 2 * k * hk * dim * 2 + q * hq * 4)
     delta_rows = sum((i.token_length + 127) // 128 * 128 for i in meta.items)
     created = c * hq * dim * 2 + (q + delta_rows) * hq * 4
     # One layer at a time: query-head partials, compact dKV, concatenation,
     # routing and pending-add copies. Add to the existing workspace allowance.
     scratch = 2 * k * hq * dim * 2 + 8 * k * hk * dim * 2
+    cp = getattr(args, 'context_parallel_size', 1)
+    if cp > 1:
+        from megatron.core.datasets.dspp_cp_layout import (
+            cp_query_runs, hybrid_cp_ownership, owned_query_runs)
+        ownership = (hybrid_cp_ownership(meta, cp)
+                     if getattr(args, 'dspp_cp_layout', 'paired') == 'hybrid' else None)
+        created_by_rank, dq_workspace = [], []
+        for rank in range(cp):
+            runs = (owned_query_runs(meta, ownership.rank_indices[rank]) if ownership
+                    else cp_query_runs(meta, cp, rank))
+            history_runs = [r for r in runs if r.history_length]
+            rows = sum(r.local_end-r.local_begin for r in history_runs)
+            rounded = sum((r.local_end-r.local_begin+127)//128*128 for r in history_runs)
+            created_by_rank.append(c//cp*hq*dim*2 + (rows+rounded)*hq*4)
+            dq_workspace.append(max(((r.local_end-r.local_begin+127)//128*128
+                                     for r in runs), default=0)*hq*dim*4)
+        created = max(created_by_rank)
+        scratch += max(dq_workspace)
     return source * layers, created * layers, scratch
 
 
@@ -87,6 +124,8 @@ class CountedMemory:
         self.v3 = profile.get('schema') == 'dspp-counted-memory-v3'
         self.after_dx = bool(getattr(args, 'dspp_history_dkv_after_dx', False))
         self.args, self.reference, self.slot_meta = args, reference, slot_meta
+        self.local_attention_counts = {id(meta): attention_token_counts(args,meta)
+                                       for meta in slot_meta.values() if meta is not None}
         self.stages = profile['stages']
         growth = profile['dynamic_growth']
         self.version = 'process-memory-profile'

@@ -52,12 +52,20 @@ class _ItemLayout:
     history: Tuple[Tuple[int, int], ...]
 
 
+class HistoryGradientJob:
+    """A deferred history computation with no autograd or communication."""
+
+    def run(self):
+        raise NotImplementedError
+
+
 class DsppSequenceKVState:
     """Iteration-scoped per-layer, per-logical-sequence K/V state."""
 
     def __init__(self, *, validate_runtime: bool = False,
                  split_attention_backward: bool = False,
-                 history_dkv_after_dx: bool = False) -> None:
+                 history_dkv_after_dx: bool = False, cp_layout: str = 'paired',
+                 cp_impl: str = 'key-value') -> None:
         self._entries: Dict[Tuple[int, int], _SequenceLayerEntry] = {}
         self._current_meta: Optional[DsppMicrobatchMeta] = None
         self._prepared_cu_seqlens: Dict[
@@ -76,6 +84,18 @@ class DsppSequenceKVState:
         self._task_modes = None
         self._required_history = {}
         self._completed_history = set()
+        self._cp_prepared = {}
+        self.cp_layout = cp_layout
+        self.cp_impl = cp_impl
+
+    def cp_ownership(self, meta, size):
+        key = ('ownership', meta.microbatch_id, size)
+        result = self._cp_prepared.get(key)
+        if result is None:
+            from megatron.core.datasets.dspp_cp_layout import hybrid_cp_ownership
+            result = hybrid_cp_ownership(meta, size)
+            self._cp_prepared[key] = result
+        return result
 
     def configure_task_modes(self, metas, deferred_tasks) -> None:
         """Freeze selective paths and all history consumers before any F.
@@ -169,7 +189,11 @@ class DsppSequenceKVState:
         record['ready'] = False  # A failed H cannot be retried with partial contributions.
         from .fa_split import backward_dkv
         count = len(record['jobs'])
-        for split_state, layer_idx, layouts, current_shape in record['jobs']:
+        for job in record['jobs']:
+            if isinstance(job, HistoryGradientJob):
+                job.run()
+                continue
+            split_state, layer_idx, layouts, current_shape = job
             dk, dv = backward_dkv(split_state, "history", compact=True)
             self._route_key_value_grads(
                 layer_idx, layouts, dk, dv, current_shape,
@@ -468,6 +492,7 @@ class DsppSequenceKVState:
         self._entries.clear()
         self._current_meta = None
         self._prepared_cu_seqlens.clear()
+        self._cp_prepared.clear()
         self._completed_history.clear()
         self._task_modes = None
         self._required_history.clear()
@@ -478,6 +503,7 @@ class DsppSequenceKVState:
         self.assert_empty()
         self._current_meta = None
         self._prepared_cu_seqlens.clear()
+        self._cp_prepared.clear()
         self._completed_history.clear()
         self._task_modes = None
         self._required_history.clear()

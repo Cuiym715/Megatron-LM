@@ -1,0 +1,24 @@
+{
+  "status": "local-CPU-complete-await-native-CPU-activation-after-current-closes",
+  "purpose": "Reuse project Mistral32000 tokenizer and real arXiv text to prepare256whole documents for unchanged target model vocab32128, avoid native151936 model substitution",
+  "tokenizer": "dspp/archive/handoff/dspp-pp8-handoff-20261030/inputs/tokenizer.model",
+  "tokenizer_sha256": "dadfd56d766715c61d2ef780a525ab43b8e6da4de6865bda3d95fdef5e134055",
+  "provenance": "archived PP8 handoff baseline argv tokenizer Mistral-7B-v0.1; inputs/data/data.json vocab32000",
+  "source": "dspp/dspp-data/slimpajama_arxiv_50k.jsonl",
+  "selection": "first256whole documents with BOS/text/EOS length2..32769; retain source docIDs, reject overlength whole documents, no truncation or tokenID modulo mapping",
+  "resources": "Mac CPU only; sentencepiece0.2.1 in /tmp isolated target if needed. No server CPU analysis while current formal batch runs, no GPU use.",
+  "completion": "vocab32000 tokenizer verified, allIDs<32000, same32128 model, exact native mmap bin/idx lengths/pointers, SHA raw selected texts/tokenizer/output; later one bounded native CPU reader validation before GPUlaunch",
+  "data": "dspp/Megatron-LM-kwai/docs/assets/cp/b-v1-20261106/prepared-arxiv-target32128",
+  "model_vocab": 32128,
+  "documents": 256,
+  "token_range": [
+    1,
+    30567
+  ],
+  "truncated_documents": 0,
+  "timed_valid_tokens": 2285842,
+  "controller": "run_workload29_target.py",
+  "activation": "activate_arxiv_target.py",
+  "host_helper": "launch_arxiv_target_host.py",
+  "resource": "Same formal8GPU exclusive checks; unchanged current short-tail pinned scripts/protocol"
+}

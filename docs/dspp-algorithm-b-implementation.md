@@ -4,6 +4,10 @@
 
 ## 1. 当前算法与运行时
 
+CP 实现与全部实验结果统一见[CP report](dspp-context-parallel-execution-report.md)，下一步见[CP plan](dspp-context-parallel-implementation-plan.md)；下文 A800/PP8 结果仅适用于原 CP1 受控配置。
+
+2026-11-04的D/H tile分派设计、设备首次查询缓存及小规模验证单列于[实现报告增补](dspp-implementation-report.md#2026-11-04增补dh-tile分派与设备配置缓存)：D按FA2共享内存规则选择，H独立保留64×64；A800仍为D64×128/H64×64。本地改动经隔离副本验证，未覆盖服务器运行中任务的源码，不改写下文2026-11-01的训练吞吐记录。
+
 “算法B”指调度求解策略；任务类型`B`指未拆分的stage输入反向，两者不要混淆。给定当前iteration的输入顺序与分块，算法B先生成无拆分供给调度，再选择部分有history依赖的B替换成D/H：D交付完整stage的dx，H计算历史KV梯度。没有history的B不作为拆分候选。W仍是deferred weight-gradient任务。
 
 当前代码保留供给构造、关键路径单拆/配对搜索、H插入位置评分、最多32次接受轮次和soft deadline；没有改成beam/top-k，也没有因本轮输入固定而返回保存计划。真实执行仍由任务依赖、P2P与KV/W状态推进，预测时间只用于规划。

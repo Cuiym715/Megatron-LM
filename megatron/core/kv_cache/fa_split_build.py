@@ -60,14 +60,17 @@ def validate_sources() -> None:
 
 
 @functools.lru_cache(maxsize=1)
-def load_extension():
+def load_extension(arch=None):
     import torch
     from torch.utils.cpp_extension import load
 
     validate_sources()
-    if not torch.cuda.is_available():
-        raise RuntimeError("CUDA is required to build/test the stage-A extension")
-    arch = torch.cuda.get_device_capability()
+    if arch is None:
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA is required unless an offline build architecture is supplied")
+        arch = torch.cuda.get_device_capability()
+    # An explicit target compiles/loads only: no CUDA context or GPU allocation.
+    arch = tuple(arch)
     # Match only the current target; do not compile every GPU in the host.
     if arch[0] not in (8, 9):
         raise RuntimeError("Stage A supports SM80-SM90 only")

@@ -1,0 +1,13 @@
+--- 
++++ 
+@@ -312,8 +312,8 @@
+     # A queued send must depend on its producer, never on unrelated CP work
+     # enqueued later on the compute stream. Receives likewise have no producer
+     # compute dependency; their Work.wait joins compute only at consumption.
+-    send_streams = {peer: torch.cuda.Stream() for peer in expected_sends} if cp_p2p else {}
+-    recv_streams = {peer: torch.cuda.Stream() for peer in expected_sends} if cp_p2p else {}
++    send_streams = {peer: _persistent_pp_stream(stage, peer, "send") for peer in expected_sends} if cp_p2p else {}
++    recv_streams = {peer: _persistent_pp_stream(stage, peer, "recv") for peer in expected_sends} if cp_p2p else {}
+     recv_lookahead = int(getattr(args, 'dspp_recv_lookahead', 2))
+     send_inflight_depth = int(
+         getattr(args, 'dspp_send_inflight_depth', 2)
