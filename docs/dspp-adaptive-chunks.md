@@ -1,46 +1,46 @@
-# 可调的轻量 chunk 选择
+# DSPP 端到端执行入口
 
-2026-11-06：实现与 CPU 集成验证完成。GPU 数值、显存实测、预测排序和吞吐评估待空闲卡；该功能显式开启，现有固定 chunk 和 CP 路径保持默认行为。
+历史版本保存在提交 `7b13bda9e`。当前使用普通 `pretrain_llama.py` 入口，不再叠加历史实验 entry/runtime monkeypatch。
 
-## 使用入口
+- `--dspp-schedule template`：SPP packing、规则 ordering、VZB 模板。
+- `--dspp-schedule b`：供给构造，然后最长序列尾部前沿 D/H 搜索；并列最长序列分别处理，每个 stage/VPP/序列接受一次后向前开放，最多接受32次。
+- 固定容量使用 `--micro-seq-length`；B没有2048限制，成本和显存profile必须对应实际容量。
+- CP1自动容量使用 `--dspp-prefetch --dspp-chunk-model FILE`。从模型域端点和当前输入的切片数变化点生成候选，用真实 packing 块数粗评。只对前两名做完整精评并复用其 packing，选中容量最多运行一次 B。`--dspp-chunk-fixed C` 可固定容量并复用同一执行路径。
+- 供给构造仅保留C++实现，通过 `--dspp-planner-backend cpp`（默认）接入固定和自动路径。
+- 删除旧 `--dspp-auto-chunk-size`、旧A/C命令入口、canonical attention适配器、逐任务时间线/显存审计/进度探针和一次性实验脚本。旧参数将由解析器拒绝，不会静默选择旧实现。
 
-在原 CP1、BF16、head-dim=128、after-dx、prefetch 训练命令上添加：
+## 时间模型
 
-```sh
---dspp-chunk-model /path/to/model.json \
---dspp-chunk-points 64 \
---dspp-chunk-step 64 \
---dspp-chunk-spacing log \
---dspp-chunk-score pipeline
-```
+执行使用原生BF16 attention；自动容量模型的execution为 `native-default-bf16-v1`。已复用原生2K/4K F/B/W、历史原生2K D/H、局部跨容量数据及现有P2P，导出 `profiles/dspp-native-pp8/model.json`。通过 `--dspp-chunk-model profiles/dspp-native-pp8/model.json` 加载。详细评估优先用全部944个实测键，未命中才使用拟合；局部数据只参与拟合，不冒充PP8实测。旧canonical数据未混入。原生模型已完成CPU接入，仍需目标PP8大容量成本、H延后显存与GPU验证，具体见 [补测清单](dspp-native-profile-plan.md) 和 `profiles/dspp-native-pp8/profile-plan.json`。
 
-`--dspp-schedule template` 只执行所选 base；`--dspp-schedule b` 对选中容量运行一次 B。使用正常训练入口，不叠加旧 chunk-v1 的实验 entry/monkeypatch，也不打开旧的 `--dspp-auto-chunk-size`。新 bundle 已含成本、P2P、显存估计，旧 compute/P2P/memory profile 参数不参与新路径，初始化也不读取它们。
+## 保留逻辑及原因
 
-`--dspp-chunk-fixed 2048` 是同执行方式、同模型下的固定容量对照；默认 0 表示自动选择。64 点、64 token 网格和 pipeline 评分是临时默认值，未认定最优。`step=1` 允许任意整数容量，但仍只采样至多 `points` 个值；不是遍历所有整数。
+- 图依赖、FIFO、每chunk W累加顺序：定义合法执行次序，删除会改变训练结果或造成通信死锁。
+- H插位后的显存可行性计算：这是调度目标约束，H延后会延长KV/梯度存活期；不是重复输入审计。
+- 预算截止与未及时完成时的同轮模板回退：让训练不等待后台规划。
+- 异步结果的轮次绑定、分布式失败传播：避免执行上一轮计划或让其他rank永远等待。
+- 初始化时检查真实算子支持条件和模型执行模式：BF16/head-dim128、CP分片整除、TP/VPP支持范围不能通过删除断言获得实现。
+- 单元测试及离线profile/模型导出/内核构建工具：用于验证修改和生成算法必需的成本；不在训练热路径运行。
 
-当前导出包的搜索域是 2048～8192，由同执行方式的 PP8 实测数据范围确定。代码没有这个区间的常量，也没有四候选名单。更换有效模型可以改变搜索域。3058、3072、3840 等容量的 metadata/base 已完成 CPU 检查，3058 另完成真实 worker 的一次 B 和物化检查；实际 GPU 行为还待验证。
+仅保留完整更新时间、有效tokens、计划选择/回退等轻量性能信息；不记录逐任务CUDA事件或完整执行计划。
 
-## 在线工作
+## 正式计时
 
-1. 序列长度直方图只统计一次；按点数、间隔、linear/log 参数直接生成有限采样点，不枚举整个整数区间。
-2. 批量计算七特征及每 stage 预计工作量；`work` 用总工作量，`pipeline` 用瓶颈 stage 工作量乘以简化填充代价。后者是待评估的粗评分，非完整 VZB makespan。
-3. 取前二，再补当前值，最多三个候选。实际重新 packing/ordering，构造 VZB、history/P2P 依赖，计算显存和完整 base 时间。
-4. 直接复用选中候选的 metadata/base/compute/messages，只给它创建一个 B 请求。B 的现有总预算包含本轮前端准备时间。
+`examples/run_dspp.sh` 是普通训练入口，模型、数据和profile参数由调用方传入。
+需要连续窗口结果时，用torchrun运行 `tools/benchmark_dspp.py`，传入相同训练参数；设置 `DSPP_BENCH_OUTPUT`、`DSPP_BENCH_WARMUP=5`、`DSPP_BENCH_TIMED=20` 和 `--train-iters 25`。只在窗口边界同步；输出所有rank耗时、最慢rank有效tokens/s和显存峰值。不保留输入或完整计划，不做全参数比较。
 
-模型和静态配置每个进程启动时加载一次。worker 初始化时收到静态 bundle，此后请求只含变化的计划、metadata 和成本。没有每轮 token SHA、静态 profile 传输、重复整图验证或完整 worker 结果日志；接收端保留轮次、输入归属和 wire shape 判断。依赖/容量计算及既有物化失败 rendezvous 仍保留。
+仓库外旧a4–a6冻结目录不属于本次备份commit，未改写其历史证据；不能再用其entry/runtime注入脚本启动本版本。
 
-当前 bundle 使用 `canonical-query-v2` 执行适配器：沿用原四容量实验的确定性 FA、完整 BF16 归约、FP32 pending 和零 dropout 路径。fused backward 在各物理 chunk 内按至多 2048 query 的 tile 逆序执行，D/H 保持原生算子。新容量会改变 tile 划分，不能由 CPU 计划合法推断 GPU 梯度/更新已通过。适配器仅由新功能初始化安装，CP1 之外不可开启。
+固定容量B的静态配置、冻结profile和stage contexts随worker启动传入一次；每轮只传metadata、已构建ordering/counts及轮次时间，不再复制整份配置/profile到IPC。
 
-## 模型与 CPU 验证
+## 本次验证边界
 
-离线导出使用同配置/同执行方式的冻结 compact snapshots，按 stage、virtual chunk 和 F/B/W/D/H 分组拟合七特征非负模型。已测签名优先查小表；每组最多保留 32 个聚合点，不保存原始重复记录。运行时不拟合。当前包 145,839 bytes，80 组模型；初始化约 4.85 ms（g37 独立 CPU 测量）。
+2026-11-08：纯CPU回归覆盖尾部候选、真实Plan依赖与回放、64/3058/4096容量、预算/显存拒绝、C++编译执行、H插位和常驻worker请求协议。运行 `python3 tests/unit_tests/dspp/test_algorithm_b.py`。Python编译、启动脚本语法和已删除模块引用检查同时通过。本机无PyTorch/CUDA，未执行完整PyTorch测试集或GPU训练；不得把这些CPU结果标为端到端验收。
 
-显存使用已有记录的最大 bytes/token 系数和静态项构造估计，再由实际任务 lifetimes 检查。它是推导的模型，尚不是新容量的实测保证。D/H 目前只有 2048 的同执行方式数据，其他容量可求解，但预测精度仍待 GPU 检查。
+## 小批次流水线空泡（2026-11-09）
 
-```sh
-python tools/export_dspp_chunk_model.py --profiles-dir /path/to/frozen/profiles --output /path/to/model.json
-CUDA_VISIBLE_DEVICES= python tools/validate_dspp_chunk_cpu.py \
-  --model /path/to/model.json --output /tmp/chunk-cpu.json --unit-tests
-```
+真实任务不足以填满V流水线warmup时，空位只用于生成八阶段相位顺序，不产生F/B/W节点、占位张量或P2P消息。单个microbatch同样可调度；真实依赖未满足时自然等待。固定入口、预取worker和容量模型入口均传真实split counts，时间/显存模型与执行器使用同一份无占位任务计划。删除原 `_pad_dspp_v_split_counts` 及执行器的padding收发分支。
 
-CPU 验证工具独立加载真实 metadata 模块，避免初始化训练应用；不启动 GPU 或通信组。覆盖有限采样、形状统计、完整 base、真实 spawn B、迟到/错误回退、token/label/position/mask 重组及固定 prefetch 回归。可用 `--legacy-runtime`、`--legacy-profiles` 加入冻结 chunk-v1 的同输入对照。GPU 上的后续比较应使用新功能的 `--dspp-chunk-fixed 2048` 与自动模式配对，以保持执行方式和模型一致。
+16条2K＋1条16K、固定4096的例子：12个真实块保持12个，每stage为72个F/B/W节点；全流水线数据消息由504条降为336条。不改变packing、真实F顺序、同序列反向顺序及每个模型chunk的W累加顺序。任务充足时，原有调度所有节点字段保持一致。
+
+CPU检查：`python3 tests/unit_tests/dspp/test_slice_v_bubbles.py` 覆盖355组依赖图、120种有限收发缓冲组合、真实4096 packing及原调度一致性；尾部B回归同时通过。尚未进行此次修改的GPU正确性/吞吐复测。之前五组完成的实验快照和结果不改写。

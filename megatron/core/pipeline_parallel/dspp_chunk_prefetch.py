@@ -11,7 +11,7 @@ from megatron.core.datasets.dspp_chunk_cost import ChunkCostModel
 from megatron.core.datasets.dspp_chunk_search import SearchOptions
 from megatron.core.datasets.dspp_training import DsppCpuBatch, _source_sequences
 from .dspp_chunk_planner import ChunkPlanner
-from .dspp_prefetch import CpuPlanner, CpuIteration, DsppIterationPrefetch
+from .dspp_prefetch import CpuPlanner, CpuIteration, DsppIterationPrefetch, NoPlanner
 from .dspp_plan import DsppSchedulePlan
 
 
@@ -21,13 +21,11 @@ def choose_chunk_plan(packet, result, reference=None):
         return reference, ''
     if result is not None:
         reason = result.get('error') or ''
-        if result['iteration'] != packet.iteration or result['input_hash'] != packet.input_hash:
+        if result['iteration'] != packet.iteration:
             reason = 'worker-input-mismatch'
         if not reason:
             candidate = DsppSchedulePlan.from_dict(result['plan'])
-            if candidate.binding == reference.binding and candidate.wire_shape == reference.wire_shape:
-                return candidate, ''
-            reason = 'worker-binding-mismatch'
+            return candidate, ''
     return replace(reference, fallback_reason='prefetch-'+reason), reason
 
 
@@ -52,26 +50,18 @@ def chunk_worker(jobs, results, model_payload, cfg, options, budget_fraction):
         results.put(json.dumps(result).encode())
 
 
-class NoPlanner:
-    process = None
-    def close(self):
-        pass
-
-
 class AdaptiveChunkPrefetch(DsppIterationPrefetch):
     def __init__(self, args, iterator, get_batch_func):
         model = ChunkCostModel.load(args.dspp_chunk_model)
+        if model.payload['execution'] != 'native-default-bf16-v1':
+            raise ValueError('re-export native performance profiles; diagnostic-mode costs cannot drive this executor')
         options = SearchOptions(args.dspp_chunk_points,args.dspp_chunk_step,
                                 args.dspp_chunk_spacing,args.dspp_chunk_score)
         self.selector = ChunkPlanner(model,args,options)
         if torch.cuda.get_device_name() != model.payload['memory']['device_name']:
             raise ValueError('chunk model hardware mismatch')
-        self.current_capacity = args.micro_seq_length
         self.fixed_capacity = args.dspp_chunk_fixed or None
         self.run_b = args.dspp_schedule == 'b'
-        if model.payload['execution'] == 'canonical-query-v2':
-            from megatron.core.kv_cache.dspp_chunk_attention import install
-            install()
         factory = (partial(CpuPlanner,target=chunk_worker,
             target_args=(model.payload,self.selector.cfg,options,args.dspp_b_budget_fraction))
             if self.run_b else NoPlanner)
@@ -95,8 +85,7 @@ class AdaptiveChunkPrefetch(DsppIterationPrefetch):
             sources.append(seqs); lengths.append(tuple(group))
         fetched = time.perf_counter()
         selected, selection = self.selector.prepare(tuple(lengths),tuple(identities),iteration,
-            consumed,self.current_capacity,fixed=self.fixed_capacity)
-        self.current_capacity = selected.capacity
+            consumed,fixed=self.fixed_capacity)
         self.prepared_reference = iteration, selected.reference
         batches = tuple(DsppCpuBatch(b.plan,s,identity,max(cfg.variable_seq_pad_token_id,0))
                         for b,s,identity in zip(selected.batches,sources,identities))

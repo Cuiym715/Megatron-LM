@@ -72,7 +72,8 @@ def _phase_repeats(num_stages: int, stage: int,
 
 def _build_stage_schedule(stage: int,
                           num_stages: int,
-                          split_counts: Sequence[int]) -> Tuple[List[SliceVNode], Tuple[int, ...]]:
+                          split_counts: Sequence[int],
+                          real_counts: Sequence[int]) -> Tuple[List[SliceVNode], Tuple[int, ...]]:
     total_segments = sum(split_counts)
     repeats = _phase_repeats(
         num_stages, stage, total_segments, max(split_counts)
@@ -89,6 +90,10 @@ def _build_stage_schedule(stage: int,
     schedule: List[SliceVNode] = []
 
     def emit(kind: str, chunk: int, task: TaskId, phase: int) -> None:
+        # Missing work in the phase grid is a bubble, not a compute/message task.
+        # Every stage omits the same identity, including its F, B and W nodes.
+        if task[0] >= len(real_counts) or task[1] >= real_counts[task[0]]:
+            return
         slot = len(schedule)
         schedule.append(SliceVNode(
             kind=kind,
@@ -151,7 +156,7 @@ def _build_stage_schedule(stage: int,
     if any(queues.values()):
         remaining = {name: len(queue) for name, queue in queues.items() if queue}
         raise RuntimeError(f"SliceV stage {stage} left compute tasks unscheduled: {remaining}")
-    expected = total_segments * 6
+    expected = sum(real_counts) * 6
     if len(schedule) != expected:
         raise RuntimeError(
             f"SliceV stage {stage} generated {len(schedule)} tasks; expected {expected}."
@@ -237,10 +242,20 @@ def build_slice_v_schedule(num_stages: int,
     if any(count <= 0 for count in split_counts):
         raise ValueError("all split counts must be positive.")
 
+    # The eight-phase construction describes a saturated pipeline. Extend only
+    # its phase grid when work is scarce; emit() suppresses every missing task.
+    # Returned counts, dependencies, costs and wire orders contain real work only.
+    phase_counts = list(split_counts)
+    if len(phase_counts) == 1 and num_stages > 1:
+        phase_counts.append(0)
+    while sum(phase_counts) < max(phase_counts) + 2 * num_stages - 2:
+        smallest = min(range(len(phase_counts)), key=phase_counts.__getitem__)
+        phase_counts[smallest] += 1
+
     schedules: List[List[SliceVNode]] = []
     phase_repeats: List[Tuple[int, ...]] = []
     for stage in range(num_stages):
-        schedule, repeats = _build_stage_schedule(stage, num_stages, split_counts)
+        schedule, repeats = _build_stage_schedule(stage, num_stages, phase_counts, split_counts)
         schedules.append(schedule)
         phase_repeats.append(repeats)
     _validate_dependencies(schedules, split_counts)

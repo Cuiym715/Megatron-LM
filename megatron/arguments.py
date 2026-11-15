@@ -190,15 +190,6 @@ def validate_args(args, defaults={}):
     else:
         args.virtual_pipeline_model_parallel_size = None
 
-    if args.dspp_timeline_iterations is not None:
-        assert all(i > 0 for i in args.dspp_timeline_iterations), 'timeline iterations must be positive'
-    if args.dspp_task_timing_only:
-        assert args.dspp, '--dspp-task-timing-only requires --dspp'
-        assert args.timing_log_level == 0, 'task-only timing requires --timing-log-level 0'
-        assert args.kaimm_cuda_synchronize_level == 0, 'task-only timing excludes debug CUDA synchronization'
-        assert not args.kaimm_profile_analysis and not args.profile, 'task-only timing excludes internal profilers'
-        assert not args.dspp_torch_profiler_dir, 'task-only timing excludes torch profiler'
-        assert not os.environ.get('DSPP_GPU_PROGRESS_DIR'), 'task-only timing excludes GPU progress recording'
     if args.dspp_history_dkv_after_dx:
         assert args.dspp_split_attention_backward, '--dspp-history-dkv-after-dx requires --dspp-split-attention-backward'
     if args.dspp_split_attention_backward:
@@ -219,7 +210,6 @@ def validate_args(args, defaults={}):
         assert args.dspp_schedule != 'legacy', 'counted memory requires the Plan IR path'
         assert not args.dspp_split_attention_backward or args.dspp_history_dkv_after_dx, \
             'counted split memory requires the after-dx boundary'
-        assert not args.dspp_auto_chunk_size, 'counted memory requires fixed capacity'
 
     if args.dspp:
         assert not args.variable_seq_slicing, \
@@ -246,9 +236,8 @@ def validate_args(args, defaults={}):
                 'DSPP CP validated queues require --dspp-recv-lookahead 0 --dspp-send-inflight-depth 1'
             assert not args.dspp_split_attention_backward or args.dspp_history_dkv_after_dx, \
                 'DSPP CP split backward requires after-dx'
-            assert args.dspp_schedule in ('legacy', 'template', 'b'), 'DSPP CP supports template or B'
-            assert not args.dspp_auto_chunk_size and not args.dspp_order_profile, \
-                'DSPP CP requires fixed chunks and metadata ordering'
+            assert args.dspp_schedule in ('template', 'b'), 'DSPP CP supports template or B'
+            assert not args.dspp_order_profile, 'DSPP CP requires fixed chunks and metadata ordering'
             assert args.dspp_schedule != 'b' or args.dspp_prefetch, \
                 'DSPP CP B requires one world-wide asynchronous planner publication'
             assert args.DDP_impl == 'local' and not getattr(args, 'overlap_grad_reduce', False), \
@@ -276,39 +265,12 @@ def validate_args(args, defaults={}):
             'DSPP currently requires unset --use-fast-rope'
         assert args.variable_seq_debug_num_batches >= 0, \
             'variable-seq-debug-num-batches must be >= 0'
-        if args.dspp_auto_chunk_size:
-            assert args.dspp_min_chunk_size > 0, \
-                '--dspp-min-chunk-size must be positive'
-            assert args.dspp_chunk_alignment > 0, \
-                '--dspp-chunk-alignment must be positive'
-            assert args.dspp_max_chunk_size >= 0, \
-                '--dspp-max-chunk-size must be non-negative'
-            assert 0.0 < args.dspp_memory_utilization <= 1.0, \
-                '--dspp-memory-utilization must be in (0, 1]'
-            assert args.dspp_memory_reserve_mib >= 0, \
-                '--dspp-memory-reserve-mib must be non-negative'
-            assert args.dspp_memory_safety_factor >= 1.0, \
-                '--dspp-memory-safety-factor must be at least 1'
-            assert args.dspp_activation_bytes_per_token >= 0.0, \
-                '--dspp-activation-bytes-per-token must be non-negative'
-            assert args.dspp_max_p2p_bytes >= 0, \
-                '--dspp-max-p2p-bytes must be non-negative'
-            assert args.dspp_saturation_chunk_size >= 0, \
-                '--dspp-saturation-chunk-size must be non-negative'
-            assert 0.0 <= args.dspp_saturation_slack < 1.0, \
-                '--dspp-saturation-slack must be in [0, 1)'
-            if args.dspp_chunk_selection == 'per-iteration-menu':
-                assert args.dspp_chunk_menu, \
-                    '--dspp-chunk-menu is required for per-iteration-menu selection'
-                assert args.dspp_execution_profile, \
-                    '--dspp-execution-profile is required for per-iteration-menu selection'
         assert args.dspp_recv_lookahead >= 0, \
             '--dspp-recv-lookahead must be non-negative'
         assert args.dspp_send_inflight_depth > 0, \
             '--dspp-send-inflight-depth must be positive'
-        if args.dspp_schedule in ('b', 'c'):
+        if args.dspp_schedule == 'b':
             assert args.pipeline_model_parallel_size > 1, 'schedule B/C requires distributed DSPP'
-            assert not args.dspp_auto_chunk_size, 'schedule B/C requires fixed chunk size'
             assert args.dspp_split_attention_backward and args.dspp_history_dkv_after_dx, \
                 'schedule B/C requires split/after-dx support'
             assert args.dspp_memory_profile or args.dspp_chunk_model, 'schedule B/C requires counted memory'
@@ -325,30 +287,19 @@ def validate_args(args, defaults={}):
             else:
                 assert args.dspp_execution_profile and args.dspp_p2p_profile, \
                     'profile costs require versioned compute/P2P profiles'
-            if args.dspp_schedule == 'b':
-                assert 0 <= args.dspp_b_budget_fraction <= 1, 'invalid B planning budget fraction'
-            else:
-                assert 0 <= args.dspp_c_b_budget_fraction <= args.dspp_c_budget_fraction <= 1, \
-                    'C planning budgets require 0 <= B fraction <= C fraction <= 1'
-        if args.dspp_schedule == 'a':
-            assert args.pipeline_model_parallel_size > 1, 'schedule A requires distributed DSPP'
-            assert not args.dspp_split_attention_backward, 'schedule A uses fused attention backward'
-            assert not args.dspp_auto_chunk_size, 'P1 schedule A requires fixed chunk size'
-            assert args.dspp_execution_profile, 'schedule A requires an explicit execution profile'
+            assert 0 <= args.dspp_b_budget_fraction <= 1, 'invalid B planning budget fraction'
         if args.dspp_prefetch:
             assert args.pipeline_model_parallel_size > 1, 'DSPP prefetch requires PP>1'
-            assert args.dspp_schedule in ('template', 'a', 'b', 'c'), 'DSPP prefetch requires Plan IR'
-            assert not args.dspp_auto_chunk_size, 'DSPP prefetch requires fixed chunk size'
+            assert args.dspp_schedule in ('template', 'b'), 'DSPP prefetch requires Plan IR'
             assert args.tensor_model_parallel_size == 1 and args.data_parallel_size == args.context_parallel_size, \
                 'DSPP prefetch requires TP=1 and one sample replica (DP/CP=1)'
             assert args.dataloader_type == 'single', 'DSPP prefetch replay requires deterministic single-pass input'
             assert args.dspp_prefetch_max_bytes > 0 and args.dspp_prefetch_timeout > 0, \
                 'DSPP prefetch needs positive CPU byte limit and timeout'
         if args.dspp_chunk_model:
-            assert args.dspp_prefetch and not args.dspp_prefetch_full_validation, \
+            assert args.dspp_prefetch, \
                 'adaptive chunks require the direct prefetch execution path'
-            assert not args.dspp_auto_chunk_size and args.context_parallel_size == 1, \
-                'adaptive chunks use their own CP1 selector, not the legacy auto path'
+            assert args.context_parallel_size == 1, 'adaptive chunks use their own CP1 selector, not the legacy auto path'
             assert args.dspp_schedule in ('template','b') and args.dspp_history_dkv_after_dx, \
                 'adaptive chunks require explicit task modes with template or B'
             assert args.dspp_chunk_points >= 2 and args.dspp_chunk_step > 0, 'invalid coarse search budget'
@@ -1494,12 +1445,11 @@ def _add_distributed_args(parser):
                        'Supports the single-GPU path and distributed PP/VPP=2 path.')
     group.add_argument('--dspp-cp-layout', choices=['paired', 'hybrid'], default='hybrid',
                        help='CP token ownership: paired reference or whole-short/shared-long hybrid.')
-    group.add_argument('--dspp-schedule', choices=['legacy', 'template', 'a', 'b', 'c'], default='template',
-                       help='Execute template, fixed-FB/W-only A, supply/cp-all B, or one fixed-H feedback C. '
-                       'legacy retains the pre-Plan path for paired validation.')
-    group.add_argument('--dspp-planner-backend', choices=['python', 'cpp'], default='cpp',
+    group.add_argument('--dspp-schedule', choices=['template', 'b'], default='template',
+                       help='Execute the rule template or supply plus tail-frontier B.')
+    group.add_argument('--dspp-planner-backend', choices=['cpp'], default='cpp',
                        help='CPU ready-construction backend; cpp reuses research 027/028 rules. '
-                       'Python remains available for paired plan checks.')
+                       'The native constructor is compiled once before training.')
     group.add_argument('--dspp-cost-model', choices=['profile', 'theoretical'], default='profile',
                        help='Measured costs by default; theoretical FLOPs/throughput and bytes/bandwidth for correctness.')
     group.add_argument('--dspp-assumed-tflops', type=float, default=1.,
@@ -1508,24 +1458,19 @@ def _add_distributed_args(parser):
                        help='Assumed effective GB/s (decimal) for theoretical CP/PP costs.')
     group.add_argument('--dspp-b-budget-fraction', type=float, default=.60,
                        help='Standalone algorithm B soft full-planning budget / original unsplit model time.')
-    group.add_argument('--dspp-c-budget-fraction', type=float, default=.50,
-                       help='Algorithm C total soft planning budget / original unsplit model time.')
-    group.add_argument('--dspp-c-b-budget-fraction', type=float, default=.30,
-                       help='B stage soft budget within C / original unsplit model time; includes preparation.')
     group.add_argument('--dspp-prefetch', action='store_true',
                        help='Prepare one future CPU input and A/B/C plan in a spawn worker; GPU inputs stay current-iteration only.')
     group.add_argument('--dspp-chunk-model', type=str, default=None,
                        help='Opt-in compact cross-capacity bundle; CPU-validated adaptive CP1 path.')
     group.add_argument('--dspp-chunk-points', type=int, default=64,
-                       help='Coarse point budget, including the current capacity; provisional default.')
+                       help='Maximum number of coarse packing candidates.')
     group.add_argument('--dspp-chunk-step', type=int, default=64,
                        help='Coarse sampling grid step; 1 permits arbitrary integer capacities.')
-    group.add_argument('--dspp-chunk-spacing', choices=['linear','log'], default='log')
+    group.add_argument('--dspp-chunk-spacing', choices=['linear','log'], default='log',
+                       help='Spacing used to sample slice-count changes when they exceed the point budget.')
     group.add_argument('--dspp-chunk-score', choices=['work','pipeline'], default='pipeline')
     group.add_argument('--dspp-chunk-fixed', type=int, default=0,
                        help='Evaluate only this capacity for matched fixed/adaptive comparisons; 0 searches.')
-    group.add_argument('--dspp-prefetch-full-validation', action='store_true',
-                       help='Use the original repeated per-rank graph validation for prefetch diagnostics and timing controls.')
     group.add_argument('--dspp-prefetch-max-bytes', type=int, default=256 * 1024 * 1024,
                        help='Maximum compact future CPU input plus planner metadata bytes (one iteration).')
     group.add_argument('--dspp-prefetch-timeout', type=float, default=30.,
@@ -1538,13 +1483,7 @@ def _add_distributed_args(parser):
                        'history to a separate task after complete dx. Requires BF16/head-dim 128.')
     group.add_argument('--dspp-history-dkv-after-dx', action='store_true',
                        help='With split attention backward, publish complete stage dx first, '
-                       'then run history-dKV separately (immediate in legacy/template; selected/placed by B/C).')
-    group.add_argument('--dspp-task-timing-only', action='store_true',
-                       help='Measure only B/H boundary CUDA events, with internal annotations and '
-                       'synchronizing timers disabled. Excludes profiler/progress diagnostics.')
-    group.add_argument('--dspp-memory-audit-dir', type=str, default=None,
-                       help='Opt-in task-boundary storage ownership audit; diagnostic overhead, '
-                       'no CUDA synchronization and no certified workspace bound.')
+                       'then run history-dKV separately (immediate in legacy/template; selected/placed by tail-B).')
     group.add_argument('--dspp-memory-profile', type=str, default=None,
                        help='Frozen counted state-size profile for fixed-capacity fused-B or after-dx plans. '
                        'Feeds existing planner counters; keeps the P1 retention guard.')
@@ -1594,49 +1533,6 @@ def _add_distributed_args(parser):
                        'no P2P profile is supplied.')
     group.add_argument('--dspp-p2p-latency-us', type=float, default=20.0,
                        help='Fallback one-message P2P latency for DAG planning.')
-    group.add_argument('--dspp-auto-chunk-size', action='store_true',
-                       help='Adapt DSPP chunk size per iteration using current sequence '
-                       'lengths, CUDA memory availability, and an online activation model. '
-                       '--micro-seq-length is the safe first-iteration bootstrap size.')
-    group.add_argument('--dspp-chunk-selection', type=str, default='memory',
-                       choices=['memory', 'structure-aware', 'per-iteration-menu'],
-                       help='Auto-chunk policy. structure-aware uses a bounded '
-                       'saturation-window selector; per-iteration-menu evaluates only '
-                       'the offline profiled menu on the current iteration metadata.')
-    group.add_argument('--dspp-chunk-menu', type=str, default=None,
-                       help='Offline compute chunk_menu.json used by '
-                       '--dspp-chunk-selection per-iteration-menu.')
-    group.add_argument('--dspp-saturation-chunk-size', type=int, default=0,
-                       help='Offline-calibrated minimum efficient chunk for the '
-                       'structure-aware selector; 0 uses --dspp-min-chunk-size.')
-    group.add_argument('--dspp-saturation-slack', type=float, default=0.20,
-                       help='Relative largest-task slack accepted in the saturation window.')
-    group.add_argument('--dspp-min-chunk-size', type=int, default=256,
-                       help='Minimum candidate chunk size for DSPP auto tuning.')
-    group.add_argument('--dspp-max-chunk-size', type=int, default=0,
-                       help='Maximum DSPP auto-tuned chunk size; 0 uses --seq-length.')
-    group.add_argument('--dspp-chunk-alignment', type=int, default=256,
-                       help='Token alignment for DSPP auto chunk candidates. This does not '
-                       'restrict candidates to powers of two.')
-    group.add_argument('--dspp-efficiency-top-k', type=int, default=4,
-                       help='Number of cheapest efficiency-screened chunks sent to the '
-                       'full DSPP DAG planner; boundary, local-peak and current-chunk '
-                       'candidates are added separately.')
-    group.add_argument('--dspp-efficiency-slack', type=float, default=0.05,
-                       help='Relative cheap-score plateau retained during DSPP efficiency '
-                       'screening.')
-    group.add_argument('--dspp-memory-utilization', type=float, default=0.90,
-                       help='Maximum fraction of locally usable CUDA memory available to DSPP.')
-    group.add_argument('--dspp-memory-reserve-mib', type=int, default=1024,
-                       help='CUDA memory headroom excluded from DSPP auto chunk selection.')
-    group.add_argument('--dspp-memory-safety-factor', type=float, default=1.05,
-                       help='Multiplier applied to the online DSPP activation-memory estimate.')
-    group.add_argument('--dspp-activation-bytes-per-token', type=float, default=0.0,
-                       help='Optional initial activation bytes per peak-live token. Zero learns '
-                       'it from the bootstrap iteration.')
-    group.add_argument('--dspp-max-p2p-bytes', type=int, default=0,
-                       help='Optional maximum DSPP activation payload per P2P message while auto '
-                       'tuning; 0 leaves the chunk bound to the memory model.')
     group.add_argument('--dspp-recv-lookahead', type=int, default=2,
                        help='Number of future receives and credits preposted per incoming DSPP '
                        'lane after sender-ready notification.')
@@ -1647,18 +1543,6 @@ def _add_distributed_args(parser):
                        help='Ablation only: use one NCCL communicator per physical PP edge '
                        'for both traffic directions. The default creates one communicator '
                        'per direction so forward and reverse traffic progress independently.')
-    group.add_argument('--dspp-timeline-dir', type=str, default=None,
-                       help='Directory for opt-in per-rank DSPP timeline JSON and merged SVG.')
-    group.add_argument('--dspp-timeline-iterations', type=int, nargs='+', default=None,
-                       help='One-based iterations to sample; overrides the single-iteration selector.')
-    group.add_argument('--dspp-task-timing-scope', choices=['bh', 'all'], default='bh',
-                       help='Pure boundary timing scope: B/H (default) or F/B/W/H.')
-    group.add_argument('--dspp-timeline-iteration', type=int, default=0,
-                       help='One-based training iteration to trace; 0 disables CUDA-event tracing.')
-    group.add_argument('--dspp-torch-profiler-dir', type=str, default=None,
-                       help='Directory for opt-in per-rank PyTorch Profiler Chrome traces.')
-    group.add_argument('--dspp-torch-profiler-iteration', type=int, default=0,
-                       help='One-based DSPP iteration to capture with PyTorch Profiler; 0 disables it.')
     group.add_argument('--dspp-metrics-path', type=str, default=None,
                        help='Optional path for the compact rank-zero DSPP metrics JSON.')
     group.add_argument('--variable-seq-slicing', action='store_true',

@@ -501,8 +501,8 @@ def replay_plan(plan, compute_costs, message_costs, owners=(), tokens=None, *, r
 
 
 def _plan_unsplit(reference, compute_costs, message_costs, *, owners=(),
-                  capacities=None, tokens=None, order_based_capacity=False, supply=False, stable_ids=None,
-                  feedback=False, token_limits=None, deadline=None, backend='python'):
+                  capacities=None, tokens=None, order_based_capacity=False, supply=True, stable_ids=None,
+                  feedback=False, token_limits=None, deadline=None, backend='cpp'):
     """027 construction for A/B; 028 mode 8 for fixed-H C feedback.
 
     Reference FIFO predicts readiness; final FIFO is rebuilt and replayed.
@@ -597,107 +597,10 @@ def _plan_unsplit(reference, compute_costs, message_costs, *, owners=(),
     ids = stable_ids or {k: i for i, k in enumerate(succ)}
     if set(ids) != set(succ) or len(set(ids.values())) != len(ids):
         raise ValueError('invalid stable input node IDs')
-    if backend not in ('python', 'cpp'):
-        raise ValueError('unknown DSPP planner backend')
-    if backend == 'cpp':
-        from .dspp_native import construct
-        orders, reason = construct(nodes, messages, succ, relays, ids, costs,
-            priority, slack, ref['end'], owners, capacities, tokens, token_limits,
-            supply=supply, feedback=feedback, deadline=deadline)
-    else:
-        degree = {k: len(v) for k, v in pred.items()}
-        pp = len(reference.schedules)
-        ready, orders = [[] for _ in range(pp)], [[] for _ in range(pp)]
-        busy, live, tlive = [False] * pp, [0.0] * pp, [0.0] * pp
-        born, users = {k: [] for k in nodes}, {k: [] for k in nodes}
-        remaining, allocated = [], set()
-        for i, o in enumerate(owners):
-            remaining.append(len(set(o.users)))
-            for k in set(o.born):
-                born[k].append(i)
-            for k in set(o.users):
-                users[k].append(i)
-        events, done, now = [], 0, 0.0
-
-        def activate(k):
-            if k in messages or k in relays:
-                known_end[k] = now + (0.0 if k in relays else costs[k])
-                heapq.heappush(events, (known_end[k], ids[k], k))
-            else:
-                ready[nodes[k].stage].append(k)
-
-        for k, d in degree.items():
-            if not d:
-                activate(k)
-        reason = ''
-        while done < len(succ):
-            if deadline is not None and time.perf_counter() >= deadline:
-                reason = 'feedback-deadline'
-                break
-            for r in range(pp):
-                if busy[r]:
-                    continue
-                candidates = []
-                for k in ready[r]:
-                    new = set(born[k]) - allocated
-                    extra = sum(owners[i].bytes for i in new)
-                    if live[r] + extra > capacities[r] + 1e-8:
-                        continue
-                    if nodes[k].kind == 'F' and tlive[r] + tokens.get(k, 0.0) > token_limits[r] + 1e-8:
-                        continue
-                    freed = sum(owners[i].bytes for i in users[k] if remaining[i] == 1 and i in allocated)
-                    date = priority[k]
-                    if supply and nodes[k].kind in ('F', 'B', 'D'):
-                        for m, target in outmsg[k]:
-                            receiver = nodes[target].stage
-                            due = max(now, frontier[receiver],
-                                      max((estimate_end(p) for p in pred[target] if p != m), default=0.0))
-                            date = min(date, due - costs[m] - costs[k] + slack[k])
-                    if freed and live[r] > 0.95 * capacities[r]:
-                        date = min(date, now - freed / max(1.0, capacities[r]))
-                    candidates.append((date, ids[k], k, new))
-                if not candidates:
-                    continue
-                # The tolerance/tie rule is the same as mode 6.
-                best = candidates[0]
-                for candidate in candidates[1:]:
-                    if candidate[0] < best[0] - 1e-8 or (abs(candidate[0] - best[0]) < 1e-8 and candidate[1] < best[1]):
-                        best = candidate
-                _, _, k, new = best
-                ready[r].remove(k)
-                orders[r].append(nodes[k])
-                busy[r] = True
-                allocated.update(new)
-                live[r] += sum(owners[i].bytes for i in new)
-                if nodes[k].kind == 'F':
-                    tlive[r] += tokens.get(k, 0.0)
-                known_end[k] = frontier[r] = now + costs[k]
-                heapq.heappush(events, (known_end[k], ids[k], k))
-            if not events:
-                reason = 'construction-capacity-deadlock'
-                break
-            now = events[0][0]
-            # Drain zero-duration messages too before dispatching another compute.
-            while events and events[0][0] <= now + 1e-9:
-                _, _, k = heapq.heappop(events)
-                done += 1
-                if k in nodes:
-                    r = nodes[k].stage
-                    busy[r] = False
-                    if not feedback or nodes[k].kind != 'H':
-                        drift[r] = now - ref['end'][k]
-                    if nodes[k].kind in ('B', 'D'):
-                        f = (r, 'F', nodes[k].chunk, nodes[k].microbatch, nodes[k].split)
-                        tlive[r] -= tokens.get(f, 0.0)
-                    for i in users[k]:
-                        remaining[i] -= 1
-                        if remaining[i] == 0 and i in allocated:
-                            allocated.remove(i)
-                            live[r] -= owners[i].bytes
-                for v in sorted(succ[k], key=ids.__getitem__):
-                    degree[v] -= 1
-                    if not degree[v]:
-                        activate(v)
+    from .dspp_native import construct
+    orders, reason = construct(nodes, messages, succ, relays, ids, costs,
+        priority, slack, ref['end'], owners, capacities, tokens, token_limits,
+        supply=supply, feedback=feedback, deadline=deadline)
     candidate = None
     if not reason:
         candidate = replace(reference, algorithm='C' if feedback else 'B' if supply else 'A', schedules=tuple(
@@ -722,27 +625,3 @@ def _plan_unsplit(reference, compute_costs, message_costs, *, owners=(),
     # B's rejected split). Acceptance here describes this construction only.
     return replace(candidate, reference_ms=total, predicted_ms=actual['makespan_ms'],
                    fallback_reason='')
-
-
-def plan_configuration_a(reference, compute_costs, message_costs, **kwargs):
-    """Fixed merged F/B and per-chunk W order (027 mode 6 plus W/W guard)."""
-    return _plan_unsplit(reference, compute_costs, message_costs, **kwargs)
-
-
-def preserves_retention_envelope(plan, reference):
-    """Conservative P1 deployment guard, independent of predicted milliseconds.
-
-    At every merged F/B frontier, all W already consumed by the template must
-    also have run. Thus no template-freed W closure is retained across another
-    F/B. This is a protocol/storage restriction, not a measured byte contract.
-    """
-    def frontiers(seq):
-        consumed, result = set(), []
-        for n in seq:
-            if n.kind == 'W':
-                consumed.add(node_key(n))
-            else:
-                result.append(frozenset(consumed))
-        return result
-    return all(all(old <= new for old, new in zip(frontiers(a), frontiers(b)))
-               for a, b in zip(reference.schedules, plan.schedules))

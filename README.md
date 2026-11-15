@@ -1,3 +1,7 @@
+# DSPP
+
+当前端到端实现与保留约束见 [运行说明](docs/dspp-adaptive-chunks.md)。历史实现和实验产物见备份提交 `7b13bda9e`。正式运行从 `pretrain_llama.py` 启动，不使用仓库外的旧实验 wrapper。
+
 > This repository is a fork of [Megatron-LM](https://github.com/NVIDIA/Megatron-LM/). The original README is [here](README_orig.md).
 
 

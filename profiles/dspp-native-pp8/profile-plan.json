@@ -1,0 +1,884 @@
+{
+  "status": "pending GPU availability; no jobs launched",
+  "target": {
+    "gpu": "NVIDIA A800-SXM4-80GB",
+    "pp": 8,
+    "vpp": 2,
+    "cp": 1,
+    "tp": 1,
+    "layers": 61,
+    "layout": "endpoint-3-2",
+    "hidden": 2048,
+    "ffn": 5504,
+    "heads": 16,
+    "head_dim": 128,
+    "vocab": 32128,
+    "dtype": "bf16",
+    "execution": "native-default-bf16-v1",
+    "optimizer": "production Adam",
+    "p2p_connections": 32
+  },
+  "sampling": {
+    "warmup": 2,
+    "repeats": 5,
+    "time_unit": "ms",
+    "stages": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "virtual_chunks": [
+      0,
+      1
+    ],
+    "boundary": "complete-stage-v1",
+    "target_overlap": "compute-p2p",
+    "note": "Complete-stage isolated runs must retain isolated context and enter local_compute, not compute. Do not relabel isolated results as compute-p2p."
+  },
+  "compute": [
+    {
+      "capacity": 2048,
+      "shapes": [
+        {
+          "name": "anchor-full-h2048",
+          "items": [
+            {
+              "query": 2048,
+              "history": 2048
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "anchor-full-h30720",
+          "items": [
+            {
+              "query": 2048,
+              "history": 30720
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "anchor-mixed",
+          "items": [
+            {
+              "query": 1025,
+              "history": 2048
+            },
+            {
+              "query": 511,
+              "history": 0
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        }
+      ]
+    },
+    {
+      "capacity": 4096,
+      "shapes": [
+        {
+          "name": "full-h4096",
+          "items": [
+            {
+              "query": 4096,
+              "history": 4096
+            }
+          ],
+          "operations": [
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "full-h16384",
+          "items": [
+            {
+              "query": 4096,
+              "history": 16384
+            }
+          ],
+          "operations": [
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "full-h28672",
+          "items": [
+            {
+              "query": 4096,
+              "history": 28672
+            }
+          ],
+          "operations": [
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "tail-h16384",
+          "items": [
+            {
+              "query": 2049,
+              "history": 16384
+            }
+          ],
+          "operations": [
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "tail-h28672",
+          "items": [
+            {
+              "query": 2049,
+              "history": 28672
+            }
+          ],
+          "operations": [
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "mixed-h4096",
+          "items": [
+            {
+              "query": 2049,
+              "history": 4096
+            },
+            {
+              "query": 1023,
+              "history": 0
+            }
+          ],
+          "operations": [
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "mixed-h28672",
+          "items": [
+            {
+              "query": 2049,
+              "history": 28672
+            },
+            {
+              "query": 1023,
+              "history": 0
+            }
+          ],
+          "operations": [
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        }
+      ]
+    },
+    {
+      "capacity": 6144,
+      "shapes": [
+        {
+          "name": "full-h6144",
+          "items": [
+            {
+              "query": 6144,
+              "history": 6144
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "full-h12288",
+          "items": [
+            {
+              "query": 6144,
+              "history": 12288
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "full-h24576",
+          "items": [
+            {
+              "query": 6144,
+              "history": 24576
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "tail-h12288",
+          "items": [
+            {
+              "query": 3073,
+              "history": 12288
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "tail-h24576",
+          "items": [
+            {
+              "query": 3073,
+              "history": 24576
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "mixed-h6144",
+          "items": [
+            {
+              "query": 3073,
+              "history": 6144
+            },
+            {
+              "query": 1535,
+              "history": 0
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "mixed-h24576",
+          "items": [
+            {
+              "query": 3073,
+              "history": 24576
+            },
+            {
+              "query": 1535,
+              "history": 0
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "no-history-full",
+          "items": [
+            {
+              "query": 6144,
+              "history": 0
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W"
+          ]
+        },
+        {
+          "name": "no-history-tail",
+          "items": [
+            {
+              "query": 1539,
+              "history": 0
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W"
+          ]
+        }
+      ]
+    },
+    {
+      "capacity": 8192,
+      "shapes": [
+        {
+          "name": "full-h8192",
+          "items": [
+            {
+              "query": 8192,
+              "history": 8192
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "full-h16384",
+          "items": [
+            {
+              "query": 8192,
+              "history": 16384
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "full-h24576",
+          "items": [
+            {
+              "query": 8192,
+              "history": 24576
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "tail-h16384",
+          "items": [
+            {
+              "query": 4097,
+              "history": 16384
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "tail-h24576",
+          "items": [
+            {
+              "query": 4097,
+              "history": 24576
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "mixed-h8192",
+          "items": [
+            {
+              "query": 4097,
+              "history": 8192
+            },
+            {
+              "query": 2047,
+              "history": 0
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "mixed-h24576",
+          "items": [
+            {
+              "query": 4097,
+              "history": 24576
+            },
+            {
+              "query": 2047,
+              "history": 0
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W",
+            "D",
+            "H",
+            "F_after_dx"
+          ]
+        },
+        {
+          "name": "no-history-full",
+          "items": [
+            {
+              "query": 8192,
+              "history": 0
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W"
+          ]
+        },
+        {
+          "name": "no-history-tail",
+          "items": [
+            {
+              "query": 2051,
+              "history": 0
+            }
+          ],
+          "operations": [
+            "F",
+            "B_fused",
+            "W"
+          ]
+        }
+      ]
+    }
+  ],
+  "holdout": [
+    {
+      "capacity": 3072,
+      "items": [
+        {
+          "query": 2311,
+          "history": 15360
+        }
+      ],
+      "operations": [
+        "F",
+        "B_fused",
+        "W",
+        "D",
+        "H"
+      ],
+      "usage": "hold out from fitting until prediction errors have been recorded"
+    },
+    {
+      "capacity": 5120,
+      "items": [
+        {
+          "query": 3847,
+          "history": 15360
+        }
+      ],
+      "operations": [
+        "F",
+        "B_fused",
+        "W",
+        "D",
+        "H"
+      ],
+      "usage": "hold out from fitting until prediction errors have been recorded"
+    }
+  ],
+  "memory": [
+    {
+      "capacity": 2048,
+      "schedules": [
+        "template",
+        "tail-B with accepted H deferral"
+      ],
+      "warmup_updates": 3,
+      "measured_updates": 1,
+      "input_lengths": [
+        [
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          16384
+        ],
+        [
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          32768
+        ]
+      ],
+      "outputs": [
+        "actual task ordering and H delay",
+        "post-Adam resident_bytes",
+        "activation_bytes",
+        "weight_forward_bytes",
+        "weight_backward_bytes",
+        "capture_bytes",
+        "attention_bytes_per_key_token",
+        "pending_bytes_per_token",
+        "workspace_bytes",
+        "allocated_peak_bytes",
+        "reserved_peak_bytes"
+      ],
+      "note": "Two representative input batches; measure costs and storage ownership in separate runs. No per-task storage walk in throughput runs."
+    },
+    {
+      "capacity": 4096,
+      "schedules": [
+        "template",
+        "tail-B with accepted H deferral"
+      ],
+      "warmup_updates": 3,
+      "measured_updates": 1,
+      "input_lengths": [
+        [
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          16384
+        ],
+        [
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          32768
+        ]
+      ],
+      "outputs": [
+        "actual task ordering and H delay",
+        "post-Adam resident_bytes",
+        "activation_bytes",
+        "weight_forward_bytes",
+        "weight_backward_bytes",
+        "capture_bytes",
+        "attention_bytes_per_key_token",
+        "pending_bytes_per_token",
+        "workspace_bytes",
+        "allocated_peak_bytes",
+        "reserved_peak_bytes"
+      ],
+      "note": "Two representative input batches; measure costs and storage ownership in separate runs. No per-task storage walk in throughput runs."
+    },
+    {
+      "capacity": 6144,
+      "schedules": [
+        "template",
+        "tail-B with accepted H deferral"
+      ],
+      "warmup_updates": 3,
+      "measured_updates": 1,
+      "input_lengths": [
+        [
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          16384
+        ],
+        [
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          32768
+        ]
+      ],
+      "outputs": [
+        "actual task ordering and H delay",
+        "post-Adam resident_bytes",
+        "activation_bytes",
+        "weight_forward_bytes",
+        "weight_backward_bytes",
+        "capture_bytes",
+        "attention_bytes_per_key_token",
+        "pending_bytes_per_token",
+        "workspace_bytes",
+        "allocated_peak_bytes",
+        "reserved_peak_bytes"
+      ],
+      "note": "Two representative input batches; measure costs and storage ownership in separate runs. No per-task storage walk in throughput runs."
+    },
+    {
+      "capacity": 8192,
+      "schedules": [
+        "template",
+        "tail-B with accepted H deferral"
+      ],
+      "warmup_updates": 3,
+      "measured_updates": 1,
+      "input_lengths": [
+        [
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          16384
+        ],
+        [
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          2048,
+          32768
+        ]
+      ],
+      "outputs": [
+        "actual task ordering and H delay",
+        "post-Adam resident_bytes",
+        "activation_bytes",
+        "weight_forward_bytes",
+        "weight_backward_bytes",
+        "capture_bytes",
+        "attention_bytes_per_key_token",
+        "pending_bytes_per_token",
+        "workspace_bytes",
+        "allocated_peak_bytes",
+        "reserved_peak_bytes"
+      ],
+      "note": "Two representative input batches; measure costs and storage ownership in separate runs. No per-task storage walk in throughput runs."
+    }
+  ],
+  "long_history_if_needed": {
+    "condition": "end-to-end inputs contain sequences longer than 32768",
+    "sequence_lengths": [
+      65536,
+      98304,
+      131072
+    ],
+    "capacities": [
+      4096,
+      8192
+    ],
+    "query": [
+      "capacity",
+      "capacity//2+1"
+    ],
+    "history": "floor((sequence_length-query)/capacity)*capacity",
+    "operations": [
+      "F",
+      "B_fused",
+      "D",
+      "H"
+    ],
+    "reuse": "Check archived native c2048 isolated long-history records first; do not repeat them by default."
+  },
+  "p2p": {
+    "action": "reuse",
+    "directions": 14,
+    "bytes": [
+      8388608,
+      16777216,
+      25165824,
+      33554432
+    ],
+    "overlap": [
+      "isolated",
+      "compute"
+    ],
+    "remeasure_only_if": "physical peer placement, transport, communication overlap policy or message-size domain changes"
+  },
+  "end_to_end": {
+    "warmup": 5,
+    "timed_updates": 20,
+    "modes": [
+      "fixed2048 template",
+      "fixed2048 tail-B",
+      "adaptive template",
+      "adaptive tail-B"
+    ],
+    "dataset": "same batches and target model in all modes",
+    "instrumentation": "tools/benchmark_dspp.py only; no per-task events or owner recording",
+    "note": "Prediction/memory checks are calibration; compare throughput separately. Do not run a4-a6 frozen wrappers."
+  },
+  "integration": {
+    "raw_format": "dspp-stage-calibration-v2 records: stage, chunk, operation, signature, duration_ms, context",
+    "source_addition": "Append raw or compact sources to sources.json.compute; local measurements to local_compute. Exporter supports .json and .json.gz. F_after_dx is recorded separately, not merged into F.",
+    "priority": "Target PP8 measurements supersede local transfers automatically when exact signatures match.",
+    "runner_note": "Historical run_window.py uses deleted timeline/owner flags. Port measurement only into an offline entry before the GPU window; never restore those flags to production schedules."
+  }
+}

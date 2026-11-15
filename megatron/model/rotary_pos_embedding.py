@@ -108,6 +108,14 @@ def apply_rotary_pos_emb(t, freqs, use_fast_rope=False):
     if use_fast_rope:
         return FastRotaryPosEmbFunction.apply(t, freqs, True)
 
+    return _apply_rotary_pos_emb(t, freqs)
+
+
+@torch.compile(fullgraph=True, dynamic=False, options={"emulate_precision_casts": True})
+def _apply_rotary_pos_emb(t, freqs):
+    # Fuse the packed-position path, including its backward, without changing
+    # the frequency layout to the optional CUDA extension's sin/cos format.
+
     rot_dim = freqs.shape[-1]
     # ideally t_pass is empty so rotary pos embedding is applied to all tensor t
     t, t_pass = t[..., :rot_dim], t[..., rot_dim:]

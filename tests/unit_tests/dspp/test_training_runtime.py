@@ -297,12 +297,9 @@ def test_dspp_selector_selects_stage_local_v_for_pp3_vpp2(monkeypatch):
     )
 
 
-def test_dspp_v_padding_adds_only_the_missing_warmup_slots():
-    assert schedules._pad_dspp_v_split_counts([6, 5], 3) == [6, 5]
-    assert schedules._pad_dspp_v_split_counts([8, 3], 3) == [8, 4]
-    padded = schedules._pad_dspp_v_split_counts([1, 1], 3)
-    assert padded == [4, 4]
-    schedules.build_slice_v_schedule(3, len(padded), padded)
-
-    with pytest.raises(ValueError, match="at least two logical microbatches"):
-        schedules._pad_dspp_v_split_counts([8], 3)
+def test_dspp_v_short_warmup_emits_only_real_tasks():
+    for counts in ([6, 5], [8, 3], [1, 1], [8], [1]):
+        seqs, plan = schedules.build_slice_v_schedule(3, len(counts), counts)
+        assert plan.split_counts == tuple(counts)
+        assert all(len(seq) == 6 * sum(counts) for seq in seqs)
+        assert all(n.split < counts[n.microbatch] for seq in seqs for n in seq)

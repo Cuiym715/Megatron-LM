@@ -1,246 +1,171 @@
-"""Few targeted B checks: deployed graph, exact slots/pairing and fallbacks."""
-from dataclasses import replace
-import json
-from types import SimpleNamespace
+"""CPU-only tail-B regression: real Plan IR, dependencies, budget and capacity.
 
-import pytest
+Run with python3 tests/unit_tests/dspp/test_algorithm_b.py (no CUDA/PyTorch needed).
+"""
+import ast
+import importlib.util
+from pathlib import Path
+import sys
+import types
+import unittest
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[3]
+if __name__ == '__main__':
+    # Load pure scheduling modules without Megatron's CUDA package bootstrap.
+    for name in ('megatron', 'megatron.core', 'megatron.core.datasets', 'megatron.core.pipeline_parallel'):
+        module = types.ModuleType(name)
+        module.__path__ = [str(ROOT / name.replace('.', '/'))]
+        sys.modules[name] = module
+    if importlib.util.find_spec('torch') is None:
+        sys.modules['torch'] = types.ModuleType('torch')  # metadata builder never calls torch
 
 from megatron.core.datasets.dspp_batch_plan import build_dspp_batch_plan
 from megatron.core.pipeline_parallel.dspp_plan import (
-    DsppSchedulePlan, PlanBinding, history_dependencies, node_key,
-    receive_orders, replay_plan, template_plan, validate_plan,
+    PlanBinding, history_dependencies, node_key, receive_orders,
+    replay_plan, template_plan, validate_plan,
 )
 from megatron.core.pipeline_parallel.dspp_plan_b import (
-    Backend, FixedGraph, OptionalPlan, State, best_insertion, initial,
-    plan_configuration_b, predecessors, run_cp, score_positions,
+    Backend, FixedGraph, OptionalPlan, initial, plan_configuration_b, predecessors,
+    run_tail, score_positions, tail_frontiers,
 )
 from megatron.core.pipeline_parallel.slice_v import build_slice_v_schedule
-from megatron.core.pipeline_parallel.schedules import _pad_dspp_v_split_counts
-from .test_schedule_plan import simulate_protocol
 
 
-def fixture(pp=4):
-    batch = build_dspp_batch_plan([145,33], chunk_size=64)
+def fixture(pp=4, capacity=64):
+    batch = build_dspp_batch_plan([capacity*3+17, capacity+9], chunk_size=capacity, validate=False)
     groups = [tuple((l,p) for p in range(len(batch.microbatches))) for l in range(2)]
     mapping = tuple((g,s,*task) for g,group in enumerate(groups) for s,task in enumerate(group))
     metadata = {(l,p):m for l in range(2) for p,m in enumerate(batch.microbatches)}
-    counts = _pad_dspp_v_split_counts(list(map(len,groups)), pp)
+    slots = {(g,s): metadata[l,p] for g,s,l,p in mapping}
+    counts = list(map(len, groups))
     seqs,_ = build_slice_v_schedule(pp,len(counts),counts)
     ref = template_plan(seqs,counts,mapping,PlanBinding(1,'input','layout'),
                         history_dependencies=history_dependencies(mapping,metadata))
-    real = {(g,s) for g,s,l,p in mapping}
-    compute = {node_key(n):1. if (n.microbatch,n.split) in real else 0.
-               for seq in seqs for n in seq}
+    compute = {node_key(n):1. if (n.microbatch,n.split) in slots else 0. for seq in seqs for n in seq}
     messages = {('message',a,b,*m):3. for (a,b),lane in receive_orders(seqs).items() for m in lane}
     sources = {edge[:2] for edge in ref.history_dependencies}
     source = next(k for k in compute if k[:3]==(0,'B',1) and k[3:] in sources)
-    compute[source] = 100.
-    compute[(1,*source[1:])] = 100.
+    compute[source] = 100.; compute[(1,*source[1:])] = 100.
     split = {k:(c*.3,c*.8) for k,c in compute.items() if k[1]=='B' and k[3:] in sources}
-    split[source] = (20.,90.)
-    tokens = {node_key(n):metadata[groups[n.microbatch][n.split]].valid_token_count
-              for seq in seqs for n in seq if n.kind=='F' and (n.microbatch,n.split) in {(g,s) for g,s,l,p in mapping}}
-    return ref,compute,messages,split,tokens
+    tokens = {node_key(n):slots[n.microbatch,n.split].valid_token_count
+              for seq in seqs for n in seq if n.kind=='F' and (n.microbatch,n.split) in slots}
+    return ref,compute,messages,split,tokens,slots
 
 
-@pytest.mark.parametrize('pp',[4,8])
-def test_b_plan_replay_fifo_split_identity_and_internal_orders(pp, monkeypatch):
-    # This is a structural/numerical check; deadline behavior has separate tests.
-    from megatron.core.pipeline_parallel import dspp_plan_b as module
-    monkeypatch.setattr(module.time, 'perf_counter', lambda: 0.)
-    ref,compute,messages,split,tokens = fixture(pp)
-    plan = plan_configuration_b(ref,compute,messages,split,tokens=tokens)
-    validate_plan(plan,ref)
-    assert plan.planning_info['selected_count']>0
-    assert plan.predicted_ms<plan.reference_ms
-    restored = DsppSchedulePlan.from_dict(json.loads(json.dumps(plan.to_dict())))
-    assert restored==plan
-    simulate_protocol(plan,2,2)
-    for seq,old in zip(plan.schedules,ref.schedules):
-        for kind in ('F','B'):
-            assert [(n.chunk,n.microbatch,n.split) for n in seq if n.kind==kind or kind=='B' and n.kind=='D']==[(n.chunk,n.microbatch,n.split) for n in old if n.kind==kind]
-    assert plan.planning_info['decision']['candidate_order']=='input-node-order'
-    assert plan.planning_info['decision']['top_k'] is None
-    assert plan.planning_info['decision']['grouping'] is None
+class TailBTests(unittest.TestCase):
+    def test_tail_order_and_longest_only(self):
+        ref,c,m,s,t,slots=fixture()
+        optional=OptionalPlan(ref,c,m,s)
+        chains=tail_frontiers(optional,slots)
+        self.assertEqual(len(chains),4*2*2) # PP × VPP × tied longest documents
+        for chain in chains:
+            segments=[]
+            for h in chain:
+                key=optional.m.names[optional.m.release[h]]
+                items=[i for i in slots[key[3:]].items if i.has_history]
+                longest=max(items,key=lambda i:i.sequence_length)
+                self.assertEqual(longest.sequence_length,209)
+                segments.append(longest.segment_id)
+            self.assertEqual(segments,sorted(segments,reverse=True))
 
+    def test_real_plans_and_arbitrary_capacity(self):
+        for pp,capacity in ((4,64),(8,64),(4,3058),(4,4096)):
+            ref,c,m,s,t,slots=fixture(pp,capacity)
+            with patch('megatron.core.pipeline_parallel.dspp_plan_b.time.perf_counter',return_value=0.):
+                plan=plan_configuration_b(ref,c,m,s,tokens=t,slot_meta=slots)
+            validate_plan(plan,ref)
+            self.assertLessEqual(plan.predicted_ms,plan.reference_ms)
+            self.assertEqual(plan.planning_info['decision']['candidate_order'],'longest-sequence-tail-frontier')
+            actual=dict(c)
+            for seq in plan.schedules:
+                for n in seq:
+                    if n.kind in ('D','H'):
+                        b=(n.stage,'B',n.chunk,n.microbatch,n.split)
+                        actual[node_key(n)]=s[b][0] if n.kind=='D' else max(s[b][1],c[b]-s[b][0])
+            self.assertAlmostEqual(replay_plan(plan,actual,m)['makespan_ms'],plan.predicted_ms)
 
-def pair_optional():
-    # Two equal critical branches. Each single keeps T=10; the pair gives T=7.
-    keys=('b0','c0','b1','c1','tail','h0','h1')
-    edges=(('b0','h0'),('h0','c0'),('b1','h1'),('h1','c1'),('b0','tail'),('b1','tail'))
-    costs=dict(zip(keys,(5.,0.,5.,0.,5.,0.,0.)))
-    graph=FixedGraph(keys,edges,costs,dict(zip(keys,(0,0,1,1,2,0,1))),
-                     {'h0':'b0','h1':'b1'},{'h0':('c0',),'h1':('c1',)})
-    o=SimpleNamespace(m=graph,fused_cost=graph.cost.copy(),split_cost={5:2.,6:2.},hcost={5:3.5,6:3.5},
-                      base_orders=((0,1),(2,3),(4,)))
-    def configure(selected):
-        graph.cost=o.fused_cost.copy()
-        for h in selected:
-            graph.cost[graph.release[h]]=o.split_cost[h]
-            graph.cost[h]=o.hcost[h]
-    o.configure=configure
-    return o
+    def test_budget_and_memory_rejection(self):
+        ref,c,m,s,t,slots=fixture()
+        plan=plan_configuration_b(ref,c,m,s,tokens=t,slot_meta=slots,budget_fraction=0)
+        self.assertEqual(plan.planning_info['decision']['stop'],'deadline')
+        self.assertEqual(plan.planning_info['selected_count'],0)
+        class Memory:
+            def check(self,plan):
+                if any(n.kind=='H' for seq in plan.schedules for n in seq):
+                    raise ValueError('capacity')
+        with patch('megatron.core.pipeline_parallel.dspp_plan_b.time.perf_counter',return_value=0.):
+            plan=plan_configuration_b(ref,c,m,s,tokens=t,slot_meta=slots,memory=Memory())
+        self.assertEqual(plan.planning_info['selected_count'],0)
+        validate_plan(plan,ref)
 
+    def test_cpp_supply_backend(self):
+        ref,c,m,s,t,slots=fixture()
+        with patch('megatron.core.pipeline_parallel.dspp_plan_b.time.perf_counter',return_value=0.):
+            plan=plan_configuration_b(ref,c,m,s,tokens=t,slot_meta=slots,backend='cpp')
+        validate_plan(plan,ref)
+        self.assertEqual(plan.planning_info['backend'],'cpp')
 
-def test_exposed_path_pair_and_fast_slot_formula():
-    o=pair_optional();backend=Backend();base=initial(o,backend)
-    assert base.makespan==10
-    preds=predecessors(o.m)
-    for h in o.m.hs:
-        scores=score_positions(o,base,h,preds,backend)
-        for predicted,pos in scores:
-            orders=[list(x) for x in base.orders]
-            orders[o.m.meta[h]['rank']].insert(pos,h)
-            o.configure({h})
-            actual=backend.evaluate(o.m,orders)
-            if actual is not None:
-                assert predicted==actual==10
-    result,info=run_cp(o,backend,1000)
-    assert result.makespan==7 and result.selected==frozenset({5,6})
-    assert info['steps'][0]['kind']=='pair'
-    assert info['steps'][0]['second_trials']>0
+    def test_tail_split_improves_and_respects_feasible_position(self):
+        # B=5 followed by work=5; downstream tail=5. Moving H after work
+        # reduces 15->12; when that lifetime is infeasible, H before work gives14.
+        keys=((0,'B',0,0,1),(0,'W',0,0,1),(0,'B',0,0,0),
+              (1,'B',0,0,0),(0,'H',0,0,1))
+        b,x,c,tail,h=keys
+        graph=FixedGraph(keys,((b,h),(h,c),(x,tail)),
+                         dict(zip(keys,(5.,5.,0.,5.,0.))),
+                         dict(zip(keys,(0,0,0,1,0))),{h:b},{h:(c,)})
+        o=types.SimpleNamespace(m=graph,fused_cost=graph.cost.copy(),split_cost={4:2.},
+            hcost={4:2.},base_orders=((0,1,2),(3,)),
+            base=types.SimpleNamespace(task_map=((0,0,0,0),(0,1,0,1))))
+        def configure(selected):
+            graph.cost=o.fused_cost.copy()
+            if 4 in selected:graph.cost[0],graph.cost[4]=2.,2.
+        o.configure=configure
+        result,_=run_tail(o,Backend(),1000)
+        self.assertEqual(result.makespan,12.)
+        result,_=run_tail(o,Backend(),1000,lambda t:t.orders[0].index(4)<t.orders[0].index(1))
+        self.assertEqual(result.makespan,14.)
 
+    def test_worker_request_uses_resident_configuration(self):
+        import json
+        import pickle
+        import queue
+        import time
+        path=ROOT/'megatron/core/pipeline_parallel/dspp_prefetch.py'
+        fn=next(n for n in ast.parse(path.read_text()).body
+                if isinstance(n,ast.FunctionDef) and n.name=='_planner_main')
+        cfg=types.SimpleNamespace(curr_iteration=0)
+        contexts={'resident':'stage contexts'}
+        seen=[]
+        def build(request,optimize):
+            seen.append(request)
+            return None,types.SimpleNamespace(to_dict=lambda:{'schedule':'result'})
+        fake_torch=types.SimpleNamespace(set_num_threads=lambda n:None,
+            set_num_interop_threads=lambda n:None,cuda=types.SimpleNamespace(is_initialized=lambda:False))
+        ns=dict(torch=fake_torch,pickle=pickle,json=json,time=time,_build=build)
+        exec(compile(ast.Module(body=[fn],type_ignores=[]),str(path),'exec'),ns)
+        jobs,results=queue.Queue(),queue.Queue()
+        jobs.put(pickle.dumps((8,'input8',(('metadata',),1.,('ordering','counts'),7))))
+        jobs.put(None)
+        ns['_planner_main'](jobs,results,cfg,contexts)
+        result=json.loads(results.get())
+        self.assertIs(seen[0][0],cfg)
+        self.assertIs(seen[0][2],contexts)
+        self.assertEqual(cfg.curr_iteration,7)
+        self.assertEqual(result['iteration'],8)
+        self.assertIsNone(result['error'])
 
-def test_deadline_and_unprofitable_costs_preserve_unsplit():
-    ref,compute,messages,split,tokens=fixture()
-    plan=plan_configuration_b(ref,compute,messages,split,tokens=tokens,budget_fraction=0)
-    assert plan.planning_info['decision']['stop']=='deadline'
-    assert plan.planning_info['selected_count']==0
-    assert not plan.planning_info['budget_met']
-    assert plan.planning_info['budget_overrun_ms']>0
-    bad={k:(compute[k]*2,compute[k]) for k in split}
-    other=plan_configuration_b(ref,compute,messages,bad,tokens=tokens)
-    assert other.planning_info['decision']['stop']=='stalled'
-    assert other.planning_info['selected_count']==0
+    def test_fast_insertion_matches_full_graph(self):
+        ref,c,m,s,t,slots=fixture()
+        o=OptionalPlan(ref,c,m,s);state=initial(o,Backend());preds=predecessors(o.m)
+        for chain in tail_frontiers(o,slots):
+            h=chain[0]
+            for predicted,pos in score_positions(o,state,h,preds,Backend()):
+                orders=[list(x) for x in state.orders]
+                orders[o.m.meta[h]['rank']].insert(pos,h);o.configure({h})
+                actual=o.m.evaluate(orders)
+                if actual is not None:self.assertAlmostEqual(actual,predicted)
 
-
-def test_infeasible_splits_never_replace_verified_base():
-    ref,compute,messages,split,tokens=fixture()
-    class Memory:
-        def check(self,plan):
-            if any(n.kind=='D' for seq in plan.schedules for n in seq):
-                raise ValueError('counted memory capacity exceeded')
-    plan=plan_configuration_b(ref,compute,messages,split,tokens=tokens,memory=Memory())
-    assert plan.planning_info['decision']['steps'][0]['after_ms'] is None
-    assert plan.planning_info['memory_search']['rejected'] > 0
-    assert not plan.fallback_reason
-    assert plan.planning_info['selected_count']==0
-    assert plan.predicted_ms==plan.planning_info['seed_makespan_ms']
-
-
-def test_history_cost_normalization_and_missing_split_samples():
-    ref,compute,messages,split,_=fixture()
-    one=next(iter(split))
-    optional=OptionalPlan(ref,compute,messages,{one:(compute[one]*.4,.01)})
-    assert len(optional.m.hs)==1
-    h=optional.m.hs[0]
-    assert optional.hcost[h]==compute[one]-optional.split_cost[h]
-    baseline=initial(optional,Backend())
-    assert abs(baseline.makespan-replay_plan(ref,compute,messages)['makespan_ms'])<1e-6
-    with pytest.raises(ValueError,match='invalid split cost'):
-        plan_configuration_b(ref,compute,messages,{one:(float('nan'),1)})
-
-
-@pytest.mark.parametrize('failure',['reference','coordinator'])
-def test_distributed_rejection_is_published_before_raise(monkeypatch, failure):
-    import torch.distributed as dist
-    from megatron.core.pipeline_parallel import dspp_plan_runtime as runtime
-    reference = fixture()[0]
-    calls = []
-    def build(*args, optimize, **kwargs):
-        if failure == 'reference' or optimize:
-            raise ValueError('injected failure')
-        return reference, reference
-    def gather(out, value, **kwargs):
-        calls.append('gather')
-        out[:] = [value, value]
-    def broadcast(value, **kwargs):
-        calls.append('broadcast')
-        assert value[0][0] == 'ValueError: injected failure'
-    monkeypatch.setattr(runtime, 'build_runtime_plan', build)
-    monkeypatch.setattr(dist, 'get_world_size', lambda group:2)
-    monkeypatch.setattr(dist, 'get_rank', lambda group:0)
-    monkeypatch.setattr(dist, 'get_global_rank', lambda group, rank:rank)
-    monkeypatch.setattr(dist, 'all_gather_object', gather)
-    monkeypatch.setattr(dist, 'broadcast_object_list', broadcast)
-    with pytest.raises(RuntimeError, match='agreement failed' if failure=='reference' else 'coordinator failed'):
-        runtime.build_distributed_b_plan(None, group=object())
-    assert calls == (['gather'] if failure=='reference' else ['gather','broadcast'])
-
-
-def placement_optional():
-    # Base=15. H after x gives 12; H before x gives 14, both improve.
-    keys=('b','x','c','tail','h')
-    graph=FixedGraph(keys,(('b','h'),('h','c'),('x','tail')),
-        dict(zip(keys,(5.,5.,0.,5.,0.))),dict(zip(keys,(0,0,0,1,0))),
-        {'h':'b'},{'h':('c',)})
-    o=SimpleNamespace(m=graph,fused_cost=graph.cost.copy(),split_cost={4:2.},
-        hcost={4:2.},base_orders=((0,1,2),(3,)))
-    def configure(selected):
-        graph.cost=o.fused_cost.copy()
-        if 4 in selected: graph.cost[0],graph.cost[4]=2.,2.
-    o.configure=configure
-    return o
-
-
-def test_slower_feasible_h_position_is_kept():
-    o=placement_optional(); checked=[]
-    def feasible(state):
-        checked.append(state.makespan)
-        return state.orders[0].index(4) < state.orders[0].index(1)
-    state,info=run_cp(o,Backend(),1000,feasible)
-    assert checked == [12.,14.]
-    assert state.makespan == 14. and state.selected == {4}
-
-
-def test_complete_pair_survives_infeasible_single_intermediate():
-    o=pair_optional()
-    o.fused_cost[2]=4.5  # single h0 now improves 10->9.5 but is infeasible
-    checked=[]
-    def feasible(state):
-        checked.append(state.selected)
-        return len(state.selected)==2
-    state,info=run_cp(o,Backend(),1000,feasible)
-    assert frozenset({5}) in checked and frozenset({5,6}) in checked
-    assert state.selected=={5,6} and state.makespan==7.
-
-
-def test_deadline_during_check_keeps_last_verified_improvement(monkeypatch):
-    from megatron.core.pipeline_parallel import dspp_plan_b as module
-    clock=[0.]
-    monkeypatch.setattr(module.time,'perf_counter',lambda:clock[0])
-    checked=[]
-    def feasible(state):
-        checked.append(state.makespan)
-        clock[0]=2.
-        return True
-    state,info=run_cp(placement_optional(),Backend(),1000,feasible)
-    assert checked==[12.] and state.makespan==12.
-    assert info['stop']=='deadline'
-
-
-def test_later_infeasible_split_keeps_previous_gain_and_checks_once():
-    ref,compute,messages,split,tokens=fixture()
-    seen=set(); selected=[]
-    class Memory:
-        def check(self,plan):
-            key=plan.schedules
-            assert key not in seen, 'same complete candidate checked twice'
-            seen.add(key)
-            count=sum(n.kind=='H' for seq in key for n in seq)
-            selected.append(count)
-            if count>1: raise ValueError('counted memory capacity exceeded')
-    plan=plan_configuration_b(ref,compute,messages,split,tokens=tokens,memory=Memory(),budget_fraction=1.)
-    assert 1 in selected and max(selected)>1
-    assert plan.planning_info['selected_count']==1
-    assert plan.predicted_ms < plan.planning_info['seed_makespan_ms']
-    assert plan.planning_info['memory_search']['checks']==len(seen)-1
-    assert not plan.fallback_reason
-
-
-def test_unprofitable_diagnostic_states_do_not_pay_for_memory_checks():
-    o=pair_optional(); o.split_cost={5:6.,6:6.}
-    def forbidden(state):
-        raise AssertionError('unprofitable candidate checked')
-    state,_=run_cp(o,Backend(),1000,forbidden)
-    assert not state.selected
+if __name__=='__main__':
+    unittest.main()

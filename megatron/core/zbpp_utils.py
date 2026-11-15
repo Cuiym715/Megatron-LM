@@ -91,7 +91,7 @@ class WeightGradStore:
 
     @classmethod
     def pop(cls, chunk=0, pop_num=None, timers=None,
-            progress_tracker=None, progress_parent=None, task_key=None):
+            task_key=None):
         cls.lazy_init()
         if pop_num is None:
             pop_num = 1
@@ -117,28 +117,11 @@ class WeightGradStore:
         timer = timers('w-compute', log_level=2) if timers is not None else None
         if timer is not None:
             timer.start()
-        wgrad_index = 0
         for _ in range(pop_num):
             stored_grads = (cls.keyed_weight_grads.pop(key) if task_key is not None
                             else cls.weight_grad_queue[chunk].popleft())
             for pre_func, func in stored_grads:
-                progress_token = None
-                if progress_tracker is not None:
-                    progress_token = progress_tracker.begin_compute(
-                        "wgrad",
-                        node=None,
-                        task_id=None,
-                        parent=progress_parent,
-                        detail={
-                            "chunk": chunk,
-                            "wgrad_index": wgrad_index,
-                            "function": getattr(func, "__name__", type(func).__name__),
-                        },
-                    )
                 func(*pre_func(async_op=False))
-                if progress_tracker is not None:
-                    progress_tracker.end_compute(progress_token)
-                wgrad_index += 1
         if timer is not None:
             timer.stop()
         return pop_num

@@ -33,7 +33,10 @@ class ChunkPlanner:
         names = (*model.payload['layout']['model'], 'params_dtype','pipeline_model_parallel_size',
                  'dspp_packing_strategy','dspp_microbatch_order','dspp_order_profile',
                  'dspp_disable_residual_packing','dspp_recv_lookahead','dspp_send_inflight_depth',
-                 'dspp_history_dkv_after_dx','dspp_split_attention_backward')
+                 'dspp_history_dkv_after_dx','dspp_split_attention_backward','dspp_planner_backend')
+        if getattr(cfg, 'dspp_planner_backend', 'cpp') == 'cpp':
+            from .dspp_native import library
+            library()
         self.model = model
         self.cfg = SimpleNamespace(**{k:getattr(cfg,k) for k in names if hasattr(cfg,k)})
         self.fused_cfg = copy(self.cfg)
@@ -60,19 +63,29 @@ class ChunkPlanner:
         return dict(schema=memory['schema'], accounting=memory['accounting'],
                     stages=rows, dynamic_growth=memory['dynamic_growth'])
 
-    def fine(self, lengths, identities, iteration, input_key, capacity):
-        from .schedules import _pad_dspp_v_split_counts
+    def pack(self, lengths, capacity):
         if not self.model.domain[0] <= capacity <= self.model.domain[1]:
             raise ValueError('capacity outside model search domain')
+        return tuple(
+            build_dspp_batch_plan(
+                group, chunk_size=capacity,
+                packing_strategy=self.cfg.dspp_packing_strategy,
+                pack_residuals=not getattr(self.cfg, 'dspp_disable_residual_packing', False),
+                validate=False,
+            )
+            for group in lengths
+        )
+
+    def fine(self, lengths, identities, iteration, input_key, capacity, *, plans=None):
         cfg, pp = self.cfg, self.model.pp
-        batches = tuple(DsppTrainingBatch(build_dspp_batch_plan(group, chunk_size=capacity,
-            packing_strategy=cfg.dspp_packing_strategy,
-            pack_residuals=not getattr(cfg,'dspp_disable_residual_packing',False), validate=False),
-            (), input_identity=identity) for group,identity in zip(lengths,identities))
+        if plans is None:
+            plans = self.pack(lengths, capacity)
+        batches = tuple(DsppTrainingBatch(plan, (), input_identity=identity)
+                        for plan, identity in zip(plans, identities))
         ordering = build_dspp_ordering_plan(batches, pp_degree=pp, mode=cfg.dspp_microbatch_order,
                                            profile_path=getattr(cfg,'dspp_order_profile',None))
         groups = ordering.schedule_groups
-        counts = tuple(_pad_dspp_v_split_counts([len(g) for g in groups], pp))
+        counts = tuple(len(g) for g in groups)
         schedules, _ = build_slice_v_schedule(pp, len(counts), counts)
         task_map = tuple((g,s,*task) for g,group in enumerate(groups) for s,task in enumerate(group))
         metadata = {(l,p):meta for l,b in enumerate(batches) for p,meta in enumerate(b.plan.microbatches)}
@@ -111,10 +124,16 @@ class ChunkPlanner:
         reference = replace(reference,reference_ms=replay['makespan_ms'],predicted_ms=replay['makespan_ms'])
         return PreparedChunk(capacity,batches,ordering,counts,reference,slots,compute,messages,report,replay['makespan_ms'])
 
-    def prepare(self, lengths, identities, iteration, consumed, current, *, fixed=None):
+    def prepare(self, lengths, identities, iteration, consumed, *, fixed=None):
         input_key = f'{iteration}:{consumed}:{len(lengths)}'
-        return self.search.select(tuple(n for group in lengths for n in group), current,
-            lambda c:self.fine(lengths,identities,iteration,input_key,c), fixed=fixed)
+        return self.search.select(
+            (n for group in lengths for n in group),
+            lambda capacity: self.pack(lengths, capacity),
+            lambda capacity, plans: self.fine(
+                lengths, identities, iteration, input_key, capacity, plans=plans,
+            ),
+            fixed=fixed,
+        )
 
     def b_request(self, prepared, started):
         # Static models/configuration never enter this per-iteration request.
@@ -143,5 +162,6 @@ class ChunkPlanner:
                                self.cfg.params_dtype, capacity)
         plan = plan_configuration_b(reference,request['compute'],request['messages'],split,
             owners=memory.owners,capacities=memory.capacities,tokens=tokens,memory=memory,
-            planning_started=request['planning_started'],budget_fraction=budget_fraction)
+            planning_started=request['planning_started'],budget_fraction=budget_fraction,
+            backend=getattr(self.cfg, 'dspp_planner_backend', 'cpp'), slot_meta=slots)
         return plan, memory.check(plan)

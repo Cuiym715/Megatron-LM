@@ -9,6 +9,9 @@ export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1} PYTHONUNBUFFERED=1
 export CUDA_DEVICE_MAX_CONNECTIONS=${CUDA_DEVICE_MAX_CONNECTIONS:-32}
 export DSPP_CP_BENCH_WARMUP=${DSPP_CP_BENCH_WARMUP:-2}
 export DSPP_CP_BENCH_TIMED=${DSPP_CP_BENCH_TIMED:-6}
+export DSPP_BENCH_OUTPUT="$DSPP_CP_BENCH_OUTPUT"
+export DSPP_BENCH_WARMUP="$DSPP_CP_BENCH_WARMUP"
+export DSPP_BENCH_TIMED="$DSPP_CP_BENCH_TIMED"
 mode=${DSPP_CP_MODE:-fused}
 pp=${DSPP_PP_SIZE:-2}
 cp=${DSPP_CP_SIZE:-2}
@@ -28,12 +31,8 @@ case "$mode" in
  *) exit 2 ;;
 esac
 extra+=("$@")
-if [[ -n ${DSPP_CP_TIMELINE_DIR:-} ]]; then
- extra+=(--dspp-timeline-dir "$DSPP_CP_TIMELINE_DIR" --dspp-timeline-iterations 3 4 5 6
-   --dspp-task-timing-only --dspp-task-timing-scope all)
-fi
 cmd=("$PYTHON_BIN" -m torch.distributed.run --standalone --nproc-per-node="$((pp*cp))"
- "${DSPP_CP_ENTRYPOINT:-tools/benchmark_dspp_cp.py}"
+ "${DSPP_CP_ENTRYPOINT:-tools/benchmark_dspp.py}"
  --tensor-model-parallel-size 1 --pipeline-model-parallel-size "$pp" --context-parallel-size "$cp"
  --num-layers-per-virtual-pipeline-stage "$((${DSPP_NUM_LAYERS:-4}/(pp*2)))" --num-layers "${DSPP_NUM_LAYERS:-4}"
  --hidden-size "${DSPP_HIDDEN_SIZE:-512}" --ffn-hidden-size "${DSPP_FFN_SIZE:-1024}" --num-attention-heads "${DSPP_HEADS:-4}"

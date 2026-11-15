@@ -15,7 +15,6 @@ from megatron.core.pipeline_parallel.dspp_plan import (
     receive_orders, split_plan, template_plan, validate_plan,
 )
 from megatron.core.pipeline_parallel.slice_v import build_slice_v_schedule
-from megatron.core.pipeline_parallel.schedules import _pad_dspp_v_split_counts
 from .test_schedule_plan import simulate_protocol
 
 
@@ -24,7 +23,7 @@ def fixture(pp):
     groups = [tuple((l, p) for p in range(len(batch.microbatches))) for l in range(2)]
     mapping = tuple((g, s, *task) for g, group in enumerate(groups) for s, task in enumerate(group))
     meta = {(l, p): m for l in range(2) for p, m in enumerate(batch.microbatches)}
-    counts = _pad_dspp_v_split_counts(list(map(len, groups)), pp)
+    counts = list(map(len, groups))
     seqs, _ = build_slice_v_schedule(pp, len(counts), counts)
     ref = template_plan(seqs, counts, mapping, PlanBinding(1, 'input', 'layout'),
                         history_dependencies=history_dependencies(mapping, meta))

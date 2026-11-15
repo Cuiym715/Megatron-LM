@@ -1,0 +1,240 @@
+{
+  "domain": [
+    2048,
+    8192
+  ],
+  "compute": [
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/pp8-contracts-20261106/results/cpu-models/c2048-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "F",
+        "B_fused",
+        "W"
+      ],
+      "evidence": "pp8-contracts-20261106: native diagnostic_entry, no canonical attention injection; measured full PP8"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/pp8-contracts-20261106/results/cpu-models/c4096-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "F",
+        "B_fused",
+        "W"
+      ],
+      "evidence": "pp8-contracts-20261106: native diagnostic_entry, no canonical attention injection; measured full PP8"
+    },
+    {
+      "path": "../../../archive/completed/runtime-opt-20261031/compact-archive-v1/gzip-profile-v1/stage-profile.json.gz",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "D",
+        "H"
+      ],
+      "evidence": "runtime-opt-20261031 README: lossless 25776-record controlled-frozen-v2 archive; original BF16 after-dx, pre-canonical"
+    }
+  ],
+  "local_compute": [
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c2048-fused-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "F",
+        "B_fused",
+        "W"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c2048-split-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "D",
+        "H"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c2560-fused-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "F",
+        "B_fused",
+        "W"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c2560-split-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "D",
+        "H"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c3072-fused-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "F",
+        "B_fused",
+        "W"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c3072-split-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "D",
+        "H"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c3840-fused-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "F",
+        "B_fused",
+        "W"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c3840-split-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "D",
+        "H"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c4096-fused-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "F",
+        "B_fused",
+        "W"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c4096-split-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "D",
+        "H"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c4608-fused-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "F",
+        "B_fused",
+        "W"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c4608-split-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "D",
+        "H"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c5120-fused-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "F",
+        "B_fused",
+        "W"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c5120-split-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "D",
+        "H"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c6144-fused-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "F",
+        "B_fused",
+        "W"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c6144-split-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "D",
+        "H"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c8192-fused-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "F",
+        "B_fused",
+        "W"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/cpu-compact-20261106/results/c8192-split-compact.json",
+      "execution": "native-default-bf16-v1",
+      "operations": [
+        "D",
+        "H"
+      ],
+      "evidence": "gpu-calibration-20261105/endpoint_batch.py: original complete-stage native kernels, isolated PP2 [3,4,4,2]; fitted transfer only"
+    }
+  ],
+  "memory": [
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/pp8-contracts-20261106/results/cpu-models/c2048-fused-memory.json"
+    },
+    {
+      "path": "../../../../docs/v5/design/chunk_size_selcetion/pp8-contracts-20261106/results/cpu-models/c4096-fused-memory.json"
+    },
+    {
+      "path": "../../../archive/completed/vocab32k-rebalance/results/profiles-memory-v1/memory.json",
+      "fields": [
+        "activation_bytes",
+        "weight_forward_bytes",
+        "weight_backward_bytes",
+        "weight_bytes",
+        "capture_bytes",
+        "attention_bytes_per_key_token",
+        "pending_bytes_per_token",
+        "workspace_bytes"
+      ],
+      "note": "Reuse native after-dx dynamic storage and historical workspace allowance only. Exclude resident inherited from 63-layer vocab151680; use measured 61-layer vocab32128 resident from current native fused snapshots."
+    }
+  ],
+  "p2p": "../../../../docs/v5/design/chunk_size_selcetion/p2p-wide-20261106/results/p2p-combined.json",
+  "limitations": [
+    "PP8 F/B/W measured at 2048/4096; D/H measured at 2048. Other capacities use fitted role-calibrated isolated PP2 evidence, never PP8 exact values.",
+    "Legacy kernel source identity has not been revalidated on current GPU code. Native flags alone do not establish prediction accuracy.",
+    "Native 2048/4096 resident and fused memory, historical 2048 native split dynamic storage and 3GiB workspace allowance. Old 63-layer/Qwen-vocab resident excluded. Current delayed-H workspace and scaling remain to be measured.",
+    "No native PP8 6144/8192 or current tail-B GPU validation performed. Domain 2048..8192 is this experiment configuration, not an algorithmic capacity restriction.",
+    "Long-history predictions beyond 32K and new packing are not validated. PP4/CP2 and vocab151680 require separate models."
+  ]
+}

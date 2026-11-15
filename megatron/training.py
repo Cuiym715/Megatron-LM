@@ -1059,33 +1059,6 @@ def train(forward_step_func, get_batch_func, model, optimizer, opt_param_schedul
     # Iterations.
     iteration = args.iteration
 
-    torch_profiler = None
-    torch_profile_iteration = int(
-        getattr(args, 'dspp_torch_profiler_iteration', 0) or 0
-    )
-    torch_profile_dir = getattr(args, 'dspp_torch_profiler_dir', None)
-    if args.dspp and torch_profile_dir and torch_profile_iteration > 0:
-        os.makedirs(torch_profile_dir, exist_ok=True)
-        warmup = 1 if torch_profile_iteration > 1 else 0
-        wait = max(0, torch_profile_iteration - warmup - 1)
-        torch_profiler = torch.profiler.profile(
-            activities=[
-                torch.profiler.ProfilerActivity.CPU,
-                torch.profiler.ProfilerActivity.CUDA,
-            ],
-            schedule=torch.profiler.schedule(
-                wait=wait, warmup=warmup, active=1, repeat=1
-            ),
-            on_trace_ready=torch.profiler.tensorboard_trace_handler(
-                torch_profile_dir,
-                worker_name=f'rank_{torch.distributed.get_rank()}',
-            ),
-            record_shapes=False,
-            profile_memory=False,
-            with_stack=False,
-        )
-        torch_profiler.start()
-
     timers('interval-time', log_level=0).start(barrier=True)
     print_datetime('before the start of training step')
     report_memory_flag = 2
@@ -1202,11 +1175,7 @@ def train(forward_step_func, get_batch_func, model, optimizer, opt_param_schedul
             print_datetime('exiting program at iteration {}'.format(iteration))
             sys.exit()
 
-        if torch_profiler is not None:
-            torch_profiler.step()
 
-    if torch_profiler is not None:
-        torch_profiler.stop()
 
     if args.kaimm_gc_interval > 0:
         gc.enable()

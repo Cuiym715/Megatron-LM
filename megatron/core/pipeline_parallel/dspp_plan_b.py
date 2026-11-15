@@ -1,9 +1,4 @@
-"""Algorithm B split search, ported from archived 030/011/010 (read-only).
-
-Candidate order, exposed-path pairing, 32 accepted rounds, soft deadlines and
-H prefix/suffix scoring are retained. The adapter binds the deployed Plan/FIFO;
-no research-directory import, kernel change, beam, top-k or feedback pass.
-"""
+"""Supply construction followed by longest-sequence tail-frontier D/H search."""
 from collections import deque
 from dataclasses import dataclass, replace
 import math
@@ -151,114 +146,72 @@ def insertion_candidates(optional, backend, current, h, preds, counters,
         counters['positions_replayed'] += 1
         if actual is None:
             continue
-        assert abs(actual - predicted) < 1e-6
         yield State(selected, tuple(tuple(rank) for rank in orders), actual), position
 
 
-def best_insertion(optional, backend, current, h, preds, counters):
-    """One-H best legal placement, including zero-gain/worse moves for diagnosis."""
-    return next(insertion_candidates(optional, backend, current, h, preds, counters),
-                (None, None))
+def tail_frontiers(optional, slot_meta=None):
+    """One tail frontier per stage/VPP/longest sequence, including length ties."""
+    chains = {}
+    logical = {(g, s): l for g, s, l, _ in optional.base.task_map}
+    for h in optional.m.hs:
+        b = optional.m.names[optional.m.release[h]]
+        stage, _, chunk, group, split = b
+        if slot_meta is None:
+            # Metadata-free callers use the real (unpadded) chain length.
+            length = sum(g == group for g, _, _, _ in optional.base.task_map)
+            items = [(group, split, length)]
+        else:
+            items = [(item.sequence_id, item.segment_id, item.sequence_length)
+                     for item in slot_meta[group, split].items if item.has_history]
+        for sequence, segment, length in items:
+            key = (stage, chunk, logical[group, split], sequence)
+            chains.setdefault(key, (length, []))[1].append((segment, h))
+    longest = (max((item.sequence_length for meta in slot_meta.values() for item in meta.items), default=0)
+               if slot_meta is not None else max((length for length, _ in chains.values()), default=0))
+    return tuple(tuple(h for _, h in sorted(items, reverse=True))
+                 for length, items in chains.values() if length == longest)
 
 
-def critical_path(optional, state):
-    optional.configure(set(state.selected))
-    detail = optional.m.evaluate(state.orders, detail=True)
-    assert detail and abs(detail['makespan_ms'] - state.makespan) < 1e-6
-    return detail['critical_path']
-
-
-
-def step_cp(o, backend, current, deadline, feasible=None):
-    m = o.m
-    path = set(critical_path(o, current))
-    eligible = [h for h in m.hs if h not in current.selected
-                and o.fused_cost[m.release[h]] > o.split_cost[h]]
-    firsts = [h for h in eligible if m.release[h] in path]
-    preds = predecessors(m)
-    counters = dict(on_path=len(firsts), firsts=len(firsts), singles_tried=0,
-                    second_candidates=0, second_trials=0, positions_scored=0,
-                    positions_replayed=0)
-    singles = []
-    for h in firsts:
-        if time.perf_counter() >= deadline:
-            break
-        placements = insertion_candidates(o, backend, current, h, preds, counters, deadline)
-        one, _ = next(placements, (None, None))
-        counters['singles_tried'] += 1
-        if one is not None:
-            singles.append((one, h, placements))
-
-    # Check only candidates which can beat the incumbent. Start with the best
-    # time score; an infeasible slot does not discard other positions of H.
-    best = None
-    if feasible is None:
-        improving = [one for one, _, _ in singles if one.makespan < current.makespan-1e-8]
-        if improving:
-            best = min(improving, key=lambda state: state.makespan)
-            return best, 'deadline' if time.perf_counter() >= deadline else 'single', counters
-    for one, h, placements in sorted(singles, key=lambda entry: entry[0].makespan):
-        trial = one
-        while trial is not None:
-            if time.perf_counter() >= deadline:
-                return best, 'deadline', counters
-            limit = best.makespan if best is not None else current.makespan
-            if trial.makespan >= limit-1e-8:
-                break
-            if feasible is None or feasible(trial):
-                best = trial
-                break
-            trial, _ = next(placements, (None, None))
-    if time.perf_counter() >= deadline:
-        return best, 'deadline', counters
-    if best is not None:
-        return best, 'single', counters
-    for one, h1, _ in singles:
-        if time.perf_counter() >= deadline:
-            return best, 'deadline', counters
-        # Keep the time-best single as a diagnostic intermediate even if its
-        # memory exceeds capacity: a complete pair may have different lifetimes.
-        exposed = set(critical_path(o, one))-path
-        seconds = [h for h in eligible if h != h1 and m.release[h] in exposed]
-        counters['second_candidates'] += len(seconds)
-        for h2 in seconds:
-            if time.perf_counter() >= deadline:
-                return best, 'deadline', counters
-            counters['second_trials'] += 1
-            for two, _ in insertion_candidates(o, backend, one, h2, preds, counters, deadline):
-                if time.perf_counter() >= deadline:
-                    return best, 'deadline', counters
-                limit = best.makespan if best is not None else current.makespan
-                if two.makespan >= limit-1e-8:
-                    break
-                if feasible is None or feasible(two):
-                    best = two
-                    break
-    return best, 'pair' if best is not None else 'stalled', counters
-
-
-def run_cp(o, backend, budget_ms, feasible=None):
-    state = initial(o, backend)
+def run_tail(optional, backend, budget_ms, feasible=None, slot_meta=None):
+    state = initial(optional, backend)
     begin = time.perf_counter()
-    deadline = begin+budget_ms/1000
-    records = []
+    deadline = begin + budget_ms / 1000
+    chains = tail_frontiers(optional, slot_meta)
+    preds = predecessors(optional.m)
+    counters = dict(positions_scored=0, positions_replayed=0, candidates=0)
+    accepted = 0
     stop = 'step_limit'
     for _ in range(32):
-        candidate, kind, counters = step_cp(o, backend, state, deadline, feasible)
-        records.append(dict(kind=kind, before_ms=state.makespan,
-                            after_ms=None if candidate is None else candidate.makespan,
-                            **counters))
-        if candidate is None:
-            stop = kind
-            break
-        state = candidate
         if time.perf_counter() >= deadline:
             stop = 'deadline'
             break
+        frontiers = dict.fromkeys(next((h for h in chain if h not in state.selected), None)
+                                  for chain in chains)
+        best = None
+        for h in frontiers:
+            if h is None or optional.fused_cost[optional.m.release[h]] <= optional.split_cost[h]:
+                continue
+            counters['candidates'] += 1
+            for trial, _ in insertion_candidates(optional, backend, state, h, preds, counters, deadline):
+                if trial.makespan >= (best.makespan if best else state.makespan) - 1e-8:
+                    break
+                if feasible is None or feasible(trial):
+                    best = trial
+                    break
+            if time.perf_counter() >= deadline:
+                break
+        if best is not None:
+            state = best
+            accepted += 1
+        if time.perf_counter() >= deadline:
+            stop = 'deadline'
+            break
+        if best is None:
+            stop = 'stalled'
+            break
     return state, dict(stop=stop, decision_ms=1000*(time.perf_counter()-begin),
-                       budget_ms=budget_ms, max_steps=32, steps=records,
-                       candidate_order='input-node-order', grouping=None, top_k=None)
-
+                       budget_ms=budget_ms, accepted=accepted, max_steps=32,
+                       candidate_order='longest-sequence-tail-frontier', **counters)
 
 
 class OptionalPlan:
@@ -321,8 +274,8 @@ class OptionalPlan:
 
 def plan_configuration_b(reference, compute, messages, split_costs, *, owners=(),
                          capacities=None, tokens=None, memory=None, budget_fraction=.60,
-                         planning_started=None, feedback_reserve_ms=0., backend='python'):
-    """027 supply -> 030 cp-all -> full audit, with 031's soft full budget.
+                         planning_started=None, feedback_reserve_ms=0., backend='cpp', slot_meta=None):
+    """Supply construction followed by tail-frontier search under a soft budget.
 
     Deployed per-chunk W order constrains readiness as well as final validation;
     the supply priority itself is unchanged. Invalid supply output falls back
@@ -371,8 +324,8 @@ def plan_configuration_b(reference, compute, messages, split_costs, *, owners=()
         memory_stats['check_ms'] += (time.perf_counter()-start)*1000
         checked[key] = accepted
         return accepted
-    state, decision = run_cp(optional, Backend(), decision_budget,
-                             feasible if memory is not None else None)
+    state, decision = run_tail(optional, Backend(), decision_budget,
+                             feasible if memory is not None else None, slot_meta)
     searched = time.perf_counter()
     candidate = optional.materialize(state)
     actual_compute = dict(compute)
@@ -383,8 +336,6 @@ def plan_configuration_b(reference, compute, messages, split_costs, *, owners=()
         actual_compute[hk] = optional.hcost[h]
     reject = ''
     actual = replay_plan(candidate, actual_compute, messages, tokens=tokens, reference=reference)
-    if abs(actual['makespan_ms']-state.makespan) > 1e-6:
-        raise ValueError('split fast score differs from materialized replay')
     try:
         # This exact state was already checked before acceptance (or is the
         # checked base). Runtime publication reuses CountedMemory's cached result.

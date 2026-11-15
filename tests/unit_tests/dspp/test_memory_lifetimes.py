@@ -108,30 +108,6 @@ def test_first_pending_charges_whole_backing_once_then_target_additions():
     assert compact[0].bytes == sum(i.token_offset for i in meta[g,s].items)*unit
 
 
-@pytest.mark.parametrize('backend',['python','cpp'])
-def test_v3_owners_in_supply_and_feedback_construction(backend):
-    from megatron.core.pipeline_parallel.dspp_plan_b import plan_configuration_b
-    from megatron.core.pipeline_parallel.dspp_plan_c import feedback_configuration_c
-    memory,ref,meta = memory_case()
-    compute = {node_key(n):1. if (n.microbatch,n.split) in meta else 0.
-               for seq in ref.schedules for n in seq}
-    source = next(k for k in compute if k[:3] == (0,'B',1)
-                  and k[3:] in meta and any(i.has_history for i in meta[k[3:]].items))
-    compute[source] = compute[(1,*source[1:])] = 100.
-    messages = {('message',a,b,*msg):3. for (a,b),lane in receive_orders(ref.schedules).items() for msg in lane}
-    costs = {k:(v*.3,v*.8) for k,v in compute.items() if k[1]=='B' and k[3:] in meta
-             and any(i.has_history for i in meta[k[3:]].items)}
-    seed = plan_configuration_b(ref,compute,messages,costs,memory=memory,
-        owners=memory.owners,capacities=memory.capacities,backend=backend)
-    feedback = feedback_configuration_c(ref,seed,compute,messages,costs,memory=memory,backend=backend)
-    for plan in (seed,feedback):
-        validate_plan(plan,ref)
-        report = memory.check(plan)
-        assert all(p<=c for p,c in zip(report['owner_peak_bytes'],memory.capacities))
-    assert {node_key(n) for seq in feedback.schedules for n in seq if n.kind=='H'} == {
-        node_key(n) for seq in seed.schedules for n in seq if n.kind=='H'}
-
-
 def test_v3_identity_and_layout_cannot_silently_reuse_other_profiles():
     args,ref,meta,profile = case()
     memory = CountedMemory(profile,args,ref,meta,torch.bfloat16,64)

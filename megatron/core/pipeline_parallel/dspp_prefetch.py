@@ -6,7 +6,7 @@ or model state. Publication uses a separate Gloo group at iteration boundaries.
 """
 import atexit
 from concurrent.futures import Future
-from copy import deepcopy
+from copy import copy, deepcopy
 from dataclasses import dataclass, replace
 import json
 import multiprocessing as mp
@@ -25,22 +25,20 @@ from megatron.core.datasets.dspp_training import (
     DsppTrainingBatch, prepare_dspp_cpu_batch,
 )
 from megatron.core.datasets.dspp_ordering import build_dspp_ordering_plan
-from megatron.core.datasets.dspp_profile_snapshot import profile_snapshot, freeze_runtime_profiles
-from .dspp_plan import DsppSchedulePlan, validate_plan, digest, preserves_retention_envelope
-from .dspp_plan_runtime import build_runtime_plan, runtime_inputs
-from .dspp_memory_counts import memory_layout
+from megatron.core.datasets.dspp_profile_snapshot import freeze_runtime_profiles
+from .dspp_plan import DsppSchedulePlan
+from .dspp_plan_runtime import build_runtime_plan
 from .slice_v import build_slice_v_schedule
 
 
 def _metadata_inputs(args, batches):
-    # Reuse the execution template/padding rule, rather than a second schedule.
-    from .schedules import _pad_dspp_v_split_counts
+    # Use the same real-task schedule as the executor.
     pp = args.pipeline_model_parallel_size
     ordering = build_dspp_ordering_plan(batches, pp_degree=pp,
         mode=args.dspp_microbatch_order, profile_path=getattr(args, 'dspp_order_profile', None))
     args._dspp_cpu_ordering = ordering
     groups = ordering.schedule_groups
-    counts = _pad_dspp_v_split_counts([len(g) for g in groups], pp)
+    counts = [len(g) for g in groups]
     args._dspp_cpu_counts = counts
     schedules, _ = build_slice_v_schedule(pp, len(counts), counts)
     return schedules, counts, groups
@@ -60,7 +58,7 @@ def _build(request, optimize):
         planning_started=started)
 
 
-def _planner_main(jobs, results):
+def _planner_main(jobs, results, cfg, contexts):
     """Spawn target. No global training args, CUDA context or process groups."""
     torch.set_num_threads(1)
     torch.set_num_interop_threads(1)
@@ -72,18 +70,25 @@ def _planner_main(jobs, results):
         iteration, input_hash, request = job
         started = time.perf_counter()
         try:
-            reference, plan = _build(request, True)
+            metadata, planning_started, cached, cfg.curr_iteration = request
+            reference, plan = _build((cfg, metadata, contexts, planning_started, cached), True)
             result = dict(iteration=iteration, input_hash=input_hash, plan=plan.to_dict(),
                 worker_started_at=started, worker_verified_at=time.perf_counter(),
                 worker_cuda_initialized=torch.cuda.is_initialized(), error=None)
-            if getattr(request[0], 'dspp_memory_report_dir', None):
-                result['memory_report'] = request[0]._dspp_memory_plan
+            if getattr(cfg, 'dspp_memory_report_dir', None):
+                result['memory_report'] = cfg._dspp_memory_plan
         except Exception as exc:
             result = dict(iteration=iteration, input_hash=input_hash, plan=None,
                 worker_started_at=started, worker_verified_at=time.perf_counter(),
                 worker_cuda_initialized=torch.cuda.is_initialized(),
                 error=f'{type(exc).__name__}: {exc}')
         results.put(json.dumps(result).encode())
+
+
+class NoPlanner:
+    process = None
+    def close(self):
+        pass
 
 
 class CpuPlanner:
@@ -163,8 +168,6 @@ class CpuPlanner:
         self.receiver.join(timeout=.2)
 
 
-def verify_sources(batches):
-    return None
 
 
 @dataclass
@@ -180,27 +183,15 @@ class CpuIteration:
     schedule_counts: tuple = ()
 
 
-@dataclass(frozen=True)
-class CheckedExecution:
-    """Coordinator's checked plan/counts, bound to immutable input and profiles."""
-    reference: DsppSchedulePlan
-    plan_hash: str
-    memory_profile: dict | None
-    memory_report: dict | None
-    checksum: str
 
 
-def check_execution_inputs(*args, **kwargs):
-    return True
-
-
-def check_live_capacity(*args, **kwargs):
-    return None
 
 
 def choose_plan(packet, result, reference=None):
     """An absent/stale/invalid result always keeps this input's verified fallback."""
     reference = reference if reference is not None else DsppSchedulePlan.from_dict(packet.reference)
+    if packet.metrics.get('rule_only'):
+        return reference, ''
     reason = packet.metrics.get('submission_error') or 'planner-not-ready'
     if result is not None:
         reason = result.get('error') or ''
@@ -223,6 +214,9 @@ class DsppIterationPrefetch:
         from megatron.microbatches import build_num_microbatches_calculator
         if not getattr(args, 'dspp_chunk_model', None):
             freeze_runtime_profiles(args)
+        if getattr(args, 'dspp_planner_backend', 'cpp') == 'cpp':
+            from .dspp_native import library
+            library()
         self.args, self.materialize = args, get_batch_func.dspp_materialize_cpu
         self.rank = dist.get_rank()
         # TP=sample-DP=1: the world is exactly one PP x CP replica. This group is not
@@ -233,10 +227,8 @@ class DsppIterationPrefetch:
         self.planner, self.iterator = None, None
         self.worker_startup_error = ''
         self.records, self.late_results = [], 0
-        self.gpu_events = None
         self.prepared_memory = None
         self.prepared_reference = None
-        self.checked_execution = None
         self.plan_selector = plan_selector
         if self.source:
             self.iterator = data_iterator[0] if isinstance(data_iterator, list) else data_iterator
@@ -247,14 +239,19 @@ class DsppIterationPrefetch:
             self.calculator = build_num_microbatches_calculator(
                 SimpleNamespace(**{**vars(self.cfg), 'rank': 1}))
             try:
-                self.planner = (planner_factory or CpuPlanner)()
+                if planner_factory is not None:
+                    self.planner = planner_factory()
+                elif args.dspp_schedule == 'b':
+                    self.planner = CpuPlanner(target_args=(self.cfg, self.contexts))
+                else:
+                    self.planner = NoPlanner()
             except Exception as exc:
                 self.worker_startup_error = f'worker-startup: {type(exc).__name__}: {exc}'
         atexit.register(self.close)
 
     def _prepare(self, iteration, consumed, num_microbatches):
         started = time.perf_counter()
-        cfg = deepcopy(self.cfg)
+        cfg = copy(self.cfg)
         cfg.curr_iteration = iteration - 1
         batches, host_bytes = [], 0
         for logical in range(num_microbatches):
@@ -290,8 +287,11 @@ class DsppIterationPrefetch:
             if name.startswith('_'):
                 delattr(cfg, name)
         metadata_bytes = None
-        request = (*request, (cpu_ordering, cpu_counts))
-        if self.closed:
+        request = (metadata, started, (cpu_ordering, cpu_counts), cfg.curr_iteration)
+        rule_only = cfg.dspp_schedule == 'template'
+        if rule_only:
+            error = ''
+        elif self.closed:
             error = 'closed'
         elif self.planner is None:
             error = self.worker_startup_error
@@ -299,7 +299,7 @@ class DsppIterationPrefetch:
             error = self.planner.submit(iteration, reference.binding.input_hash, request)
         metrics = dict(requested_at=started, fetched_at=fetched, metadata_ready_at=ready,
             enqueued_at=time.perf_counter(), host_bytes=host_bytes, metadata_bytes=metadata_bytes,
-            submission_error=error, states=['fetched', 'metadata_ready', 'prepared-fallback', 'planning'])
+            submission_error=error, rule_only=rule_only, states=['fetched', 'metadata_ready', 'prepared-fallback', 'planning'])
         if getattr(cfg, 'dspp_memory_report_dir', None):
             # The template report was computed above; copy it before cfg's
             # private fields are stripped for the spawned planner request.
@@ -403,7 +403,6 @@ class DsppIterationPrefetch:
             counts = self._active_cpu_counts
             self.args._dspp_counted_memory = None
             self.args._dspp_memory_plan = self.active.get('memory_report')
-            self.args._dspp_last_schedule_plan = plan.to_dict()
         except Exception as exc:
             error = f'{type(exc).__name__}: {exc}'
         # This is the executor rendezvous, not a plan/hash agreement check.
@@ -417,7 +416,7 @@ class DsppIterationPrefetch:
         return logical, ordering, counts, plan, None
 
     def commit(self, plan, plan_hash=None):
-        self.active.update(committed_at=time.perf_counter(), plan_hash=plan_hash or plan.plan_hash)
+        self.active.update(committed_at=time.perf_counter(), plan_hash=None)
         self.active['commit_check_ms'] = (
             (self.active['committed_at'] - self.active['h2d_queued_at']) * 1000
             if 'h2d_queued_at' in self.active else 0.)
@@ -427,21 +426,14 @@ class DsppIterationPrefetch:
             self.calculator.update(consumed, True)
             self._request(self.active['iteration'] + 1, consumed, self.calculator.get())
 
-    def mark_compute(self, finished=False):
-        if not finished:
-            self.gpu_events = (torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True))
-        self.gpu_events[int(finished)].record()
-        self.active['compute_last_queued_at' if finished else 'compute_first_queued_at'] = time.perf_counter()
 
     def retire(self):
         self.active.update(retired_at=time.perf_counter(), optimizer_completed_at=time.perf_counter())
         self.active['states'].append('retired')
-        if self.gpu_events and self.gpu_events[1].query():
-            self.active['gpu_compute_ms'] = self.gpu_events[0].elapsed_time(self.gpu_events[1])
         self.args._dspp_prefetch_metrics = dict(self.active)
         if getattr(self.args, 'dspp_prefetch_report_dir', None):
             self.records.append(dict(self.active))
-        self.active, self.gpu_events = None, None
+        self.active = None
 
     def close(self):
         if self.closed:

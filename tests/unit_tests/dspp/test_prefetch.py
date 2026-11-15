@@ -10,6 +10,7 @@ import torch
 
 from megatron.core.datasets.dspp_training import build_dspp_training_batch, prepare_dspp_cpu_batch, DsppTrainingBatch
 from megatron.core.pipeline_parallel import dspp_prefetch as module
+from megatron.core.pipeline_parallel.dspp_plan import validate_plan
 
 
 def data(offset=0):
@@ -56,12 +57,13 @@ def request(iteration=1):
 
 def test_spawn_worker_has_no_cuda_or_collectives_and_returns_verified_plan():
     visible_devices = os.environ.get('CUDA_VISIBLE_DEVICES')
-    planner = module.CpuPlanner()
+    job = request()
+    planner = module.CpuPlanner(target_args=(job[0], job[2]))
     assert os.environ.get('CUDA_VISIBLE_DEVICES') == visible_devices
     try:
-        job = request()
         reference = module._build(job, False)[0]
-        assert not planner.submit(1, reference.binding.input_hash, job)
+        assert not planner.submit(1, reference.binding.input_hash,
+            (job[1], job[3], (job[0]._dspp_cpu_ordering, job[0]._dspp_cpu_counts), job[0].curr_iteration))
         deadline = time.perf_counter() + 30
         result = None
         while result is None and time.perf_counter() < deadline:
@@ -70,7 +72,7 @@ def test_spawn_worker_has_no_cuda_or_collectives_and_returns_verified_plan():
         assert result is not None and not result['error']
         assert not result['worker_cuda_initialized']
         plan = module.DsppSchedulePlan.from_dict(result['plan'])
-        module.validate_plan(plan, reference, binding=reference.binding)
+        validate_plan(plan, reference, binding=reference.binding)
         planner.process.terminate()
         planner.process.join(timeout=3)
         assert planner.submit(2, reference.binding.input_hash, job) == 'worker-unavailable'
@@ -164,7 +166,7 @@ def test_byte_limit_and_partial_iteration_fail_before_publication(monkeypatch):
 
 
 @pytest.mark.parametrize('cp', (1, 2))
-def test_worker_startup_failure_is_a_same_input_fallback(monkeypatch, cp):
+def test_template_never_starts_a_planning_worker(monkeypatch, cp):
     fake_replica(monkeypatch)
     def fail():
         raise OSError('injected spawn failure')
@@ -173,27 +175,13 @@ def test_worker_startup_failure_is_a_same_input_fallback(monkeypatch, cp):
                                          SimpleNamespace(dspp_materialize_cpu=lambda b: b))
     try:
         batches, plan = wrapper.acquire_iteration(1, 2, 0)
-        assert len(batches) == 2 and 'worker-startup' in plan.fallback_reason
+        assert len(batches) == 2 and not plan.fallback_reason
+        assert wrapper.planner.process is None
+        assert not wrapper.worker_startup_error
     finally:
         wrapper.close()
 
 
-@pytest.mark.parametrize('pp', [3, 8])
-def test_legacy_execution_check_does_not_repeat_coordinator_work(pp, monkeypatch):
-    cfg, batches, contexts, started = request()
-    cfg.pipeline_model_parallel_size = pp
-    cfg.num_layers = pp * 4
-    reference, _ = module._build((cfg, batches, contexts, started), False)
-    _, _, groups = module._metadata_inputs(cfg, batches)
-    checked = module.CheckedExecution(reference, reference.plan_hash, None, None,
-        module.digest([reference.plan_hash, None, None]))
-    shape = (cfg.seq_length, cfg.micro_batch_size, cfg.hidden_size)
-    args = (groups, batches, cfg.params_dtype, shape, cfg.micro_seq_length)
-    def forbidden(*args, **kwargs):
-        raise AssertionError('repeated runtime audit')
-    monkeypatch.setattr(module, 'validate_plan', forbidden)
-    monkeypatch.setattr(module, 'digest', forbidden)
-    assert module.check_execution_inputs(cfg, checked, reference, *args)
 
 
 def test_fast_commit_materializes_once_and_rendezvouses_failures(monkeypatch):
@@ -203,8 +191,6 @@ def test_fast_commit_materializes_once_and_rendezvouses_failures(monkeypatch):
     def forbidden(*args, **kwargs):
         raise AssertionError('fingerprint/graph agreement in fast commit')
     monkeypatch.setattr(module.dist, 'all_gather_object', forbidden)
-    monkeypatch.setattr(module, 'validate_plan', forbidden)
-    monkeypatch.setattr(module, 'digest', forbidden)
     materialized = []
     def materialize(batch):
         materialized.append(batch)
@@ -235,16 +221,3 @@ def test_fast_commit_materializes_once_and_rendezvouses_failures(monkeypatch):
         assert wrapper.future is None
     finally:
         wrapper.close()
-
-
-def test_fast_commit_does_not_poll_gpu_allocator_for_audit(monkeypatch):
-    profile = dict(device_name='test', stages=[dict(physical_bytes=1000,
-        resident_bytes=100, reserve_bytes=10)])
-    report = dict(total_peak_bytes=[300])
-    cuda = module.torch.cuda
-    def forbidden(*args, **kwargs):
-        raise AssertionError('live GPU query in CPU commit')
-    for name in ('get_device_name','get_device_properties','current_device',
-                 'memory_allocated','memory_reserved','mem_get_info'):
-        monkeypatch.setattr(cuda,name,forbidden)
-    module.check_live_capacity(profile, report, 0)

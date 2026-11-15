@@ -54,10 +54,12 @@ class ChunkCostModel:
         x = shape_features(capacity, shape)
         return max(1e-9, sum(a*b for a,b in zip(self.coefficients[key], x)))
 
-    def coarse(self, histogram, capacities, mode):
+    def coarse(self, histogram, capacities, mode, *, block_counts=None):
         scores = []
         for start in range(0, len(capacities), 256):
-            x, w = aggregate_features(histogram, capacities[start:start+256])
+            stop = start + 256
+            counts = None if block_counts is None else block_counts[start:stop]
+            x, w = aggregate_features(histogram, capacities[start:stop], counts)
             stages = (np.einsum('ij,sj->is',x,self.work,optimize=False)
                       + np.einsum('ij,sj->is',w,self.weight,optimize=False))
             # Configurable proxy, not a makespan oracle or lower bound.

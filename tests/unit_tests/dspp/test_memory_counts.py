@@ -12,12 +12,11 @@ from megatron.core.datasets.dspp_batch_plan import build_dspp_batch_plan
 from megatron.core.datasets.dspp_execution_cost import DsppExecutionCostModel
 from megatron.core.pipeline_parallel.dspp_memory_counts import CountedMemory, memory_layout, history_state_bytes
 from megatron.core.pipeline_parallel.dspp_plan import (
-    PlanBinding, node_key, order_owner_peaks, plan_configuration_a, receive_orders,
+    PlanBinding, node_key, order_owner_peaks, receive_orders,
     template_plan, validate_plan,
 )
 from megatron.core.pipeline_parallel.dspp_plan_runtime import build_runtime_plan
 from megatron.core.pipeline_parallel.slice_v import build_slice_v_schedule
-from megatron.core.pipeline_parallel.schedules import _pad_dspp_v_split_counts
 
 
 def case(pp=3):
@@ -25,7 +24,7 @@ def case(pp=3):
                            dspp_send_inflight_depth=2)
     batch = build_dspp_batch_plan([193, 129, 33, 17], chunk_size=64)
     groups = [tuple((l, p) for p in range(len(batch.microbatches))) for l in range(2)]
-    counts = _pad_dspp_v_split_counts([len(g) for g in groups], pp)
+    counts = [len(g) for g in groups]
     seqs, _ = build_slice_v_schedule(pp, len(counts), counts)
     mapping = tuple((g, s, *task) for g, group in enumerate(groups) for s, task in enumerate(group))
     reference = replace(template_plan(seqs, counts, mapping, PlanBinding(1, 'input', 'layout')),
@@ -41,25 +40,6 @@ def case(pp=3):
     return args, batch, groups, reference, meta, profile
 
 
-@pytest.mark.parametrize('pp', [3, 4, 8])
-def test_local_order_peak_matches_independent_active_sum_and_a(pp):
-    args, _, _, ref, meta, profile = case(pp)
-    memory = CountedMemory(profile, args, ref, meta, torch.bfloat16, 64)
-    positions = {node_key(n): i for seq in ref.schedules for i, n in enumerate(seq)}
-    expected = []
-    for r, seq in enumerate(ref.schedules):
-        expected.append(max(sum(o.bytes for o in memory.owners if o.stage == r
-            and min(positions[k] for k in o.born) <= i <= max(positions[k] for k in o.users))
-            for i in range(len(seq))))
-    assert order_owner_peaks(ref, memory.owners) == tuple(expected)
-    rng = random.Random(7)
-    compute = {node_key(n): rng.uniform(.2, 4) for seq in ref.schedules for n in seq}
-    comm = {('message', a, b, *msg): .13 for (a, b), lane in receive_orders(ref.schedules).items() for msg in lane}
-    candidate = plan_configuration_a(ref, compute, comm, owners=memory.owners,
-        capacities=memory.capacities, order_based_capacity=True)
-    validate_plan(candidate, ref)
-    report = memory.check(candidate)
-    assert all(x <= b * 1.05 for x, b in zip(report['dynamic_peak_bytes'], memory.baseline_dynamic))
 
 
 def test_w_starts_charging_at_f_and_shared_kv_has_one_record_per_logical_chunk():
@@ -99,42 +79,6 @@ def test_rejects_stale_uncovered_or_insufficient_profiles(mutation, error):
         CountedMemory(profile, args, ref, meta, torch.bfloat16, 64)
 
 
-def test_runtime_passes_real_owners_capacities_and_binds_profile(tmp_path, monkeypatch):
-    args, batch, groups, ref, meta, profile = case()
-    path = tmp_path/'memory.json'
-    path.write_text(json.dumps(profile))
-    args.dspp_memory_profile = str(path)
-    records = [dict(stage=r, kind=op, duration_ms=1., sequence_chunk_size=64,
-                    items=[vars(i) for i in m.items])
-               for r in range(3) for op in 'FBW' for m in batch.microbatches]
-    cost = tmp_path/'cost.json'
-    DsppExecutionCostModel.from_records(records).save(cost)
-    args.dspp_execution_profile = str(cost)
-    import megatron.core.pipeline_parallel.dspp_plan_runtime as runtime
-    original = runtime.plan_configuration_a
-    calls = []
-    def observed(*a, **kw):
-        calls.append(kw)
-        return original(*a, **kw)
-    monkeypatch.setattr(runtime, 'plan_configuration_a', observed)
-    reference, candidate = build_runtime_plan(args, ref.schedules, ref.split_counts,
-        groups, [SimpleNamespace(plan=batch)] * 2, torch.bfloat16, (64, 1, 8), 64)
-    assert calls and calls[0]['owners'] and calls[0]['order_based_capacity']
-    assert candidate.binding.capacity_version == args._dspp_counted_memory.version
-    assert reference.binding.capacity_version == candidate.binding.capacity_version
-    assert args._dspp_memory_plan == args._dspp_counted_memory.check(candidate)
-    profile['stages'][0]['weight_bytes'][0] += 1
-    path.write_text(json.dumps(profile))
-    newer, _ = build_runtime_plan(args, ref.schedules, ref.split_counts,
-        groups, [SimpleNamespace(plan=batch)] * 2, torch.bfloat16, (64, 1, 8), 64)
-    # A running process pins the original calibration bytes at each path.
-    assert newer.binding.capacity_version == reference.binding.capacity_version
-    replacement = tmp_path/'replacement-memory.json'
-    replacement.write_text(json.dumps(profile))
-    args.dspp_memory_profile = str(replacement)
-    switched, _ = build_runtime_plan(args, ref.schedules, ref.split_counts,
-        groups, [SimpleNamespace(plan=batch)] * 2, torch.bfloat16, (64, 1, 8), 64)
-    assert switched.binding.capacity_version != reference.binding.capacity_version
 
 
 def test_packed_key_coverage_and_unimplemented_split_are_explicit():

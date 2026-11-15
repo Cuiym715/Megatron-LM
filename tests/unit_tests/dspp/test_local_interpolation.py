@@ -14,10 +14,9 @@ from megatron.core.datasets.dspp_calibration import (
 from megatron.core.datasets.dspp_execution_cost import meta_from_timeline_record
 from megatron.core.datasets.dspp_p2p import DsppP2PCostModel
 from megatron.core.pipeline_parallel import dspp_plan_runtime as runtime
-from megatron.core.pipeline_parallel.dspp_plan import plan_configuration_a, node_key
+from megatron.core.pipeline_parallel.dspp_plan import node_key
 from megatron.core.pipeline_parallel.dspp_plan_b import plan_configuration_b
 from megatron.core.pipeline_parallel.slice_v import build_slice_v_schedule
-from megatron.core.pipeline_parallel.schedules import _pad_dspp_v_split_counts
 from .test_stage_calibration import record, context
 from .test_schedule_plan import case
 from .test_algorithm_b import fixture
@@ -126,55 +125,8 @@ def test_changed_policy_rejected_by_both_profile_loaders(tmp_path, mutation):
         runtime.load_runtime_calibration(str(path), runtime._file_version(path))
 
 
-@pytest.mark.parametrize('policy', [INTERPOLATION_POLICY, NOISE_RELAXED_INTERPOLATION_POLICY])
-@pytest.mark.parametrize('q, searched, noisy', [(24, True, False), (8, False, False), (24, True, True)])
-def test_runtime_searches_covered_nonexact_inputs_only(tmp_path, monkeypatch, q, searched, noisy, policy):
-    batch = build_dspp_batch_plan([q], chunk_size=64)
-    counts = _pad_dspp_v_split_counts([1,1], 3)
-    schedules,_ = build_slice_v_schedule(3,len(counts),counts)
-    contexts = {(s,c):context(c,s) for s in range(3) for c in range(2)}
-    data=[]
-    for (s,c),identity in contexts.items():
-        measurements = rows('F') + rows('B_fused') + [record(op='W')]
-        if noisy:
-            measurements[0]['duration_ms'] *= 1.5
-        for row in measurements:
-            data.append(dict(row, stage=s, chunk=c, context=identity))
-    profile=tmp_path/'stage.json'
-    profile.write_text(json.dumps(StageCalibration(data, interpolation_policy=policy).to_dict()))
-    p2p=tmp_path/'p2p.json'
-    DsppP2PCostModel.from_records([dict(bytes=65536,duration_ms=.1,
-        direction=f'{a}->{b}',overlap='compute') for a,b in ((0,1),(1,0),(1,2),(2,1))]).save(p2p)
-    args=SimpleNamespace(hidden_size=512,curr_iteration=0,dspp_schedule='a',
-        dspp_execution_profile=str(profile),dspp_p2p_profile=str(p2p))
-    calls=[]
-    def solver(reference, *a, **kw):
-        calls.append(reference)
-        return reference
-    monkeypatch.setattr(runtime,'plan_configuration_a',solver)
-    _, plan=runtime.build_runtime_plan(args,schedules,counts,
-        [((0,0),),((1,0),)],[SimpleNamespace(plan=batch),SimpleNamespace(plan=batch)],
-        torch.bfloat16,(64,1,512),64,calibration_contexts=contexts)
-    if searched and policy == INTERPOLATION_POLICY:
-        assert plan.planning_info['cost_acceptance_policy'] == 'nominal-makespan-v1'
-    else:
-        assert 'cost_acceptance_policy' not in plan.planning_info
-    assert bool(calls) == searched
-    assert (plan.fallback_reason == 'unreliable-compute-cost') != searched
 
 
-def test_nominal_improvement_must_exceed_interpolation_uncertainty():
-    ref,compute,comm,tokens=case(4)
-    candidate=plan_configuration_a(ref,compute,comm,tokens=tokens)
-    assert not candidate.fallback_reason and candidate.predicted_ms < candidate.reference_ms
-    key=next(k for k in compute if k[1]=='F' and compute[k]>0)
-    accepted=runtime.check_interpolated_improvement(ref,candidate,compute,comm,{key:1e-7})
-    assert accepted.schedules == candidate.schedules
-    assert accepted.planning_info['cost_uncertainty']['accepted']
-    rejected=runtime.check_interpolated_improvement(ref,candidate,compute,comm,{key:1e4})
-    assert rejected.schedules == ref.schedules
-    assert rejected.fallback_reason == 'interpolation-uncertain-improvement'
-    assert runtime.check_interpolated_improvement(ref,candidate,compute,comm,{}) is candidate
 
 
 def test_only_selected_split_errors_affect_acceptance(monkeypatch):

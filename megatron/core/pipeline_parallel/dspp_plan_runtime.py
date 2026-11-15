@@ -15,11 +15,10 @@ from megatron.core.datasets.dspp_p2p import load_p2p_cost_model
 from megatron.core.datasets.dspp_profile_snapshot import profile_snapshot
 from .dspp_plan import (
     PlanBinding, digest, node_key, receive_orders, template_plan,
-    plan_configuration_a, preserves_retention_envelope, history_dependencies, replay_plan,
+    history_dependencies, replay_plan,
 )
 from .dspp_memory_counts import CountedMemory
 from .dspp_plan_b import plan_configuration_b
-from .dspp_plan_c import plan_configuration_c
 from megatron.core.datasets.dspp_theoretical_cost import TheoreticalCostModel
 
 
@@ -122,8 +121,7 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
     binding, task_map, metadata, slot_meta, execution_version = runtime_inputs(
         args, len(schedules), schedule_groups, batches, dtype, tensor_shape,
         chunk_size, forward_only)
-    if explicit_history and (forward_only or getattr(args, 'dspp_auto_chunk_size', False)
-            or not getattr(args, 'dspp_history_dkv_after_dx', False)
+    if explicit_history and (forward_only or not getattr(args, 'dspp_history_dkv_after_dx', False)
             or not getattr(args, 'dspp_split_attention_backward', False)
             or not getattr(args, 'dspp_memory_profile', None)):
         raise ValueError('explicit D/H requires fixed capacity, after-dx and a memory profile')
@@ -145,8 +143,6 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
         return reference, reference
     if mode == 'a' and getattr(args, 'dspp_split_attention_backward', False):
         raise ValueError('P1 A requires fused B, without dKV splitting')
-    if getattr(args, 'dspp_auto_chunk_size', False):
-        raise ValueError('schedule A/B/C requires fixed chunk size')
     theoretical = getattr(args, 'dspp_cost_model', 'profile') == 'theoretical'
     execution_path = getattr(args, 'dspp_execution_profile', None)
     if not theoretical and not execution_path:
@@ -222,16 +218,12 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
                         if p.source == 'validated-query-interpolation' else 0. for p in estimates)
                     if any(uncertainty):
                         split_errors[node_key(n)] = uncertainty
-        solver = plan_configuration_c if mode == 'c' else plan_configuration_b
-        budgets = (dict(budget_fraction=getattr(args, 'dspp_c_budget_fraction', .50),
-                        b_budget_fraction=getattr(args, 'dspp_c_b_budget_fraction', .30))
-                   if mode == 'c' else
-                   dict(budget_fraction=getattr(args, 'dspp_b_budget_fraction', .60)))
-        candidate = solver(reference, compute, messages, split_costs,
+        budgets = dict(budget_fraction=getattr(args, 'dspp_b_budget_fraction', .60))
+        candidate = plan_configuration_b(reference, compute, messages, split_costs,
             tokens=tokens, owners=memory.owners, capacities=memory.capacities, memory=memory,
-            **budgets,
+            **budgets, slot_meta=slot_meta,
             planning_started=planning_begin,
-            backend=getattr(args, 'dspp_planner_backend', 'python'))
+            backend=getattr(args, 'dspp_planner_backend', 'cpp'))
         candidate = check_interpolated_improvement(reference, candidate, compute, messages,
                                                   errors, split_costs, split_errors,
                                                   enforce=enforce_uncertainty)
@@ -246,19 +238,6 @@ def build_runtime_plan(args, schedules, split_counts, schedule_groups, batches,
         candidate.planning_info.update(total_ms=elapsed, budget_met=elapsed<=budget,
                                       budget_overrun_ms=max(0.,elapsed-budget))
         return reference, candidate
-    candidate = plan_configuration_a(reference, compute, messages, tokens=tokens,
-        owners=memory.owners if memory else (),
-        capacities=memory.capacities if memory else None,
-        order_based_capacity=memory is not None,
-        backend=getattr(args, 'dspp_planner_backend', 'python'))
-    if not preserves_retention_envelope(candidate, reference):
-        candidate = replace(reference, algorithm='A', fallback_reason='template-W-retention-envelope',
-                            reference_ms=candidate.reference_ms, predicted_ms=candidate.reference_ms)
-    candidate = check_interpolated_improvement(reference, candidate, compute, messages, errors,
-                                               enforce=enforce_uncertainty)
-    if memory is not None:
-        args._dspp_memory_plan = memory.check(candidate)
-    return reference, candidate
 
 
 def build_distributed_b_plan(args, *plan_args, group, **kwargs):
